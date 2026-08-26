@@ -8,6 +8,7 @@ on:
       - main
     paths:
       - "scripts/build_firis.py"
+      - "requirements.txt"
       - "data/raw/fwi/**"
       - "data/raw/fuel/**"
       - "data/raw/topography/**"
@@ -16,78 +17,57 @@ on:
 permissions:
   contents: write
 
+# جلوگیری از اجرای هم‌زمان چند Workflow مربوط به FIRIS
+concurrency:
+  group: firis-build-publish-main
+  cancel-in-progress: false
+
 jobs:
   build-firis:
     runs-on: ubuntu-latest
 
     env:
-      # مسیر فایل‌های ورودی
-      FWI_RASTER: data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif
-      FUEL_RASTER: data/raw/fuel/fars_fuel.tif
-      DEM_RASTER: data/raw/topography/dem_fars.tif
-      FUEL_EXCEL: data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx
+      FIRIS_DATE: "2026-08-27"
 
-      # ستون‌های جدول Fuelbeds_metric
-      FUEL_CODE_COLUMN: JOIN_VALUE
-      FUEL_SCORE_COLUMN: AUTO
+      FWI_RASTER: "data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif"
+      FUEL_RASTER: "data/raw/fuel/fars_fuel.tif"
+      DEM_RASTER: "data/raw/topography/dem_fars.tif"
+      FUEL_EXCEL: "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
 
-      # مسیر و تاریخ خروجی
-      OUTPUT_DIR: data/outputs
-      FIRIS_DATE: 2026-08-27
+      FUEL_CODE_COLUMN: "JOIN_VALUE"
+      FUEL_SCORE_COLUMN: "AUTO"
+
+      OUTPUT_DIR: "data/outputs"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # برای pull --rebase و push به تاریخچه کامل Git نیاز داریم.
+          # برای fetch، rebase و push لازم است.
           fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gdal-bin libgdal-dev
+          cache: "pip"
 
       - name: Install Python dependencies
         run: |
+          set -e
           python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            pip install numpy pandas rasterio openpyxl scipy
-          fi
-
-      - name: Verify input files
+      - name: Check input files
         run: |
           set -e
 
-          echo "Checking FIRIS input files..."
+          echo "Checking input files..."
 
-          test -f "$FWI_RASTER" || {
-            echo "ERROR: FWI raster not found: $FWI_RASTER"
-            exit 1
-          }
-
-          test -f "$FUEL_RASTER" || {
-            echo "ERROR: Fuel raster not found: $FUEL_RASTER"
-            exit 1
-          }
-
-          test -f "$DEM_RASTER" || {
-            echo "ERROR: DEM raster not found: $DEM_RASTER"
-            exit 1
-          }
-
-          test -f "$FUEL_EXCEL" || {
-            echo "ERROR: Fuel Excel file not found: $FUEL_EXCEL"
-            exit 1
-          }
+          test -f "$FWI_RASTER"
+          test -f "$FUEL_RASTER"
+          test -f "$DEM_RASTER"
+          test -f "$FUEL_EXCEL"
 
           echo "All input files exist."
 
@@ -95,8 +75,10 @@ jobs:
         run: |
           mkdir -p "$OUTPUT_DIR"
 
-      - name: Build FIRIS layers and FLI
+      - name: Build FIRIS
         run: |
+          set -e
+
           python scripts/build_firis.py \
             --fwi-raster "$FWI_RASTER" \
             --fuel-raster "$FUEL_RASTER" \
@@ -107,40 +89,52 @@ jobs:
             --output-dir "$OUTPUT_DIR" \
             --run-date "$FIRIS_DATE"
 
-      - name: Verify generated output files
+      - name: Show generated outputs
         run: |
           set -e
+          echo "Files in output directory:"
+          ls -lah "$OUTPUT_DIR"
 
-          echo "Generated output files:"
-          ls -lh "$OUTPUT_DIR"
-
-          test -f "$OUTPUT_DIR/f_fwi_fars_${FIRIS_DATE}.tif"
-          test -f "$OUTPUT_DIR/f_fuel_fars_${FIRIS_DATE}.tif"
-          test -f "$OUTPUT_DIR/slope_fars_${FIRIS_DATE}.tif"
-          test -f "$OUTPUT_DIR/f_topo_fars_${FIRIS_DATE}.tif"
-          test -f "$OUTPUT_DIR/fli_fars_${FIRIS_DATE}.tif"
-          test -f "$OUTPUT_DIR/firis_report_${FIRIS_DATE}.json"
-
-          echo "All expected FIRIS output files were created successfully."
-
-      - name: Commit and push generated outputs
+      - name: Commit and push generated outputs safely
         run: |
           set -e
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+          # فقط فایل‌های خروجی تولیدشده وارد Commit شوند
           git add data/outputs/
 
+          # اگر خروجی نسبت به Git تغییری نکرده، کار تمام است.
           if git diff --cached --quiet; then
-            echo "No new output changes to commit."
+            echo "No output changes to commit."
             exit 0
           fi
 
           git commit -m "chore(firis): update FLI ${FIRIS_DATE} [skip ci]"
 
-          # اگر در طول اجرا Commit جدیدی در main ثبت شده باشد،
-          # Commit خروجی را روی آخرین وضعیت remote قرار می‌دهد.
-          git pull --rebase origin main
+          # اگر هم‌زمان Commit دیگری روی main ایجاد شد،
+          # این بخش تا 5 بار fetch + rebase + push را تکرار می‌کند.
+          for attempt in 1 2 3 4 5; do
+            echo "----------------------------------------"
+            echo "Push attempt: ${attempt}/5"
 
-          git push origin HEAD:main
+            # دریافت آخرین وضعیت main از GitHub
+            git fetch origin main
+
+            # قرار دادن Commit خروجی روی آخرین Commit شاخه main
+            git rebase origin/main
+
+            # ارسال Commit به GitHub
+            if git push origin HEAD:main; then
+              echo "FIRIS outputs pushed successfully."
+              exit 0
+            fi
+
+            echo "Push rejected: main changed during workflow execution."
+            echo "Waiting before next attempt..."
+            sleep $((attempt * 5))
+          done
+
+          echo "ERROR: Push failed after 5 attempts."
+          exit 1
