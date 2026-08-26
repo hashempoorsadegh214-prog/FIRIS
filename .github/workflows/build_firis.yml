@@ -11,7 +11,7 @@ on:
       - main
     paths:
       - "scripts/**"
-      - "data/inputs/**"
+      - "data/**"
       - "Global_fuelbeds_parameters_v1.2.xlsx"
       - "requirements.txt"
       - ".github/workflows/build_firis.yml"
@@ -19,6 +19,7 @@ on:
 permissions:
   contents: write
 
+# جلوگیری از اجرای هم‌زمان Workflowها و Conflict هنگام push
 concurrency:
   group: firis-build-main
   cancel-in-progress: false
@@ -39,7 +40,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: pip
 
       - name: Install dependencies
         shell: bash
@@ -49,50 +49,153 @@ jobs:
           python -m pip install --upgrade pip
 
           if [ -f requirements.txt ]; then
-            echo "Installing dependencies from requirements.txt..."
+            echo "Installing requirements.txt ..."
             pip install -r requirements.txt
           else
-            echo "requirements.txt was not found. Installing required packages directly..."
+            echo "requirements.txt not found; installing required libraries ..."
             pip install numpy pandas rasterio openpyxl
           fi
 
-      - name: Show Python and package versions
+      - name: Show available input files
         shell: bash
         run: |
-          python --version
-          python -c "import numpy; print('numpy:', numpy.__version__)"
-          python -c "import pandas; print('pandas:', pandas.__version__)"
-          python -c "import rasterio; print('rasterio:', rasterio.__version__)"
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "Available raster files:"
+          echo "============================================================"
+          find data -type f \( -iname "*.tif" -o -iname "*.tiff" \) | sort || true
+
+          echo ""
+          echo "============================================================"
+          echo "Available Excel files:"
+          echo "============================================================"
+          find . -type f \( -iname "*.xlsx" -o -iname "*.xls" \) | sort || true
+
+      - name: Locate FIRIS input files
+        id: input_files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # فقط داده‌های ورودی بررسی شوند؛ خروجی‌های قبلی وارد انتخاب نشوند.
+          SEARCH_DIR="data"
+
+          find_single_raster() {
+            local label="$1"
+            local pattern="$2"
+
+            mapfile -t matches < <(
+              find "${SEARCH_DIR}" \
+                -type f \
+                \( -iname "*.tif" -o -iname "*.tiff" \) \
+                ! -path "data/outputs/*" \
+                ! -path "docs/*" \
+                -iname "${pattern}" \
+                | sort
+            )
+
+            if [ "${#matches[@]}" -eq 0 ]; then
+              echo "ERROR: هیچ فایل رستری برای ${label} پیدا نشد."
+              echo "Pattern searched: ${pattern}"
+              exit 1
+            fi
+
+            if [ "${#matches[@]}" -gt 1 ]; then
+              echo "ERROR: بیش از یک فایل برای ${label} پیدا شد:"
+              printf ' - %s\n' "${matches[@]}"
+              echo "نام فایل‌ها را یکتا کنید یا الگوی جستجو را در Workflow دقیق‌تر کنید."
+              exit 1
+            fi
+
+            echo "${matches[0]}"
+          }
+
+          # فایل‌هایی که نامشان شامل fwi، fuel و dem باشد پیدا می‌شوند.
+          FWI_RASTER="$(find_single_raster "FWI raster" "*fwi*.tif")"
+          FUEL_RASTER="$(find_single_raster "Fuel raster" "*fuel*.tif")"
+          DEM_RASTER="$(find_single_raster "DEM raster" "*dem*.tif")"
+
+          FUEL_EXCEL="Global_fuelbeds_parameters_v1.2.xlsx"
+
+          if [ ! -f "${FUEL_EXCEL}" ]; then
+            echo "ERROR: فایل اکسل سوخت پیدا نشد: ${FUEL_EXCEL}"
+            exit 1
+          fi
+
+          echo "============================================================"
+          echo "Selected FIRIS inputs:"
+          echo "============================================================"
+          echo "FWI raster : ${FWI_RASTER}"
+          echo "Fuel raster: ${FUEL_RASTER}"
+          echo "DEM raster : ${DEM_RASTER}"
+          echo "Fuel Excel : ${FUEL_EXCEL}"
+
+          # انتقال متغیرها به Step بعدی
+          echo "FWI_RASTER=${FWI_RASTER}" >> "$GITHUB_ENV"
+          echo "FUEL_RASTER=${FUEL_RASTER}" >> "$GITHUB_ENV"
+          echo "DEM_RASTER=${DEM_RASTER}" >> "$GITHUB_ENV"
+          echo "FUEL_EXCEL=${FUEL_EXCEL}" >> "$GITHUB_ENV"
 
       - name: Build FIRIS FLI GeoTIFF and report
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/build_firis.py
+
+          mkdir -p data/outputs
+
+          # تاریخ خروجی مطابق تاریخ اجرای Workflow
+          RUN_DATE="$(date -u +'%Y-%m-%d')"
+
+          echo "============================================================"
+          echo "Running build_firis.py"
+          echo "============================================================"
+          echo "Run date    : ${RUN_DATE}"
+          echo "FWI raster  : ${FWI_RASTER}"
+          echo "Fuel raster : ${FUEL_RASTER}"
+          echo "DEM raster  : ${DEM_RASTER}"
+          echo "Fuel Excel  : ${FUEL_EXCEL}"
+          echo "Output dir  : data/outputs"
+
+          python scripts/build_firis.py \
+            --fwi-raster "${FWI_RASTER}" \
+            --fuel-raster "${FUEL_RASTER}" \
+            --dem-raster "${DEM_RASTER}" \
+            --fuel-excel "${FUEL_EXCEL}" \
+            --output-dir "data/outputs" \
+            --run-date "${RUN_DATE}"
 
       - name: Build web PNG overlay and metadata
         shell: bash
         run: |
           set -euo pipefail
-          python scripts/build_web_map.py
+
+          mkdir -p docs/data
+
+          python scripts/build_web_map.py \
+            --output-dir "docs/data"
 
       - name: Show generated files
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "===== FIRIS calculation outputs ====="
-          find data/outputs -maxdepth 1 -type f -printf "%f  %k KB\n" | sort || true
+          echo "============================================================"
+          echo "FIRIS outputs:"
+          echo "============================================================"
+          find data/outputs -maxdepth 1 -type f -printf "%f  %k KB\n" | sort
 
           echo ""
-          echo "===== Web-map outputs ====="
-          find docs/data -maxdepth 1 -type f -printf "%f  %k KB\n" | sort || true
+          echo "============================================================"
+          echo "Web-map outputs:"
+          echo "============================================================"
+          find docs/data -maxdepth 1 -type f -printf "%f  %k KB\n" | sort
 
           echo ""
-          echo "===== Latest web metadata ====="
-          if [ -f docs/data/fli_latest.json ]; then
-            cat docs/data/fli_latest.json
-          fi
+          echo "============================================================"
+          echo "Latest metadata:"
+          echo "============================================================"
+          cat docs/data/fli_latest.json
 
       - name: Commit and push generated outputs safely
         shell: bash
@@ -111,30 +214,28 @@ jobs:
 
           git commit -m "chore(firis): update FLI and web-map outputs [skip ci]"
 
-          # تلاش مجدد برای جلوگیری از خطای rejected در Commitهای هم‌زمان
+          # تلاش مجدد برای مدیریت Push هم‌زمان یا rejected
           for attempt in 1 2 3 4 5; do
-            echo "Push attempt ${attempt}/5..."
+            echo "Push attempt ${attempt}/5 ..."
 
             git fetch origin main
 
-            # خروجی‌های تولیدی Workflow اولویت دارند.
-            # اگر تعارضی رخ دهد، نسخهٔ Commit فعلی Workflow نگه داشته می‌شود.
-            git rebase -X theirs origin/main || {
-              echo "Rebase conflict detected. Aborting rebase."
+            # در تعارض فایل‌های تولیدشده، خروجی جدید Workflow اولویت دارد.
+            if ! git rebase -X theirs origin/main; then
+              echo "Rebase conflict occurred; aborting and retrying ..."
               git rebase --abort || true
-              echo "Waiting before retry..."
               sleep $((attempt * 5))
               continue
-            }
+            fi
 
             if git push origin HEAD:main; then
-              echo "Generated outputs were pushed successfully."
+              echo "Generated outputs pushed successfully."
               exit 0
             fi
 
-            echo "Push was rejected. Waiting before retry..."
+            echo "Push rejected; retrying ..."
             sleep $((attempt * 5))
           done
 
-          echo "ERROR: Could not push generated outputs after 5 attempts."
+          echo "ERROR: Push failed after 5 attempts."
           exit 1
