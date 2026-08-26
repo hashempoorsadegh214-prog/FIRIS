@@ -1,6 +1,6 @@
 {
   "project": "FIRIS - Fars Integrated Fire Information System",
-  "generated_at_utc": "2026-08-26T19:40:35.666018+00:00",
+  "generated_at_utc": "2026-08-26T22:06:28.666978+00:00",
   "run_date": "2026-08-27",
   "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
   "weights": {
@@ -34,21 +34,21 @@
   },
   "fuel_mapping": {
     "unique_fuel_codes_in_raster": [
-      4010,
-      4020,
-      4130,
-      4150,
-      4180,
-      13010,
-      13020,
-      13030,
-      13110,
-      13150,
-      914030,
-      914091,
-      914110,
-      914120,
-      924030
+      4010.0,
+      4020.0,
+      4130.0,
+      4150.0,
+      4180.0,
+      13010.0,
+      13020.0,
+      13030.0,
+      13110.0,
+      13150.0,
+      914030.0,
+      914091.0,
+      914110.0,
+      914120.0,
+      924030.0
     ],
     "unique_fuel_code_count": 15,
     "mapped_code_count": 15,
@@ -63,10 +63,21 @@
       "Litter": 0.1,
       "CanopyStructure": 0.1
     },
+    "selected_source_columns": {
+      "FineFuel": "G_Load (Mg/ha)",
+      "DeadWood": [
+        "W_10h Load (Mg/ha)",
+        "W_100h Load (Mg/ha)",
+        "W_1000h Load (Mg/ha)"
+      ],
+      "ShrubStructure": "Shrub Cover (%)",
+      "Litter": null,
+      "CanopyStructure": null
+    },
     "f_fuel_statistics_in_reference_table": {
-      "min": 0.007,
-      "max": 0.525447,
-      "mean": 0.230977
+      "min": 0.0,
+      "max": 0.445137,
+      "mean": 0.131808
     }
   },
   "statistics": {
@@ -74,8 +85,8 @@
       "valid_pixel_count": 4000000,
       "min": 0.0,
       "max": 115.134232,
-      "mean": 42.8466,
-      "std": 33.498825
+      "mean": 42.846594,
+      "std": 33.49882
     },
     "f_fwi": {
       "valid_pixel_count": 4000000,
@@ -86,31 +97,31 @@
     },
     "f_fuel": {
       "valid_pixel_count": 708957,
-      "min": 0.03748,
-      "max": 0.26355,
-      "mean": 0.126719,
-      "std": 0.049416
+      "min": 0.014,
+      "max": 0.167333,
+      "mean": 0.062434,
+      "std": 0.031587
     },
     "slope_degrees": {
       "valid_pixel_count": 3252391,
-      "min": NaN,
-      "max": NaN,
-      "mean": NaN,
-      "std": NaN
+      "min": 0.0,
+      "max": 89.999924,
+      "mean": 47.416354,
+      "std": 44.913242
     },
     "f_topo": {
-      "valid_pixel_count": 3247026,
+      "valid_pixel_count": 3252391,
       "min": 0.0,
       "max": 1.0,
-      "mean": 0.079591,
-      "std": 0.14316
+      "mean": 0.527105,
+      "std": 0.499257
     },
     "fli": {
       "valid_pixel_count": 708957,
-      "min": 1.354227,
-      "max": 68.529312,
-      "mean": 38.411339,
-      "std": 5.891477
+      "min": 20.49,
+      "max": 65.6493,
+      "mean": 52.826862,
+      "std": 4.249672
     },
     "final_model_valid_pixels": 708957
   },
