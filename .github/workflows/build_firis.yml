@@ -1,185 +1,140 @@
-name: Build FIRIS Fire Risk Index
+name: Build FIRIS Fire Risk Map
 
 on:
   workflow_dispatch:
+
+  schedule:
+    - cron: "30 5 * * *"
 
   push:
     branches:
       - main
     paths:
-      - "scripts/build_firis.py"
+      - "scripts/**"
+      - "data/inputs/**"
+      - "Global_fuelbeds_parameters_v1.2.xlsx"
       - "requirements.txt"
-      - "data/raw/fwi/**"
-      - "data/raw/fuel/**"
-      - "data/raw/topography/**"
       - ".github/workflows/build_firis.yml"
 
 permissions:
   contents: write
 
-# جلوگیری از اجرای هم‌زمان چند Workflow FIRIS
 concurrency:
-  group: firis-build-publish-main
+  group: firis-build-main
   cancel-in-progress: false
 
 jobs:
   build-firis:
+    name: Build FIRIS outputs and web map
     runs-on: ubuntu-latest
-
-    env:
-      # تاریخ خروجی
-      FIRIS_DATE: "2026-08-27"
-
-      # فایل‌های ورودی
-      FWI_RASTER: "data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif"
-      FUEL_RASTER: "data/raw/fuel/fars_fuel.tif"
-      DEM_RASTER: "data/raw/topography/dem_fars.tif"
-      FUEL_EXCEL: "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
-
-      # تنظیمات Fuel Mapping
-      FUEL_CODE_COLUMN: "JOIN_VALUE"
-      FUEL_SCORE_COLUMN: "AUTO"
-
-      # پوشهٔ خروجی
-      OUTPUT_DIR: "data/outputs"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # برای fetch / rebase / push لازم است.
           fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
+          cache: pip
 
-      - name: Install Python dependencies
+      - name: Install dependencies
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           python -m pip install --upgrade pip
 
-          # اگر requirements.txt وجود داشت، وابستگی‌ها از آن نصب می‌شوند.
-          if [ -f "requirements.txt" ]; then
+          if [ -f requirements.txt ]; then
             echo "Installing dependencies from requirements.txt..."
             pip install -r requirements.txt
           else
-            echo "requirements.txt not found."
-            echo "Installing FIRIS dependencies directly..."
-
-            pip install \
-              "numpy>=1.26.0" \
-              "pandas>=2.1.0" \
-              "rasterio>=1.3.10" \
-              "openpyxl>=3.1.0"
+            echo "requirements.txt was not found. Installing required packages directly..."
+            pip install numpy pandas rasterio openpyxl
           fi
 
+      - name: Show Python and package versions
+        shell: bash
+        run: |
+          python --version
           python -c "import numpy; print('numpy:', numpy.__version__)"
           python -c "import pandas; print('pandas:', pandas.__version__)"
           python -c "import rasterio; print('rasterio:', rasterio.__version__)"
-          python -c "import openpyxl; print('openpyxl:', openpyxl.__version__)"
 
-      - name: Check input files
+      - name: Build FIRIS FLI GeoTIFF and report
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
+          python scripts/build_firis.py
 
-          echo "Checking FIRIS input files..."
-
-          if [ ! -f "$FWI_RASTER" ]; then
-            echo "ERROR: FWI raster not found: $FWI_RASTER"
-            exit 1
-          fi
-
-          if [ ! -f "$FUEL_RASTER" ]; then
-            echo "ERROR: Fuel raster not found: $FUEL_RASTER"
-            exit 1
-          fi
-
-          if [ ! -f "$DEM_RASTER" ]; then
-            echo "ERROR: DEM raster not found: $DEM_RASTER"
-            exit 1
-          fi
-
-          if [ ! -f "$FUEL_EXCEL" ]; then
-            echo "ERROR: Fuel Excel file not found: $FUEL_EXCEL"
-            exit 1
-          fi
-
-          echo "All required input files exist."
-
-      - name: Create output directory
+      - name: Build web PNG overlay and metadata
+        shell: bash
         run: |
-          mkdir -p "$OUTPUT_DIR"
+          set -euo pipefail
+          python scripts/build_web_map.py
 
-      - name: Build FIRIS layers and FLI
+      - name: Show generated files
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
-          python scripts/build_firis.py \
-            --fwi-raster "$FWI_RASTER" \
-            --fuel-raster "$FUEL_RASTER" \
-            --dem-raster "$DEM_RASTER" \
-            --fuel-excel "$FUEL_EXCEL" \
-            --fuel-code-column "$FUEL_CODE_COLUMN" \
-            --fuel-score-column "$FUEL_SCORE_COLUMN" \
-            --output-dir "$OUTPUT_DIR" \
-            --run-date "$FIRIS_DATE"
+          echo "===== FIRIS calculation outputs ====="
+          find data/outputs -maxdepth 1 -type f -printf "%f  %k KB\n" | sort || true
 
-      - name: Show generated outputs
-        run: |
-          set -e
+          echo ""
+          echo "===== Web-map outputs ====="
+          find docs/data -maxdepth 1 -type f -printf "%f  %k KB\n" | sort || true
 
-          echo "Generated FIRIS files:"
-          ls -lah "$OUTPUT_DIR"
+          echo ""
+          echo "===== Latest web metadata ====="
+          if [ -f docs/data/fli_latest.json ]; then
+            cat docs/data/fli_latest.json
+          fi
 
       - name: Commit and push generated outputs safely
+        shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # فقط فایل‌های خروجی تولیدشده در Commit وارد می‌شوند.
-          git add data/outputs/
+          git add data/outputs/ docs/data/
 
-          # اگر تغییری در خروجی‌ها نیست، نیازی به Commit و Push نیست.
           if git diff --cached --quiet; then
-            echo "No output changes to commit."
+            echo "No generated-file changes to commit."
             exit 0
           fi
 
-          git commit -m "chore(firis): update FLI ${FIRIS_DATE} [skip ci]"
+          git commit -m "chore(firis): update FLI and web-map outputs [skip ci]"
 
-          # حداکثر پنج مرتبه برای ارسال خروجی تلاش می‌کند.
+          # تلاش مجدد برای جلوگیری از خطای rejected در Commitهای هم‌زمان
           for attempt in 1 2 3 4 5; do
-            echo "----------------------------------------"
-            echo "Push attempt ${attempt}/5"
+            echo "Push attempt ${attempt}/5..."
 
-            # اگر تلاش قبلی در حالت rebase مانده باشد، آن را پاک می‌کند.
-            git rebase --abort || true
-
-            # دریافت آخرین وضعیت شاخهٔ main
             git fetch origin main
 
-            # Commit خروجی روی آخرین main قرار می‌گیرد.
-            #
-            # -X theirs یعنی اگر فایل خروجی FIRIS Conflict داشت،
-            # نسخهٔ Commit تولیدشده توسط همین Workflow نگه داشته شود.
-            git rebase -X theirs origin/main
+            # خروجی‌های تولیدی Workflow اولویت دارند.
+            # اگر تعارضی رخ دهد، نسخهٔ Commit فعلی Workflow نگه داشته می‌شود.
+            git rebase -X theirs origin/main || {
+              echo "Rebase conflict detected. Aborting rebase."
+              git rebase --abort || true
+              echo "Waiting before retry..."
+              sleep $((attempt * 5))
+              continue
+            }
 
-            # Push به شاخهٔ main
             if git push origin HEAD:main; then
-              echo "FIRIS outputs pushed successfully."
+              echo "Generated outputs were pushed successfully."
               exit 0
             fi
 
-            echo "Push was rejected because main changed during execution."
-            echo "Waiting before retry..."
+            echo "Push was rejected. Waiting before retry..."
             sleep $((attempt * 5))
           done
 
-          echo "ERROR: Could not push FIRIS outputs after 5 attempts."
+          echo "ERROR: Could not push generated outputs after 5 attempts."
           exit 1
