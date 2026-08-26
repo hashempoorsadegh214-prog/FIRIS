@@ -17,7 +17,7 @@ on:
 permissions:
   contents: write
 
-# جلوگیری از تداخل دو اجرای هم‌زمان Workflow
+# جلوگیری از اجرای هم‌زمان چند Workflow FIRIS
 concurrency:
   group: firis-build-publish-main
   cancel-in-progress: false
@@ -27,27 +27,27 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # تاریخ تولید خروجی
+      # تاریخ خروجی
       FIRIS_DATE: "2026-08-27"
 
-      # مسیر فایل‌های ورودی
+      # فایل‌های ورودی
       FWI_RASTER: "data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif"
       FUEL_RASTER: "data/raw/fuel/fars_fuel.tif"
       DEM_RASTER: "data/raw/topography/dem_fars.tif"
       FUEL_EXCEL: "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
 
-      # تنظیمات جدول سوخت
+      # تنظیمات Fuel Mapping
       FUEL_CODE_COLUMN: "JOIN_VALUE"
       FUEL_SCORE_COLUMN: "AUTO"
 
-      # پوشه خروجی
+      # پوشهٔ خروجی
       OUTPUT_DIR: "data/outputs"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # برای rebase و push به تاریخچهٔ کامل Git نیاز داریم.
+          # برای fetch / rebase / push لازم است.
           fetch-depth: 0
 
       - name: Set up Python
@@ -62,13 +62,13 @@ jobs:
 
           python -m pip install --upgrade pip
 
-          # اگر requirements.txt وجود دارد، از آن استفاده کن.
+          # اگر requirements.txt وجود داشت، وابستگی‌ها از آن نصب می‌شوند.
           if [ -f "requirements.txt" ]; then
-            echo "requirements.txt found. Installing dependencies from it..."
+            echo "Installing dependencies from requirements.txt..."
             pip install -r requirements.txt
           else
-            echo "requirements.txt was not found."
-            echo "Installing required FIRIS libraries directly..."
+            echo "requirements.txt not found."
+            echo "Installing FIRIS dependencies directly..."
 
             pip install \
               "numpy>=1.26.0" \
@@ -77,7 +77,6 @@ jobs:
               "openpyxl>=3.1.0"
           fi
 
-          echo "Installed package versions:"
           python -c "import numpy; print('numpy:', numpy.__version__)"
           python -c "import pandas; print('pandas:', pandas.__version__)"
           python -c "import rasterio; print('rasterio:', rasterio.__version__)"
@@ -87,7 +86,7 @@ jobs:
         run: |
           set -e
 
-          echo "Checking input files..."
+          echo "Checking FIRIS input files..."
 
           if [ ! -f "$FWI_RASTER" ]; then
             echo "ERROR: FWI raster not found: $FWI_RASTER"
@@ -109,7 +108,7 @@ jobs:
             exit 1
           fi
 
-          echo "All input files exist."
+          echo "All required input files exist."
 
       - name: Create output directory
         run: |
@@ -133,7 +132,7 @@ jobs:
         run: |
           set -e
 
-          echo "Generated files:"
+          echo "Generated FIRIS files:"
           ls -lah "$OUTPUT_DIR"
 
       - name: Commit and push generated outputs safely
@@ -143,10 +142,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # فقط خروجی‌های نهایی را برای Commit انتخاب می‌کند.
+          # فقط فایل‌های خروجی تولیدشده در Commit وارد می‌شوند.
           git add data/outputs/
 
-          # اگر خروجی جدیدی ایجاد یا تغییر نکرده است.
+          # اگر تغییری در خروجی‌ها نیست، نیازی به Commit و Push نیست.
           if git diff --cached --quiet; then
             echo "No output changes to commit."
             exit 0
@@ -154,22 +153,33 @@ jobs:
 
           git commit -m "chore(firis): update FLI ${FIRIS_DATE} [skip ci]"
 
-          # در صورت تغییر main توسط کاربر یا اجرای دیگر، Push را تکرار می‌کند.
+          # حداکثر پنج مرتبه برای ارسال خروجی تلاش می‌کند.
           for attempt in 1 2 3 4 5; do
             echo "----------------------------------------"
             echo "Push attempt ${attempt}/5"
 
-            git fetch origin main
-            git rebase origin/main
+            # اگر تلاش قبلی در حالت rebase مانده باشد، آن را پاک می‌کند.
+            git rebase --abort || true
 
+            # دریافت آخرین وضعیت شاخهٔ main
+            git fetch origin main
+
+            # Commit خروجی روی آخرین main قرار می‌گیرد.
+            #
+            # -X theirs یعنی اگر فایل خروجی FIRIS Conflict داشت،
+            # نسخهٔ Commit تولیدشده توسط همین Workflow نگه داشته شود.
+            git rebase -X theirs origin/main
+
+            # Push به شاخهٔ main
             if git push origin HEAD:main; then
               echo "FIRIS outputs pushed successfully."
               exit 0
             fi
 
-            echo "Push was rejected because main changed concurrently."
+            echo "Push was rejected because main changed during execution."
+            echo "Waiting before retry..."
             sleep $((attempt * 5))
           done
 
-          echo "ERROR: Push failed after 5 attempts."
+          echo "ERROR: Could not push FIRIS outputs after 5 attempts."
           exit 1
