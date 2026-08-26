@@ -21,17 +21,17 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # مسیر ورودی‌ها
+      # مسیر فایل‌های ورودی
       FWI_RASTER: data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif
       FUEL_RASTER: data/raw/fuel/fars_fuel.tif
       DEM_RASTER: data/raw/topography/dem_fars.tif
       FUEL_EXCEL: data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx
 
-      # تنظیمات جدول سوخت
+      # ستون‌های جدول Fuelbeds_metric
       FUEL_CODE_COLUMN: JOIN_VALUE
       FUEL_SCORE_COLUMN: AUTO
 
-      # مسیر و تاریخ خروجی‌ها
+      # مسیر و تاریخ خروجی
       OUTPUT_DIR: data/outputs
       FIRIS_DATE: 2026-08-27
 
@@ -39,6 +39,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          # برای pull --rebase و push به تاریخچه کامل Git نیاز داریم.
           fetch-depth: 0
 
       - name: Set up Python
@@ -62,11 +63,11 @@ jobs:
             pip install numpy pandas rasterio openpyxl scipy
           fi
 
-      - name: Verify required input files
+      - name: Verify input files
         run: |
           set -e
 
-          echo "Checking required FIRIS input files..."
+          echo "Checking FIRIS input files..."
 
           test -f "$FWI_RASTER" || {
             echo "ERROR: FWI raster not found: $FWI_RASTER"
@@ -88,7 +89,7 @@ jobs:
             exit 1
           }
 
-          echo "All required input files were found."
+          echo "All input files exist."
 
       - name: Create output directory
         run: |
@@ -106,11 +107,11 @@ jobs:
             --output-dir "$OUTPUT_DIR" \
             --run-date "$FIRIS_DATE"
 
-      - name: Verify generated outputs
+      - name: Verify generated output files
         run: |
           set -e
 
-          echo "Generated files:"
+          echo "Generated output files:"
           ls -lh "$OUTPUT_DIR"
 
           test -f "$OUTPUT_DIR/f_fwi_fars_${FIRIS_DATE}.tif"
@@ -120,10 +121,12 @@ jobs:
           test -f "$OUTPUT_DIR/fli_fars_${FIRIS_DATE}.tif"
           test -f "$OUTPUT_DIR/firis_report_${FIRIS_DATE}.json"
 
-          echo "All expected FIRIS outputs were generated successfully."
+          echo "All expected FIRIS output files were created successfully."
 
       - name: Commit and push generated outputs
         run: |
+          set -e
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -131,7 +134,13 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No new output changes to commit."
-          else
-            git commit -m "chore(firis): update FLI ${FIRIS_DATE} [skip ci]"
-            git push origin main
+            exit 0
           fi
+
+          git commit -m "chore(firis): update FLI ${FIRIS_DATE} [skip ci]"
+
+          # اگر در طول اجرا Commit جدیدی در main ثبت شده باشد،
+          # Commit خروجی را روی آخرین وضعیت remote قرار می‌دهد.
+          git pull --rebase origin main
+
+          git push origin HEAD:main
