@@ -1,0 +1,244 @@
+from __future__ import annotations
+
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import rasterio
+from openpyxl import load_workbook
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+FUEL_RASTER = PROJECT_ROOT / "data" / "raw" / "fuel" / "fars_fuel.tif"
+FUEL_WORKBOOK = (
+    PROJECT_ROOT
+    / "data"
+    / "raw"
+    / "fuel"
+    / "Global_fuelbeds_parameters_v1.2.xlsx"
+)
+
+SHEET_NAME = "Fuelbeds_metric"
+OUTPUT_FILE = PROJECT_ROOT / "data" / "fuel_mapping_inventory.json"
+
+
+def json_safe(value: Any) -> Any:
+    """Convert values into JSON-safe primitive values."""
+    if value is None:
+        return None
+
+    if isinstance(value, (str, int, float, bool)):
+        return value
+
+    if isinstance(value, np.generic):
+        return value.item()
+
+    return str(value)
+
+
+def normalized_key(value: Any) -> str | None:
+    """
+    Create a stable comparison key for raster codes and Excel JOIN_VALUE values.
+
+    Integer-like numeric values become e.g. '4010', avoiding mismatches
+    such as 4010 vs 4010.0.
+    """
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        value = value.strip()
+        if not value:
+            return None
+
+    try:
+        numeric_value = float(value)
+        if numeric_value.is_integer():
+            return str(int(numeric_value))
+        return str(numeric_value)
+    except (TypeError, ValueError):
+        return str(value).strip()
+
+
+def read_raster_codes() -> dict[str, Any]:
+    """Read all valid unique categorical codes from the Fuel GeoTIFF."""
+    with rasterio.open(FUEL_RASTER) as dataset:
+        values = dataset.read(1, masked=True)
+
+        unique_values, counts = np.unique(
+            values.compressed(),
+            return_counts=True,
+        )
+
+        codes = [
+            {
+                "join_value": int(code),
+                "pixel_count": int(pixel_count),
+            }
+            for code, pixel_count in zip(unique_values, counts)
+        ]
+
+        return {
+            "path": str(FUEL_RASTER.relative_to(PROJECT_ROOT)).replace("\\", "/"),
+            "nodata": json_safe(dataset.nodata),
+            "valid_pixel_count": int(values.count()),
+            "unique_code_count": len(codes),
+            "codes": codes,
+        }
+
+
+def read_excel_fuelbeds() -> dict[str, dict[str, Any]]:
+    """
+    Read only columns useful for verifying Fuel raster-to-workbook matching.
+
+    No fuel score is calculated here. This is an inspection-only utility.
+    """
+    workbook = load_workbook(
+        filename=FUEL_WORKBOOK,
+        read_only=True,
+        data_only=False,
+    )
+
+    if SHEET_NAME not in workbook.sheetnames:
+        workbook.close()
+        raise ValueError(
+            f"Worksheet '{SHEET_NAME}' was not found. "
+            f"Available sheets: {workbook.sheetnames}"
+        )
+
+    worksheet = workbook[SHEET_NAME]
+
+    header_row = next(
+        worksheet.iter_rows(min_row=1, max_row=1, values_only=True)
+    )
+    headers = {
+        str(value).strip(): index
+        for index, value in enumerate(header_row)
+        if value is not None
+    }
+
+    required_columns = ["N", "FUELBED", "JOIN_VALUE", "Biome", "LandCover"]
+    missing_columns = [
+        column for column in required_columns
+        if column not in headers
+    ]
+
+    if missing_columns:
+        workbook.close()
+        raise ValueError(
+            "Required Excel columns are missing: "
+            + ", ".join(missing_columns)
+        )
+
+    rows_by_join_value: dict[str, dict[str, Any]] = {}
+
+    for row_number, row in enumerate(
+        worksheet.iter_rows(min_row=2, values_only=True),
+        start=2,
+    ):
+        join_value = row[headers["JOIN_VALUE"]]
+        key = normalized_key(join_value)
+
+        if key is None:
+            continue
+
+        rows_by_join_value[key] = {
+            "excel_row": row_number,
+            "N": json_safe(row[headers["N"]]),
+            "FUELBED": json_safe(row[headers["FUELBED"]]),
+            "JOIN_VALUE": json_safe(join_value),
+            "Biome": json_safe(row[headers["Biome"]]),
+            "LandCover": json_safe(row[headers["LandCover"]]),
+        }
+
+    workbook.close()
+    return rows_by_join_value
+
+
+def main() -> int:
+    missing_files = [
+        str(path.relative_to(PROJECT_ROOT))
+        for path in (FUEL_RASTER, FUEL_WORKBOOK)
+        if not path.exists()
+    ]
+
+    if missing_files:
+        print("Required input file(s) missing:")
+        for path in missing_files:
+            print(f"- {path}")
+        return 1
+
+    raster_info = read_raster_codes()
+    excel_rows = read_excel_fuelbeds()
+
+    matched_codes: list[dict[str, Any]] = []
+    unmatched_raster_codes: list[dict[str, Any]] = []
+
+    raster_keys: set[str] = set()
+
+    for code_info in raster_info["codes"]:
+        key = normalized_key(code_info["join_value"])
+        raster_keys.add(key)
+
+        if key in excel_rows:
+            matched_codes.append(
+                {
+                    **code_info,
+                    "excel": excel_rows[key],
+                }
+            )
+        else:
+            unmatched_raster_codes.append(code_info)
+
+    unused_excel_rows = [
+        row
+        for key, row in excel_rows.items()
+        if key not in raster_keys
+    ]
+
+    report = {
+        "project": "FIRIS",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "purpose": (
+            "Inspection-only report for matching fars_fuel.tif values "
+            "with Fuelbeds_metric.JOIN_VALUE."
+        ),
+        "raster": raster_info,
+        "excel": {
+            "path": str(FUEL_WORKBOOK.relative_to(PROJECT_ROOT)).replace("\\", "/"),
+            "sheet": SHEET_NAME,
+            "join_column": "JOIN_VALUE",
+            "excel_join_value_count": len(excel_rows),
+        },
+        "matching_summary": {
+            "matched_raster_code_count": len(matched_codes),
+            "unmatched_raster_code_count": len(unmatched_raster_codes),
+            "unused_excel_row_count": len(unused_excel_rows),
+        },
+        "matched_raster_codes": matched_codes,
+        "unmatched_raster_codes": unmatched_raster_codes,
+        "unused_excel_rows": unused_excel_rows,
+    }
+
+    OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_FILE.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    print(
+        "Fuel mapping inspection complete: "
+        f"{len(matched_codes)} matched / "
+        f"{len(unmatched_raster_codes)} unmatched raster codes."
+    )
+    print(f"Report written: {OUTPUT_FILE}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
