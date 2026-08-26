@@ -2,8 +2,8 @@ name: Build FIRIS Fire Likelihood Index
 
 on:
   workflow_dispatch:
+
   schedule:
-    # هر روز ساعت 06:00 UTC
     - cron: "0 6 * * *"
 
 permissions:
@@ -15,44 +15,27 @@ concurrency:
 
 jobs:
   build-firis:
-    name: Build FLI raster and report
+    name: Build FLI Raster and Report
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     env:
-      # ==========================================================
-      # مسیر فایل‌های ورودی
-      # ==========================================================
       FWI_RASTER: data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif
       FUEL_RASTER: data/raw/fuel/fars_fuel.tif
       DEM_RASTER: data/raw/topography/dem_fars.tif
       FUEL_EXCEL: data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx
 
-      # ==========================================================
-      # مسیر خروجی
-      # ==========================================================
       OUTPUT_DIR: data/outputs
 
-      # ==========================================================
-      # نام ستون‌های فایل Excel
-      # این نام‌ها باید با ستون‌های واقعی Excel هماهنگ باشند.
-      # ==========================================================
       FUEL_CODE_COLUMN: fuel_code
       FUEL_SCORE_COLUMN: fuel_score
 
     steps:
-
-      # ==========================================================
-      # Checkout repository
-      # ==========================================================
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # ==========================================================
-      # Setup Python
-      # ==========================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -60,59 +43,17 @@ jobs:
           cache: pip
           cache-dependency-path: scripts/requirements.txt
 
-      # ==========================================================
-      # Install dependencies
-      # ==========================================================
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r scripts/requirements.txt
 
-      # ==========================================================
-      # Show repository input files
-      # ==========================================================
-      - name: Show repository input files
-        shell: bash
-        run: |
-          echo "=============================================="
-          echo "All data files in repository"
-          echo "=============================================="
-
-          if [ -d "data" ]; then
-            find data -type f | sort
-          else
-            echo "WARNING: data directory does not exist."
-          fi
-
-          echo ""
-          echo "=============================================="
-          echo "GeoTIFF files"
-          echo "=============================================="
-
-          find . -type f \( \
-            -iname "*.tif" -o \
-            -iname "*.tiff" \
-          \) | sort || true
-
-          echo ""
-          echo "=============================================="
-          echo "Excel files"
-          echo "=============================================="
-
-          find . -type f \( \
-            -iname "*.xlsx" -o \
-            -iname "*.xls" \
-          \) | sort || true
-
-      # ==========================================================
-      # Validate required input files
-      # ==========================================================
-      - name: Validate required input files
+      - name: Validate input files
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "Checking configured input paths..."
+          echo "Checking FIRIS input files..."
 
           for file in \
             "$FWI_RASTER" \
@@ -121,17 +62,7 @@ jobs:
             "$FUEL_EXCEL"
           do
             if [ ! -f "$file" ]; then
-              echo "::error::Required input file was not found: $file"
-              echo ""
-              echo "Available TIFF/XLSX files:"
-
-              find . -type f \( \
-                -iname "*.tif" -o \
-                -iname "*.tiff" -o \
-                -iname "*.xlsx" -o \
-                -iname "*.xls" \
-              \) | sort || true
-
+              echo "::error::Input file not found: $file"
               exit 1
             fi
 
@@ -140,53 +71,38 @@ jobs:
 
           mkdir -p "$OUTPUT_DIR"
 
-      # ==========================================================
-      # Inspect fuel Excel file
-      # ==========================================================
-      - name: Inspect fuel Excel file
+      - name: Show fuel Excel sheets and columns
         shell: bash
         run: |
           python - <<'PY'
           import os
           import pandas as pd
 
-          path = os.environ["FUEL_EXCEL"]
+          excel_path = os.environ["FUEL_EXCEL"]
 
-          workbook = pd.ExcelFile(path)
+          workbook = pd.ExcelFile(excel_path)
 
-          print(f"Excel file: {path}")
-          print(f"Available sheets: {workbook.sheet_names}")
+          print(f"Excel file: {excel_path}")
+          print(f"Sheets: {workbook.sheet_names}")
 
-          for sheet_name in workbook.sheet_names:
+          for sheet in workbook.sheet_names:
+              df = pd.read_excel(excel_path, sheet_name=sheet, nrows=5)
+
               print("\n" + "=" * 70)
-              print(f"Sheet: {sheet_name}")
-
-              df = pd.read_excel(
-                  path,
-                  sheet_name=sheet_name,
-                  nrows=5
-              )
-
+              print(f"Sheet: {sheet}")
               print("Columns:")
               print(df.columns.tolist())
-
-              print("\nFirst rows:")
+              print("\nSample rows:")
               print(df.to_string(index=False))
           PY
 
-      # ==========================================================
-      # Set build date
-      # ==========================================================
-      - name: Set build date
-        id: build_date
+      - name: Set run date
+        id: run_date
         shell: bash
         run: |
           echo "value=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
-      # ==========================================================
-      # Build FIRIS FLI raster and JSON report
-      # ==========================================================
-      - name: Build FIRIS FLI raster and JSON report
+      - name: Build FIRIS FLI
         shell: bash
         run: |
           set -euo pipefail
@@ -199,49 +115,27 @@ jobs:
             --fuel-code-column "$FUEL_CODE_COLUMN" \
             --fuel-score-column "$FUEL_SCORE_COLUMN" \
             --output-dir "$OUTPUT_DIR" \
-            --run-date "${{ steps.build_date.outputs.value }}"
+            --run-date "${{ steps.run_date.outputs.value }}"
 
-      # ==========================================================
-      # Verify generated files
-      # ==========================================================
-      - name: Verify generated files
+      - name: Verify output files
         shell: bash
         run: |
           set -euo pipefail
 
-          echo "=============================================="
-          echo "Generated FIRIS outputs"
-          echo "=============================================="
+          TIF_FILE="$OUTPUT_DIR/fli_fars_${{ steps.run_date.outputs.value }}.tif"
+          JSON_FILE="$OUTPUT_DIR/firis_report_${{ steps.run_date.outputs.value }}.json"
 
-          find "$OUTPUT_DIR" \
-            -maxdepth 1 \
-            -type f \
-            -printf "%f  %k KB\n" | sort
+          echo "Generated files:"
+          find "$OUTPUT_DIR" -maxdepth 1 -type f | sort
 
-          TIF_FILE="$OUTPUT_DIR/fli_fars_${{ steps.build_date.outputs.value }}.tif"
-          JSON_FILE="$OUTPUT_DIR/firis_report_${{ steps.build_date.outputs.value }}.json"
-
-          if [ ! -f "$TIF_FILE" ]; then
-            echo "::error::FLI GeoTIFF was not generated: $TIF_FILE"
-            exit 1
-          fi
-
-          if [ ! -f "$JSON_FILE" ]; then
-            echo "::error::JSON report was not generated: $JSON_FILE"
-            exit 1
-          fi
+          test -f "$TIF_FILE"
+          test -f "$JSON_FILE"
 
           echo ""
-          echo "=============================================="
-          echo "JSON report"
-          echo "=============================================="
-
+          echo "FIRIS report:"
           cat "$JSON_FILE"
 
-      # ==========================================================
-      # Commit and push output files
-      # ==========================================================
-      - name: Commit and push output files
+      - name: Commit outputs to repository
         shell: bash
         run: |
           set -euo pipefail
@@ -252,8 +146,9 @@ jobs:
           git add data/outputs/
 
           if git diff --cached --quiet; then
-            echo "No changes detected in output files; nothing to commit."
-          else
-            git commit -m "chore(firis): update FLI outputs for ${{ steps.build_date.outputs.value }}"
-            git push origin HEAD:${{ github.ref_name }}
+            echo "No output changes to commit."
+            exit 0
           fi
+
+          git commit -m "chore(firis): update FLI ${{ steps.run_date.outputs.value }}"
+          git push origin "HEAD:${{ github.ref_name }}"
