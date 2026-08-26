@@ -1,0 +1,85 @@
+{
+  "project": "FIRIS",
+  "product": "Fire Likelihood Index",
+  "province": "Fars",
+  "run_date": "2026-08-26",
+  "created_at_utc": "2026-08-26T21:33:01.406765+00:00",
+  "formula": {
+    "expression": "FLI = 100 * (0.45 * FWI + 0.35 * Fuel + 0.20 * Topography)",
+    "weights": {
+      "fwi": 0.45,
+      "fuel": 0.35,
+      "topography": 0.2
+    }
+  },
+  "inputs": {
+    "fwi_raster": "data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif",
+    "fuel_raster": "data/raw/fuel/fars_fuel.tif",
+    "dem_raster": "data/raw/topography/dem_fars.tif",
+    "fuel_excel": "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx",
+    "fuel_code_column": "JOIN_VALUE",
+    "fuel_score_column": "AUTO"
+  },
+  "outputs": {
+    "fli_raster": "data/outputs/fli_fars_2026-08-26.tif"
+  },
+  "grid": {
+    "crs": "EPSG:4326",
+    "width": 2000,
+    "height": 2000,
+    "resolution_x": 0.0025000000000000014,
+    "resolution_y": 0.0025000000000000014,
+    "total_pixels": 4000000,
+    "valid_fli_pixels": 708957,
+    "valid_fli_percent": 17.723925
+  },
+  "fuel_mapping": {
+    "mode": "AUTO",
+    "mapping_entries": 359,
+    "unmatched_fuel_raster_pixels": 0
+  },
+  "statistics": {
+    "fwi_raw": {
+      "count": 4000000,
+      "min": 0.0,
+      "max": 115.13423156738281,
+      "mean": 42.846594069992065,
+      "std": 33.49881964969863
+    },
+    "fuel_raw_score": {
+      "count": 708957,
+      "min": 0.0,
+      "max": 2.950000047683716,
+      "mean": 1.1947346089163602,
+      "std": 0.6422213926688745
+    },
+    "slope_degrees": {
+      "count": 3252391,
+      "min": 0.0,
+      "max": 89.99992370605469,
+      "mean": 47.416668636011806,
+      "std": 44.91320056638045
+    },
+    "fli": {
+      "count": 708957,
+      "min": 19.926340103149414,
+      "max": 89.12115478515625,
+      "mean": 60.78040540914231,
+      "std": 8.29249073496843
+    }
+  },
+  "fli_class_pixel_counts": {
+    "very_low_0_20": 1455,
+    "low_20_40": 418,
+    "moderate_40_60": 265064,
+    "high_60_80": 441614,
+    "very_high_80_100": 406
+  },
+  "fli_classes": {
+    "1": "Very Low (0-20)",
+    "2": "Low (20-40)",
+    "3": "Moderate (40-60)",
+    "4": "High (60-80)",
+    "5": "Very High (80-100)"
+  }
+}
