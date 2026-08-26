@@ -1,37 +1,42 @@
-name: Build FIRIS Fire Likelihood Index
+name: Build FIRIS Fire Risk Index
 
 on:
   workflow_dispatch:
 
-  schedule:
-    - cron: "0 6 * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/build_firis.py"
+      - "data/raw/fwi/**"
+      - "data/raw/fuel/**"
+      - "data/raw/topography/**"
+      - ".github/workflows/build_firis.yml"
 
 permissions:
   contents: write
 
-concurrency:
-  group: build-firis
-  cancel-in-progress: false
-
 jobs:
   build-firis:
-    name: Build FLI Raster and Report
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     env:
+      # ورودی‌ها
       FWI_RASTER: data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif
       FUEL_RASTER: data/raw/fuel/fars_fuel.tif
       DEM_RASTER: data/raw/topography/dem_fars.tif
       FUEL_EXCEL: data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx
 
+      # تنظیمات Fuel Mapping
+      FUEL_SHEET: Fuelbeds_metric
+      FUEL_CODE_COLUMN: JOIN_VALUE
+      FUEL_SCORE_COLUMN: AUTO
+
+      # خروجی‌ها
       OUTPUT_DIR: data/outputs
 
-      # ستون واقعی کد Fuel در Excel
-      FUEL_CODE_COLUMN: JOIN_VALUE
-
-      # AUTO یعنی اسکریپت امتیاز Fuel را خودکار محاسبه می‌کند.
-      FUEL_SCORE_COLUMN: AUTO
+      # برای نام‌گذاری خروجی‌ها
+      FIRIS_DATE: 2026-08-27
 
     steps:
       - name: Checkout repository
@@ -44,78 +49,81 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: scripts/requirements.txt
 
-      - name: Install dependencies
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gdal-bin libgdal-dev
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r scripts/requirements.txt
 
-      - name: Validate input files
-        shell: bash
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          else
+            pip install \
+              numpy \
+              pandas \
+              rasterio \
+              openpyxl \
+              scipy
+          fi
+
+      - name: Verify required input files
         run: |
-          set -euo pipefail
+          set -e
 
-          for file in \
-            "$FWI_RASTER" \
-            "$FUEL_RASTER" \
-            "$DEM_RASTER" \
-            "$FUEL_EXCEL"
-          do
-            if [ ! -f "$file" ]; then
-              echo "::error::Input file not found: $file"
-              exit 1
-            fi
+          echo "Checking FIRIS input files..."
 
-            echo "FOUND: $file"
-          done
+          test -f "$FWI_RASTER" || {
+            echo "ERROR: FWI raster not found: $FWI_RASTER"
+            exit 1
+          }
 
+          test -f "$FUEL_RASTER" || {
+            echo "ERROR: Fuel raster not found: $FUEL_RASTER"
+            exit 1
+          }
+
+          test -f "$DEM_RASTER" || {
+            echo "ERROR: DEM raster not found: $DEM_RASTER"
+            exit 1
+          }
+
+          test -f "$FUEL_EXCEL" || {
+            echo "ERROR: Fuel Excel file not found: $FUEL_EXCEL"
+            exit 1
+          }
+
+          echo "All required input files exist."
+
+      - name: Create output directory
+        run: |
           mkdir -p "$OUTPUT_DIR"
 
-      - name: Set run date
-        id: run_date
-        shell: bash
+      - name: Build FIRIS layers and FLI
         run: |
-          echo "value=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+          python scripts/build_firis.py
 
-      - name: Build FIRIS FLI
-        shell: bash
+      - name: Verify generated outputs
         run: |
-          set -euo pipefail
+          set -e
 
-          python scripts/build_firis.py \
-            --fwi-raster "$FWI_RASTER" \
-            --fuel-raster "$FUEL_RASTER" \
-            --dem-raster "$DEM_RASTER" \
-            --fuel-excel "$FUEL_EXCEL" \
-            --fuel-code-column "$FUEL_CODE_COLUMN" \
-            --fuel-score-column "$FUEL_SCORE_COLUMN" \
-            --output-dir "$OUTPUT_DIR" \
-            --run-date "${{ steps.run_date.outputs.value }}"
+          echo "Files created in $OUTPUT_DIR:"
+          ls -lh "$OUTPUT_DIR"
 
-      - name: Verify output files
-        shell: bash
+          test -f "$OUTPUT_DIR/f_fwi_fars_${FIRIS_DATE}.tif"
+          test -f "$OUTPUT_DIR/f_fuel_fars_${FIRIS_DATE}.tif"
+          test -f "$OUTPUT_DIR/slope_fars_${FIRIS_DATE}.tif"
+          test -f "$OUTPUT_DIR/f_topo_fars_${FIRIS_DATE}.tif"
+          test -f "$OUTPUT_DIR/fli_fars_${FIRIS_DATE}.tif"
+          test -f "$OUTPUT_DIR/firis_report_${FIRIS_DATE}.json"
+
+          echo "All expected FIRIS outputs were generated successfully."
+
+      - name: Commit and push outputs
         run: |
-          set -euo pipefail
-
-          TIF_FILE="$OUTPUT_DIR/fli_fars_${{ steps.run_date.outputs.value }}.tif"
-          JSON_FILE="$OUTPUT_DIR/firis_report_${{ steps.run_date.outputs.value }}.json"
-
-          test -f "$TIF_FILE"
-          test -f "$JSON_FILE"
-
-          echo "Generated files:"
-          find "$OUTPUT_DIR" -maxdepth 1 -type f | sort
-
-          echo ""
-          echo "FIRIS report:"
-          cat "$JSON_FILE"
-
-      - name: Commit outputs to repository
-        shell: bash
-        run: |
-          set -euo pipefail
-
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -123,8 +131,7 @@ jobs:
 
           if git diff --cached --quiet; then
             echo "No output changes to commit."
-            exit 0
+          else
+            git commit -m "chore(firis): update FLI ${FIRIS_DATE} [skip ci]"
+            git push origin main
           fi
-
-          git commit -m "chore(firis): update FLI ${{ steps.run_date.outputs.value }}"
-          git push origin "HEAD:${{ github.ref_name }}"
