@@ -25,12 +25,14 @@ jobs:
           pip install -r scripts/requirements.txt
 
       - name: بازرسی ورودی‌های خام
-        run: python scripts/inspect_inputs.py
+        run: |
+          python scripts/inspect_inputs.py
+          python scripts/inspect_fuel_mapping.py
 
       - name: ذخیره گزارش بازرسی در مخزن
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/input_inventory.json
-          git diff --cached --quiet || git commit -m "chore: update FIRIS input inventory"
+          git add data/input_inventory.json data/fuel_mapping_inventory.json
+          git diff --cached --quiet || git commit -m "chore: update FIRIS input and fuel mapping inventory"
           git push
