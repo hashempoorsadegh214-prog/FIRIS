@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>سامانه پیش‌بینی خطر آتش‌سوزی مراتع و جنگل‌های استان فارس (FIRIS)</title>
+  <!-- Leaflet 1.9.4 CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- SheetJS 0.18.5 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Leaflet 1.9.4 JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --panel-bg: rgba(255, 255, 255, 0.95);
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      --card-bg: #ffffff;
+    }
+    body.dark {
+      --bg: #0f172a;
+      --panel-bg: rgba(30, 41, 59, 0.95);
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --primary: #3b82f6;
+      --primary-hover: #60a5fa;
+      --shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      --card-bg: #1e293b;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Tahoma, sans-serif;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+    }
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+    }
+    /* Header */
+    header {
+      background: var(--panel-bg);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 1000;
+      box-shadow: var(--shadow);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .header-title-box {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .header-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: var(--text);
+    }
+    .date-line {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #ea580c;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn {
+      background: var(--card-bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .btn:hover:not(:disabled) {
+      background: var(--border);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+    }
+    /* Layout */
+    .main-container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      height: calc(100% - 60px);
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    /* Panels */
+    .controls-panel {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 280px;
+      max-height: calc(100% - 24px);
+      overflow-y: auto;
+      background: var(--panel-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      z-index: 1000;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      font-size: 0.85rem;
+    }
+    .panel-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 8px;
+    }
+    .panel-section:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .section-title {
+      font-weight: bold;
+      color: var(--text);
+      font-size: 0.9rem;
+      margin-bottom: 2px;
+    }
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .select-control {
+      width: 100%;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      color: var(--text);
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+    .stat-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      padding: 6px 8px;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .stat-value {
+      font-size: 1rem;
+      font-weight: bold;
+      color: var(--text);
+    }
+    /* Legend */
+    .legend-panel {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      z-index: 1000;
+      box-shadow: var(--shadow);
+      font-size: 0.8rem;
+    }
+    .legend-title {
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+    .legend-items {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      border: 1px solid rgba(0,0,0,0.15);
+      flex-shrink: 0;
+    }
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      z-index: 2000;
+      display: none;
+      justify-content: center;
+      align-items: center;
+    }
+    .modal-overlay.active {
+      display: flex;
+    }
+    .modal-box {
+      background: var(--card-bg);
+      color: var(--text);
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 480px;
+      width: 90%;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      font-weight: bold;
+      font-size: 1.1rem;
+    }
+    .modal-body {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+    .status-badge {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="header-title-box">
+        <span class="header-title">سامانه پیش‌بینی خطر وقوع حریق در عرصه‌های طبیعی استان فارس (FIRIS)</span>
+        <div class="date-line" id="forecastDate">در حال بارگذاری اطلاعات پیش‌بینی...</div>
+      </div>
+      <div class="header-actions">
+        <button class="btn" id="aboutBtn">معرفی سامانه</button>
+        <button class="btn" id="themeToggleBtn">🌙 شب</button>
+        <button class="btn btn-primary" id="exportBtn" disabled>📊 خروجی اکسل</button>
+      </div>
+    </header>
+
+    <div class="main-container">
+      <div id="map"></div>
+
+      <!-- Controls Panel -->
+      <div class="controls-panel">
+        <div class="panel-section">
+          <div class="section-title">لایه‌های نقشه</div>
+          <label class="checkbox-label">
+            <input type="checkbox" id="layerFwi" checked>
+            <span>نقاط شاخص حریق (FWI)</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="layerProtected" checked>
+            <span>مناطق چهارگانه محیط زیست</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="layerHunting" checked>
+            <span>مناطق شکار ممنوع</span>
+          </label>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-title">فیلتر محدوده جغرافیایی</div>
+          <select id="scopeFilter" class="select-control">
+            <option value="all">تمام استان فارس</option>
+            <option value="protected">فقط مناطق چهارگانه محیط زیست</option>
+            <option value="hunting">فقط مناطق شکار ممنوع</option>
+          </select>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-title">فیلتر طبقه خطر</div>
+          <select id="riskFilter" class="select-control">
+            <option value="all">همه سطوح خطر</option>
+            <option value="low">کم (< 11.2)</option>
+            <option value="moderate">متوسط (11.2 - 21.3)</option>
+            <option value="high">زیاد (21.3 - 38)</option>
+            <option value="veryHigh">خیلی زیاد (38 - 50)</option>
+            <option value="extreme">بسیار شدید (50 - 70)</option>
+            <option value="veryExtreme">فوق‌العاده بحرانی (≥ 70)</option>
+          </select>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-title">آمار فیلتر جاری</div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">تعداد نقاط</div>
+              <div class="stat-value" id="statCount">0</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">میانگین FWI</div>
+              <div class="stat-value" id="statMean">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">حداکثر FWI</div>
+              <div class="stat-value" id="statMax">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">نقاط خطر بالا+</div>
+              <div class="stat-value" id="statHighPlus">0</div>
+            </div>
+          </div>
+          <div class="status-badge" id="dataStatus">وضعیت: در حال دریافت داده‌ها...</div>
+        </div>
+      </div>
+
+      <!-- Legend Panel -->
+      <div class="legend-panel">
+        <div class="legend-title">شاخص خطر حریق (FWI)</div>
+        <div class="legend-items">
+          <div class="legend-item"><span class="legend-color" style="background: #22c55e;"></span><span>کم (&lt; 11.2)</span></div>
+          <div class="legend-item"><span class="legend-color" style="background: #eab308;"></span><span>متوسط (11.2 - 21.3)</span></div>
+          <div class="legend-item"><span class="legend-color" style="background: #f97316;"></span><span>زیاد (21.3 - 38)</span></div>
+          <div class="legend-item"><span class="legend-color" style="background: #ef4444;"></span><span>خیلی زیاد (38 - 50)</span></div>
+          <div class="legend-item"><span class="legend-color" style="background: #b91c1c;"></span><span>بسیار شدید (50 - 70)</span></div>
+          <div class="legend-item"><span class="legend-color" style="background: #581c87;"></span><span>فوق‌العاده بحرانی (&ge; 70)</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- About Modal -->
+    <div class="modal-overlay" id="aboutModal">
+      <div class="modal-box">
+        <div class="modal-header">
+          <span>درباره سامانه FIRIS</span>
+          <button class="btn" id="modalCloseBtn">✕</button>
+        </div>
+        <div class="modal-body">
+          سامانه پیش‌بینی خطر آتش‌سوزی در عرصه‌های طبیعی استان فارس (FIRIS) با بهره‌گیری از داده‌های پیش‌بینی هواشناسی و مدل استاندارد شاخص آب و هوای آتش (FWI)، احتمال و شدت وقوع آتش‌سوزی در مراتع، جنگل‌ها، مناطق تحت حفاظت و مناطق شکار ممنوع استان را محاسبه و به صورت برخط پایش می‌نماید.
+        </div>
+        <div style="text-align: left;">
+          <button class="btn btn-primary" id="modalOkBtn">متوجه شدم</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State & Storage
+    let fwiRawData = null;
+    let farsGeoJson = null;
+    let protectedGeoJson = null;
+    let huntingGeoJson = null;
+    let filteredPoints = [];
+
+    // Dark mode handling
+    const savedTheme = localStorage.getItem('firis_theme') || 'light';
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark');
+    }
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    function updateThemeBtn() {
+      themeToggleBtn.textContent = document.body.classList.contains('dark') ? '☀️ روز' : '🌙 شب';
+    }
+    updateThemeBtn();
+    themeToggleBtn.addEventListener('click', () => {
+      document.body.classList.toggle('dark');
+      const isDark = document.body.classList.contains('dark');
+      localStorage.setItem('firis_theme', isDark ? 'dark' : 'light');
+      updateThemeBtn();
+    });
+
+    // Map initialization
+    const map = L.map('map', { preferCanvas: true }).setView([29.5, 53.2], 7);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    // Layer groups
+    const borderLayer = L.geoJSON(null, {
+      style: { color: '#334155', weight: 2.5, fillOpacity: 0 }
+    }).addTo(map);
+
+    const protectedLayer = L.geoJSON(null, {
+      style: { color: '#059669', weight: 2, fillColor: '#10b981', fillOpacity: 0.25 },
+      onEachFeature: (feature, layer) => {
+        const name = feature.properties?.Name || 'منطقه حفاظت شده';
+        layer.bindPopup(`<b>منطقه محیط زیست:</b> ${name}`);
+      }
+    }).addTo(map);
+
+    const huntingLayer = L.geoJSON(null, {
+      style: { color: '#d97706', weight: 2, fillColor: '#fbbf24', fillOpacity: 0.2 },
+      onEachFeature: (feature, layer) => {
+        const name = feature.properties?.Name || 'منطقه شکار ممنوع';
+        layer.bindPopup(`<b>منطقه شکار ممنوع:</b> ${name}`);
+      }
+    }).addTo(map);
+
+    const fwiLayerGroup = L.layerGroup().addTo(map);
+
+    // Point in Polygon & MultiPolygon
+    function pointInRing(pt, ring) {
+      const x = pt[0], y = pt[1];
+      let inside = false;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        const xi = ring[i][0], yi = ring[i][1];
+        const xj = ring[j][0], yj = ring[j][1];
+        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function pointInPolygon(pt, geom) {
+      if (geom.type === 'Polygon') {
+        if (!pointInRing(pt, geom.coordinates[0])) return false;
+        for (let i = 1; i < geom.coordinates.length; i++) {
+          if (pointInRing(pt, geom.coordinates[i])) return false;
+        }
+        return true;
+      } else if (geom.type === 'MultiPolygon') {
+        for (let p = 0; p < geom.coordinates.length; p++) {
+          const polyCoords = geom.coordinates[p];
+          if (pointInRing(pt, polyCoords[0])) {
+            let inHole = false;
+            for (let i = 1; i < polyCoords.length; i++) {
+              if (pointInRing(pt, polyCoords[i])) { inHole = true; break; }
+            }
+            if (!inHole) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    function pointInFeatureCollection(pt, fc) {
+      if (!fc || !fc.features) return false;
+      for (let i = 0; i < fc.features.length; i++) {
+        if (pointInPolygon(pt, fc.features[i].geometry)) return true;
+      }
+      return false;
+    }
+
+    // FWI Risk Calculation
+    function getRiskInfo(fwi) {
+      const val = Number(fwi);
+      if (val < 11.2) return { key: 'low', label: 'کم', color: '#22c55e' };
+      if (val < 21.3) return { key: 'moderate', label: 'متوسط', color: '#eab308' };
+      if (val < 38.0) return { key: 'high', label: 'زیاد', color: '#f97316' };
+      if (val < 50.0) return { key: 'veryHigh', label: 'خیلی زیاد', color: '#ef4444' };
+      if (val < 70.0) return { key: 'extreme', label: 'بسیار شدید', color: '#b91c1c' };
+      return { key: 'veryExtreme', label: 'فوق‌العاده بحرانی', color: '#581c87' };
+    }
+
+    // Render FWI Points & Update Stats
+    function renderFwi() {
+      fwiLayerGroup.clearLayers();
+      if (!fwiRawData || !fwiRawData.points) return;
+
+      const scope = document.getElementById('scopeFilter').value;
+      const riskFilter = document.getElementById('riskFilter').value;
+
+      filteredPoints = [];
+      let sumFwi = 0;
+      let maxFwi = -Infinity;
+      let highPlusCount = 0;
+
+      const points = fwiRawData.points;
+      for (let i = 0; i < points.length; i++) {
+        const pt = points[i];
+        const val = Number(pt.fwi);
+        const lat = Number(pt.lat);
+        const lon = Number(pt.lon);
+        const risk = getRiskInfo(val);
+
+        // Scope Filter
+        if (scope === 'protected' && (!protectedGeoJson || !pointInFeatureCollection([lon, lat], protectedGeoJson))) {
+          continue;
+        }
+        if (scope === 'hunting' && (!huntingGeoJson || !pointInFeatureCollection([lon, lat], huntingGeoJson))) {
+          continue;
+        }
+
+        // Risk Filter
+        if (riskFilter !== 'all' && risk.key !== riskFilter) {
+          continue;
+        }
+
+        filteredPoints.push({
+          lat: lat,
+          lon: lon,
+          fwi: val,
+          riskKey: risk.key,
+          riskLabel: risk.label,
+          color: risk.color,
+          forecastDateShamsi: fwiRawData.forecast_shamsi || '',
+          forecastDateGregorian: fwiRawData.forecast_gregorian || ''
+        });
+
+        sumFwi += val;
+        if (val > maxFwi) maxFwi = val;
+        if (val >= 21.3) highPlusCount++;
+
+        // Add CircleMarker
+        const marker = L.circleMarker([lat, lon], {
+          radius: 5,
+          fillColor: risk.color,
+          color: '#ffffff',
+          weight: 1,
+          opacity: 0.9,
+          fillOpacity: 0.85
+        });
+
+        marker.bindPopup(`
+          <div style="font-size:0.85rem; line-height:1.5;">
+            <div><b>مختصات:</b> ${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
+            <div><b>شاخص FWI:</b> ${val.toFixed(2)}</div>
+            <div><b>سطح خطر:</b> <span style="font-weight:bold; color:${risk.color}">${risk.label}</span></div>
+            <div><b>تاریخ پیش‌بینی:</b> ${fwiRawData.forecast_shamsi || '-'}</div>
+          </div>
+        `);
+        fwiLayerGroup.addLayer(marker);
+      }
+
+      // Update Stats
+      const count = filteredPoints.length;
+      document.getElementById('statCount').textContent = count.toLocaleString('fa-IR');
+      document.getElementById('statMean').textContent = count > 0 ? (sumFwi / count).toFixed(1) : '-';
+      document.getElementById('statMax').textContent = count > 0 ? maxFwi.toFixed(1) : '-';
+      document.getElementById('statHighPlus').textContent = highPlusCount.toLocaleString('fa-IR');
+
+      // Update Export button status
+      document.getElementById('exportBtn').disabled = (count === 0);
+    }
+
+    // Event Listeners for Filters
+    document.getElementById('scopeFilter').addEventListener('change', renderFwi);
+    document.getElementById('riskFilter').addEventListener('change', renderFwi);
+
+    // Layer checkboxes
+    document.getElementById('layerFwi').addEventListener('change', (e) => {
+      if (e.target.checked) map.addLayer(fwiLayerGroup);
+      else map.removeLayer(fwiLayerGroup);
+    });
+    document.getElementById('layerProtected').addEventListener('change', (e) => {
+      if (e.target.checked) map.addLayer(protectedLayer);
+      else map.removeLayer(protectedLayer);
+    });
+    document.getElementById('layerHunting').addEventListener('change', (e) => {
+      if (e.target.checked) map.addLayer(huntingLayer);
+      else map.removeLayer(huntingLayer);
+    });
+
+    // Modal Events
+    const aboutModal = document.getElementById('aboutModal');
+    document.getElementById('aboutBtn').addEventListener('click', () => aboutModal.classList.add('active'));
+    document.getElementById('modalCloseBtn').addEventListener('click', () => aboutModal.classList.remove('active'));
+    document.getElementById('modalOkBtn').addEventListener('click', () => aboutModal.classList.remove('active'));
+
+    // Excel Export with SheetJS
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      if (!filteredPoints || filteredPoints.length === 0) return;
+
+      const wb = XLSX.utils.book_new();
+
+      // Sheet 1: Metadata
+      const metaData = [
+        ["عنوان گزارش", "گزارش پیش‌بینی خطر آتش‌سوزی استان فارس (FIRIS)"],
+        ["تاریخ پیش‌بینی شمسی", fwiRawData?.forecast_shamsi || "-"],
+        ["تاریخ پیش‌بینی میلادی", fwiRawData?.forecast_gregorian || "-"],
+        ["فیلتر محدوده", document.getElementById('scopeFilter').options[document.getElementById('scopeFilter').selectedIndex].text],
+        ["فیلتر طبقه خطر", document.getElementById('riskFilter').options[document.getElementById('riskFilter').selectedIndex].text],
+        ["تعداد کل نقاط فیلترشده", filteredPoints.length],
+        ["میانگین شاخص FWI", document.getElementById('statMean').textContent],
+        ["حداکثر شاخص FWI", document.getElementById('statMax').textContent],
+        ["نقاط با خطر بالا و بیشتر", document.getElementById('statHighPlus').textContent]
+      ];
+      const wsMeta = XLSX.utils.aoa_to_sheet(metaData);
+      XLSX.utils.book_append_sheet(wb, wsMeta, "اطلاعات گزارش");
+
+      // Sheet 2: Points Data
+      const pointsData = [
+        ["ردیف", "عرض جغرافیایی (Latitude)", "طول جغرافیایی (Longitude)", "شاخص FWI", "سطح خطر", "تاریخ پیش‌بینی شمسی", "تاریخ پیش‌بینی میلادی"]
+      ];
+
+      filteredPoints.forEach((p, idx) => {
+        pointsData.push([
+          idx + 1,
+          p.lat,
+          p.lon,
+          p.fwi,
+          p.riskLabel,
+          p.forecastDateShamsi,
+          p.forecastDateGregorian
+        ]);
+      });
+
+      const wsPoints = XLSX.utils.aoa_to_sheet(pointsData);
+      XLSX.utils.book_append_sheet(wb, wsPoints, "نقاط پیش‌بینی");
+
+      const dateStr = (fwiRawData?.forecast_shamsi || 'fwi_report').replace(/[\/\s:]/g, '_');
+      XLSX.writeFile(wb, `FIRIS_Report_${dateStr}.xlsx`);
+    });
+
+    // Independent Data Fetches
+    // 1. Fars border (always visible, no checkbox)
+    fetch('fars.geojson')
+      .then(r => r.ok ? r.json() : Promise.reject('fars.geojson not found'))
+      .then(data => {
+        farsGeoJson = data;
+        borderLayer.addData(data);
+      })
+      .catch(err => console.warn("Fars border error:", err));
+
+    // 2. Protected areas
+    fetch('protected_areas.geojson')
+      .then(r => r.ok ? r.json() : Promise.reject('protected_areas.geojson not found'))
+      .then(data => {
+        protectedGeoJson = data;
+        protectedLayer.addData(data);
+        renderFwi();
+      })
+      .catch(err => console.warn("Protected areas error:", err));
+
+    // 3. Hunting banned areas
+    fetch('hunting_banned.geojson')
+      .then(r => r.ok ? r.json() : Promise.reject('hunting_banned.geojson not found'))
+      .then(data => {
+        huntingGeoJson = data;
+        huntingLayer.addData(data);
+        renderFwi();
+      })
+      .catch(err => console.warn("Hunting banned error:", err));
+
+    // 4. FWI Data (Root with fallback)
+    function loadFwiData(path, fallbackPath) {
+      fetch(path)
+        .then(r => {
+          if (!r.ok) throw new Error("Root FWI not found");
+          return r.json();
+        })
+        .then(data => handleFwiLoaded(data))
+        .catch(() => {
+          if (fallbackPath) {
+            fetch(fallbackPath)
+              .then(r => {
+                if (!r.ok) throw new Error("Fallback FWI not found");
+                return r.json();
+              })
+              .then(data => handleFwiLoaded(data))
+              .catch(err => {
+                console.error("FWI load failed:", err);
+                document.getElementById('forecastDate').textContent = "عدم دسترسی به داده‌های پیش‌بینی";
+                document.getElementById('dataStatus').textContent = "وضعیت: خطا در بارگذاری داده‌ها";
+              });
+          }
+        });
+    }
+
+    function handleFwiLoaded(data) {
+      fwiRawData = data;
+      const shamsi = data.forecast_shamsi || '';
+      const greg = data.forecast_gregorian || '';
+      document.getElementById('forecastDate').textContent = `پیش‌بینی برای فردا: ${shamsi} (${greg})`;
+      document.getElementById('dataStatus').textContent = "وضعیت: داده‌ها با موفقیت بارگذاری شدند";
+      renderFwi();
+    }
+
+    loadFwiData('fwi_fars.json', 'data/fwi_fars.json');
+  </script>
+</body>
+</html>
