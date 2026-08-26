@@ -23,16 +23,19 @@ jobs:
     # مسیر فایل‌ها را در این قسمت با مسیر واقعی مخزن تنظیم کنید
     # ==========================================================
     env:
-      FWI_RASTER: data/inputs/fwi_fars.tif
-      FUEL_RASTER: data/inputs/fuelbeds_fars.tif
-      DEM_RASTER: data/inputs/dem_fars.tif
-      FUEL_EXCEL: data/inputs/Global_fuelbeds_parameters_v1.2.xlsx
+    FWI_RASTER: data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif
+    FUEL_RASTER: data/raw/fuel/fars_fuel.tif
+    DEM_RASTER: data/raw/topography/dem_fars.tif
+  FUEL_EXCEL: data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx
 
-      OUTPUT_DIR: data/outputs
+  OUTPUT_DIR: data/outputs
+
+  FUEL_CODE_COLUMN: fuel_code
+  FUEL_SCORE_COLUMN: fuel_score
 
       # این دو نام باید با ستون‌های واقعی اکسل هماهنگ شوند.
-      FUEL_CODE_COLUMN: fuel_code
-      FUEL_SCORE_COLUMN: fuel_score
+     FUEL_CODE_COLUMN: fuel_code
+     FUEL_SCORE_COLUMN: fuel_score
 
     steps:
       - name: Checkout repository
