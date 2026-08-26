@@ -21,21 +21,18 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # ورودی‌ها
+      # مسیر ورودی‌ها
       FWI_RASTER: data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif
       FUEL_RASTER: data/raw/fuel/fars_fuel.tif
       DEM_RASTER: data/raw/topography/dem_fars.tif
       FUEL_EXCEL: data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx
 
-      # تنظیمات Fuel Mapping
-      FUEL_SHEET: Fuelbeds_metric
+      # تنظیمات جدول سوخت
       FUEL_CODE_COLUMN: JOIN_VALUE
       FUEL_SCORE_COLUMN: AUTO
 
-      # خروجی‌ها
+      # مسیر و تاریخ خروجی‌ها
       OUTPUT_DIR: data/outputs
-
-      # برای نام‌گذاری خروجی‌ها
       FIRIS_DATE: 2026-08-27
 
     steps:
@@ -62,19 +59,14 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           else
-            pip install \
-              numpy \
-              pandas \
-              rasterio \
-              openpyxl \
-              scipy
+            pip install numpy pandas rasterio openpyxl scipy
           fi
 
       - name: Verify required input files
         run: |
           set -e
 
-          echo "Checking FIRIS input files..."
+          echo "Checking required FIRIS input files..."
 
           test -f "$FWI_RASTER" || {
             echo "ERROR: FWI raster not found: $FWI_RASTER"
@@ -96,7 +88,7 @@ jobs:
             exit 1
           }
 
-          echo "All required input files exist."
+          echo "All required input files were found."
 
       - name: Create output directory
         run: |
@@ -104,13 +96,21 @@ jobs:
 
       - name: Build FIRIS layers and FLI
         run: |
-          python scripts/build_firis.py
+          python scripts/build_firis.py \
+            --fwi-raster "$FWI_RASTER" \
+            --fuel-raster "$FUEL_RASTER" \
+            --dem-raster "$DEM_RASTER" \
+            --fuel-excel "$FUEL_EXCEL" \
+            --fuel-code-column "$FUEL_CODE_COLUMN" \
+            --fuel-score-column "$FUEL_SCORE_COLUMN" \
+            --output-dir "$OUTPUT_DIR" \
+            --run-date "$FIRIS_DATE"
 
       - name: Verify generated outputs
         run: |
           set -e
 
-          echo "Files created in $OUTPUT_DIR:"
+          echo "Generated files:"
           ls -lh "$OUTPUT_DIR"
 
           test -f "$OUTPUT_DIR/f_fwi_fars_${FIRIS_DATE}.tif"
@@ -122,7 +122,7 @@ jobs:
 
           echo "All expected FIRIS outputs were generated successfully."
 
-      - name: Commit and push outputs
+      - name: Commit and push generated outputs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -130,7 +130,7 @@ jobs:
           git add data/outputs/
 
           if git diff --cached --quiet; then
-            echo "No output changes to commit."
+            echo "No new output changes to commit."
           else
             git commit -m "chore(firis): update FLI ${FIRIS_DATE} [skip ci]"
             git push origin main
