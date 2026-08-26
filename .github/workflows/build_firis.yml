@@ -19,30 +19,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
-    # ==========================================================
-    # مسیر فایل‌ها را در این قسمت با مسیر واقعی مخزن تنظیم کنید
-    # ==========================================================
     env:
-    FWI_RASTER: data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif
-    FUEL_RASTER: data/raw/fuel/fars_fuel.tif
-    DEM_RASTER: data/raw/topography/dem_fars.tif
-  FUEL_EXCEL: data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx
+      # ==========================================================
+      # مسیر فایل‌های ورودی
+      # ==========================================================
+      FWI_RASTER: data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif
+      FUEL_RASTER: data/raw/fuel/fars_fuel.tif
+      DEM_RASTER: data/raw/topography/dem_fars.tif
+      FUEL_EXCEL: data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx
 
-  OUTPUT_DIR: data/outputs
+      # ==========================================================
+      # مسیر خروجی
+      # ==========================================================
+      OUTPUT_DIR: data/outputs
 
-  FUEL_CODE_COLUMN: fuel_code
-  FUEL_SCORE_COLUMN: fuel_score
-
-      # این دو نام باید با ستون‌های واقعی اکسل هماهنگ شوند.
-     FUEL_CODE_COLUMN: fuel_code
-     FUEL_SCORE_COLUMN: fuel_score
+      # ==========================================================
+      # نام ستون‌های فایل Excel
+      # این نام‌ها باید با ستون‌های واقعی Excel هماهنگ باشند.
+      # ==========================================================
+      FUEL_CODE_COLUMN: fuel_code
+      FUEL_SCORE_COLUMN: fuel_score
 
     steps:
+
+      # ==========================================================
+      # Checkout repository
+      # ==========================================================
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # ==========================================================
+      # Setup Python
+      # ==========================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -50,11 +60,17 @@ jobs:
           cache: pip
           cache-dependency-path: scripts/requirements.txt
 
+      # ==========================================================
+      # Install dependencies
+      # ==========================================================
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r scripts/requirements.txt
 
+      # ==========================================================
+      # Show repository input files
+      # ==========================================================
       - name: Show repository input files
         shell: bash
         run: |
@@ -72,14 +88,25 @@ jobs:
           echo "=============================================="
           echo "GeoTIFF files"
           echo "=============================================="
-          find . -type f \( -iname "*.tif" -o -iname "*.tiff" \) | sort || true
+
+          find . -type f \( \
+            -iname "*.tif" -o \
+            -iname "*.tiff" \
+          \) | sort || true
 
           echo ""
           echo "=============================================="
           echo "Excel files"
           echo "=============================================="
-          find . -type f \( -iname "*.xlsx" -o -iname "*.xls" \) | sort || true
 
+          find . -type f \( \
+            -iname "*.xlsx" -o \
+            -iname "*.xls" \
+          \) | sort || true
+
+      # ==========================================================
+      # Validate required input files
+      # ==========================================================
       - name: Validate required input files
         shell: bash
         run: |
@@ -97,7 +124,14 @@ jobs:
               echo "::error::Required input file was not found: $file"
               echo ""
               echo "Available TIFF/XLSX files:"
-              find . -type f \( -iname "*.tif" -o -iname "*.tiff" -o -iname "*.xlsx" -o -iname "*.xls" \) | sort || true
+
+              find . -type f \( \
+                -iname "*.tif" -o \
+                -iname "*.tiff" -o \
+                -iname "*.xlsx" -o \
+                -iname "*.xls" \
+              \) | sort || true
+
               exit 1
             fi
 
@@ -106,6 +140,9 @@ jobs:
 
           mkdir -p "$OUTPUT_DIR"
 
+      # ==========================================================
+      # Inspect fuel Excel file
+      # ==========================================================
       - name: Inspect fuel Excel file
         shell: bash
         run: |
@@ -116,6 +153,7 @@ jobs:
           path = os.environ["FUEL_EXCEL"]
 
           workbook = pd.ExcelFile(path)
+
           print(f"Excel file: {path}")
           print(f"Available sheets: {workbook.sheet_names}")
 
@@ -123,7 +161,11 @@ jobs:
               print("\n" + "=" * 70)
               print(f"Sheet: {sheet_name}")
 
-              df = pd.read_excel(path, sheet_name=sheet_name, nrows=5)
+              df = pd.read_excel(
+                  path,
+                  sheet_name=sheet_name,
+                  nrows=5
+              )
 
               print("Columns:")
               print(df.columns.tolist())
@@ -132,12 +174,18 @@ jobs:
               print(df.to_string(index=False))
           PY
 
+      # ==========================================================
+      # Set build date
+      # ==========================================================
       - name: Set build date
         id: build_date
         shell: bash
         run: |
           echo "value=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
 
+      # ==========================================================
+      # Build FIRIS FLI raster and JSON report
+      # ==========================================================
       - name: Build FIRIS FLI raster and JSON report
         shell: bash
         run: |
@@ -153,6 +201,9 @@ jobs:
             --output-dir "$OUTPUT_DIR" \
             --run-date "${{ steps.build_date.outputs.value }}"
 
+      # ==========================================================
+      # Verify generated files
+      # ==========================================================
       - name: Verify generated files
         shell: bash
         run: |
@@ -162,7 +213,10 @@ jobs:
           echo "Generated FIRIS outputs"
           echo "=============================================="
 
-          find "$OUTPUT_DIR" -maxdepth 1 -type f -printf "%f  %k KB\n" | sort
+          find "$OUTPUT_DIR" \
+            -maxdepth 1 \
+            -type f \
+            -printf "%f  %k KB\n" | sort
 
           TIF_FILE="$OUTPUT_DIR/fli_fars_${{ steps.build_date.outputs.value }}.tif"
           JSON_FILE="$OUTPUT_DIR/firis_report_${{ steps.build_date.outputs.value }}.json"
@@ -181,8 +235,12 @@ jobs:
           echo "=============================================="
           echo "JSON report"
           echo "=============================================="
+
           cat "$JSON_FILE"
 
+      # ==========================================================
+      # Commit and push output files
+      # ==========================================================
       - name: Commit and push output files
         shell: bash
         run: |
