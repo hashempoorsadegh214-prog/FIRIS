@@ -27,7 +27,7 @@ OUTPUT_FILE = PROJECT_ROOT / "data" / "fuel_mapping_inventory.json"
 
 
 def json_safe(value: Any) -> Any:
-    """Convert values into JSON-safe primitive values."""
+    """تبدیل داده‌ها به مقادیر قابل پشتیبانی در JSON"""
     if value is None:
         return None
 
@@ -41,12 +41,7 @@ def json_safe(value: Any) -> Any:
 
 
 def normalized_key(value: Any) -> str | None:
-    """
-    Create a stable comparison key for raster codes and Excel JOIN_VALUE values.
-
-    Integer-like numeric values become e.g. '4010', avoiding mismatches
-    such as 4010 vs 4010.0.
-    """
+    """یکسان‌سازی مقادیر عددی برای مقایسه دقیق رستر با اکسل"""
     if value is None:
         return None
 
@@ -65,7 +60,7 @@ def normalized_key(value: Any) -> str | None:
 
 
 def read_raster_codes() -> dict[str, Any]:
-    """Read all valid unique categorical codes from the Fuel GeoTIFF."""
+    """خواندن تمام کدهای یکتای رستر سوخت"""
     with rasterio.open(FUEL_RASTER) as dataset:
         values = dataset.read(1, masked=True)
 
@@ -92,11 +87,7 @@ def read_raster_codes() -> dict[str, Any]:
 
 
 def read_excel_fuelbeds() -> dict[str, dict[str, Any]]:
-    """
-    Read only columns useful for verifying Fuel raster-to-workbook matching.
-
-    No fuel score is calculated here. This is an inspection-only utility.
-    """
+    """خواندن ستون‌های پایه اکسل برای تطبیق کدهای سوخت"""
     workbook = load_workbook(
         filename=FUEL_WORKBOOK,
         read_only=True,
@@ -177,7 +168,6 @@ def main() -> int:
 
     matched_codes: list[dict[str, Any]] = []
     unmatched_raster_codes: list[dict[str, Any]] = []
-
     raster_keys: set[str] = set()
 
     for code_info in raster_info["codes"]:
