@@ -1,85 +1,135 @@
 {
-  "project": "FIRIS",
-  "product": "Fire Likelihood Index",
-  "province": "Fars",
+  "project": "FIRIS - Fars Integrated Fire Information System",
+  "generated_at_utc": "2026-08-26T21:41:31.449996+00:00",
   "run_date": "2026-08-26",
-  "created_at_utc": "2026-08-26T21:33:01.406765+00:00",
-  "formula": {
-    "expression": "FLI = 100 * (0.45 * FWI + 0.35 * Fuel + 0.20 * Topography)",
-    "weights": {
-      "fwi": 0.45,
-      "fuel": 0.35,
-      "topography": 0.2
-    }
+  "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
+  "weights": {
+    "F_FWI": 0.45,
+    "F_Fuel": 0.35,
+    "F_Topo": 0.2
+  },
+  "normalization": {
+    "F_FWI": "clip(FWI / 100.0, 0, 1); FWI values at or above the scale receive 1.",
+    "F_Fuel": "Weighted normalized fuelbed parameters from Fuelbeds_metric using FineFuel=35%, DeadWood=30%, ShrubStructure=15%, Litter=10%, CanopyStructure=10%.",
+    "F_Topo": "clip(slope_degrees / 45.0, 0, 1); slopes at or above the scale receive 1."
   },
   "inputs": {
     "fwi_raster": "data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif",
     "fuel_raster": "data/raw/fuel/fars_fuel.tif",
-    "dem_raster": "data/raw/topography/dem_fars.tif",
-    "fuel_excel": "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx",
-    "fuel_code_column": "JOIN_VALUE",
-    "fuel_score_column": "AUTO"
+    "fuel_table": "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx",
+    "dem_raster": "data/raw/topography/dem_fars.tif"
   },
-  "outputs": {
-    "fli_raster": "data/outputs/fli_fars_2026-08-26.tif"
-  },
-  "grid": {
+  "target_grid": {
     "crs": "EPSG:4326",
     "width": 2000,
     "height": 2000,
-    "resolution_x": 0.0025000000000000014,
-    "resolution_y": 0.0025000000000000014,
-    "total_pixels": 4000000,
-    "valid_fli_pixels": 708957,
-    "valid_fli_percent": 17.723925
+    "transform": [
+      0.0025000000000000014,
+      0.0,
+      50.0,
+      0.0,
+      -0.0025000000000000014,
+      32.0
+    ]
   },
   "fuel_mapping": {
-    "mode": "AUTO",
-    "mapping_entries": 359,
-    "unmatched_fuel_raster_pixels": 0
-  },
-  "statistics": {
-    "fwi_raw": {
-      "count": 4000000,
-      "min": 0.0,
-      "max": 115.13423156738281,
-      "mean": 42.846594069992065,
-      "std": 33.49881964969863
+    "unique_fuel_codes_in_raster": [
+      4010.0,
+      4020.0,
+      4130.0,
+      4150.0,
+      4180.0,
+      13010.0,
+      13020.0,
+      13030.0,
+      13110.0,
+      13150.0,
+      914030.0,
+      914091.0,
+      914110.0,
+      914120.0,
+      924030.0
+    ],
+    "unique_fuel_code_count": 15,
+    "mapped_code_count": 15,
+    "unmapped_codes": [],
+    "unmapped_code_count": 0,
+    "reference_table_rows_after_cleanup": 359,
+    "duplicate_join_values_removed": 0,
+    "fuel_component_weights": {
+      "FineFuel": 0.35,
+      "DeadWood": 0.3,
+      "ShrubStructure": 0.15,
+      "Litter": 0.1,
+      "CanopyStructure": 0.1
     },
-    "fuel_raw_score": {
-      "count": 708957,
-      "min": 0.0,
-      "max": 2.950000047683716,
-      "mean": 1.1947346089163602,
-      "std": 0.6422213926688745
+    "selected_source_columns": {
+      "FineFuel": "G_Load (Mg/ha)",
+      "DeadWood": [
+        "W_10h Load (Mg/ha)",
+        "W_100h Load (Mg/ha)",
+        "W_1000h Load (Mg/ha)"
+      ],
+      "ShrubStructure": "Shrub Cover (%)",
+      "Litter": null,
+      "CanopyStructure": null
     },
-    "slope_degrees": {
-      "count": 3252391,
+    "f_fuel_statistics_in_reference_table": {
       "min": 0.0,
-      "max": 89.99992370605469,
-      "mean": 47.416668636011806,
-      "std": 44.91320056638045
-    },
-    "fli": {
-      "count": 708957,
-      "min": 19.926340103149414,
-      "max": 89.12115478515625,
-      "mean": 60.78040540914231,
-      "std": 8.29249073496843
+      "max": 0.445137,
+      "mean": 0.131808
     }
   },
-  "fli_class_pixel_counts": {
-    "very_low_0_20": 1455,
-    "low_20_40": 418,
-    "moderate_40_60": 265064,
-    "high_60_80": 441614,
-    "very_high_80_100": 406
+  "statistics": {
+    "fwi_original": {
+      "valid_pixel_count": 4000000,
+      "min": 0.0,
+      "max": 115.134232,
+      "mean": 42.846594,
+      "std": 33.49882
+    },
+    "f_fwi": {
+      "valid_pixel_count": 4000000,
+      "min": 0.0,
+      "max": 1.0,
+      "mean": 0.428436,
+      "std": 0.334931
+    },
+    "f_fuel": {
+      "valid_pixel_count": 708957,
+      "min": 0.014,
+      "max": 0.167333,
+      "mean": 0.062434,
+      "std": 0.031587
+    },
+    "slope_degrees": {
+      "valid_pixel_count": 3252391,
+      "min": 0.0,
+      "max": 89.999924,
+      "mean": 47.416667,
+      "std": 44.913199
+    },
+    "f_topo": {
+      "valid_pixel_count": 3252391,
+      "min": 0.0,
+      "max": 1.0,
+      "mean": 0.527109,
+      "std": 0.499257
+    },
+    "fli": {
+      "valid_pixel_count": 708957,
+      "min": 20.49,
+      "max": 65.6493,
+      "mean": 52.826867,
+      "std": 4.249669
+    },
+    "final_model_valid_pixels": 708957
   },
-  "fli_classes": {
-    "1": "Very Low (0-20)",
-    "2": "Low (20-40)",
-    "3": "Moderate (40-60)",
-    "4": "High (60-80)",
-    "5": "Very High (80-100)"
+  "outputs": {
+    "f_fwi": "data/outputs/f_fwi_fars_2026-08-26.tif",
+    "f_fuel": "data/outputs/f_fuel_fars_2026-08-26.tif",
+    "slope": "data/outputs/slope_fars_2026-08-26.tif",
+    "f_topo": "data/outputs/f_topo_fars_2026-08-26.tif",
+    "fli": "data/outputs/fli_fars_2026-08-26.tif"
   }
 }
