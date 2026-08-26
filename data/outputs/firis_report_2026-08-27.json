@@ -1,6 +1,6 @@
 {
   "project": "FIRIS - Fars Integrated Fire Information System",
-  "generated_at_utc": "2026-08-26T19:27:54.385855+00:00",
+  "generated_at_utc": "2026-08-26T19:40:35.666018+00:00",
   "run_date": "2026-08-27",
   "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
   "weights": {
