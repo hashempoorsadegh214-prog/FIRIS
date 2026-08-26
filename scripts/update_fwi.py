@@ -4,146 +4,158 @@ import argparse
 import json
 import os
 import tempfile
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import rasterio
+from rasterio.errors import RasterioError
 import requests
 
 
+# سرویس رسمی WMS سامانه Global Wildfire Information System
 WMS_URL = "https://maps.effis.emergency.copernicus.eu/gwis"
 
-# محدوده تقریبی استان فارس در EPSG:4326
-# ترتیب BBOX در WMS 1.1.1:
-# min_longitude, min_latitude, max_longitude, max_latitude
-DEFAULT_FARS_BBOX = "50.0,27.0,55.0,32.0"
-
+# لایه Fire Weather Index از ECMWF
 LAYER_NAME = "ecmwf.fwi"
-CRS = "EPSG:4326"
-DEFAULT_WIDTH = 2000
-DEFAULT_HEIGHT = 2000
+
+# محدودهٔ جغرافیایی فارس، ترتیب مختصات در WMS 1.1.1:
+# min_longitude, min_latitude, max_longitude, max_latitude
+FARS_BBOX = "50.0,27.0,55.0,32.0"
+
+# WMS 1.1.1 برای جلوگیری از تغییر ترتیب محور مختصات EPSG:4326
+WMS_VERSION = "1.1.1"
+SRS = "EPSG:4326"
+
+# اندازهٔ خروجی. حداکثر سرویس 5120 × 5120 است.
+WIDTH = 2000
+HEIGHT = 2000
+
 REQUEST_TIMEOUT_SECONDS = 180
 
 
 def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """خواندن پارامترهای خط فرمان."""
     parser = argparse.ArgumentParser(
         description=(
-            "Download and validate an ECMWF Fire Weather Index (FWI) GeoTIFF "
-            "for Fars from Copernicus GWIS WMS."
+            "Download ECMWF Fire Weather Index (FWI) GeoTIFF for Fars "
+            "from Copernicus GWIS WMS."
         )
     )
 
     parser.add_argument(
         "--date",
         dest="target_date",
-        help="Forecast date in YYYY-MM-DD format. Default: tomorrow (UTC).",
-    )
-
-    parser.add_argument(
-        "--bbox",
-        default=DEFAULT_FARS_BBOX,
+        default=None,
         help=(
-            "WMS 1.1.1 BBOX in EPSG:4326 as "
-            "min_lon,min_lat,max_lon,max_lat. "
-            f"Default: {DEFAULT_FARS_BBOX}"
+            "Date in YYYY-MM-DD format. "
+            "Default: tomorrow in UTC."
         ),
-    )
-
-    parser.add_argument(
-        "--width",
-        type=int,
-        default=DEFAULT_WIDTH,
-        help=f"Output raster width in pixels. Default: {DEFAULT_WIDTH}",
-    )
-
-    parser.add_argument(
-        "--height",
-        type=int,
-        default=DEFAULT_HEIGHT,
-        help=f"Output raster height in pixels. Default: {DEFAULT_HEIGHT}",
     )
 
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Replace an existing GeoTIFF for the requested date.",
+        help="Download again even if output TIFF already exists.",
     )
 
     return parser.parse_args()
 
 
 def get_target_date(value: str | None) -> str:
-    """Return the requested ISO date, or tomorrow in UTC."""
-    if value:
+    """
+    تاریخ هدف را برمی‌گرداند.
+    در صورت نداشتن آرگومان، تاریخ فردا بر مبنای UTC انتخاب می‌شود.
+    """
+    if value is not None:
         try:
-            return date.fromisoformat(value).isoformat()
+            return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
         except ValueError as error:
             raise SystemExit(
-                f"Invalid --date value '{value}'. Expected YYYY-MM-DD."
+                f"Invalid date: {value}. Expected format: YYYY-MM-DD"
             ) from error
 
-    return (datetime.now(timezone.utc).date() + timedelta(days=1)).isoformat()
+    tomorrow = datetime.now(timezone.utc).date() + timedelta(days=1)
+    return tomorrow.isoformat()
 
 
-def validate_bbox(bbox: str) -> str:
-    """Validate and normalize a WMS 1.1.1 geographic bounding box."""
-    try:
-        values = [float(value.strip()) for value in bbox.split(",")]
-    except ValueError as error:
-        raise SystemExit(
-            "Invalid --bbox. Expected: min_lon,min_lat,max_lon,max_lat"
-        ) from error
-
-    if len(values) != 4:
-        raise SystemExit(
-            "Invalid --bbox. Expected exactly four values: "
-            "min_lon,min_lat,max_lon,max_lat"
-        )
-
-    min_lon, min_lat, max_lon, max_lat = values
-
-    if not (-180 <= min_lon < max_lon <= 180):
-        raise SystemExit("Invalid longitude values in --bbox.")
-
-    if not (-90 <= min_lat < max_lat <= 90):
-        raise SystemExit("Invalid latitude values in --bbox.")
-
-    return ",".join(f"{value:g}" for value in values)
-
-
-def validate_downloaded_geotiff(file_path: Path) -> dict[str, Any]:
+def response_is_error_payload(response: requests.Response) -> bool:
     """
-    Open the downloaded file with rasterio and return useful raster metadata.
+    تشخیص پاسخ خطا از سرویس WMS.
 
-    Raises SystemExit if the server response is not a readable GeoTIFF or
-    contains no valid numeric values.
+    گاهی پاسخ HTTP موفق است ولی بدنهٔ پاسخ XML/HTML شامل ServiceException
+    است؛ بنابراین صرفاً HTTP 200 کافی نیست.
+    """
+    content_type = response.headers.get("Content-Type", "").lower()
+    sample = response.content[:1000].lstrip().lower()
+
+    error_content_types = (
+        "text/xml",
+        "application/xml",
+        "text/html",
+        "application/json",
+        "text/plain",
+    )
+
+    if any(item in content_type for item in error_content_types):
+        return True
+
+    error_prefixes = (
+        b"<?xml",
+        b"<serviceexception",
+        b"<serviceexceptionreport",
+        b"<html",
+        b"<!doctype html",
+        b"{",
+        b"[",
+    )
+
+    return sample.startswith(error_prefixes)
+
+
+def write_error_response(
+    output_dir: Path,
+    target_date: str,
+    response: requests.Response,
+) -> Path:
+    """ذخیرهٔ پاسخ خطای WMS برای بررسی در GitHub Actions."""
+    error_path = output_dir / f"fwi_download_error_{target_date}.txt"
+
+    header = (
+        f"HTTP status: {response.status_code}\n"
+        f"Content-Type: {response.headers.get('Content-Type', '')}\n"
+        f"Request URL: {response.url}\n"
+        "\n"
+        "Response body:\n"
+        "------------------------------------------------------------\n"
+    ).encode("utf-8")
+
+    error_path.write_bytes(header + response.content)
+    return error_path
+
+
+def validate_geotiff(tif_path: Path) -> dict[str, Any]:
+    """
+    بررسی می‌کند فایل دانلودی واقعاً GeoTIFF رستری خوانا و دارای داده باشد.
     """
     try:
-        with rasterio.open(file_path) as dataset:
+        with rasterio.open(tif_path) as dataset:
             if dataset.driver != "GTiff":
-                raise SystemExit(
-                    f"Downloaded file is not a GeoTIFF. Detected driver: {dataset.driver}"
+                raise RuntimeError(
+                    f"Expected GTiff, received driver: {dataset.driver}"
                 )
 
             if dataset.count < 1:
-                raise SystemExit("Downloaded GeoTIFF does not contain any raster band.")
+                raise RuntimeError("GeoTIFF contains no raster band.")
 
             if dataset.width < 1 or dataset.height < 1:
-                raise SystemExit("Downloaded GeoTIFF has invalid dimensions.")
+                raise RuntimeError("GeoTIFF has invalid dimensions.")
 
-            band = dataset.read(1, masked=True)
-            valid_value_count = int(band.count())
+            first_band = dataset.read(1, masked=True)
+            valid_pixel_count = int(first_band.count())
 
-            if valid_value_count == 0:
-                raise SystemExit(
-                    "Downloaded GeoTIFF contains no valid FWI pixel values."
-                )
-
-            minimum = float(band.min())
-            maximum = float(band.max())
-            mean = float(band.mean())
+            if valid_pixel_count == 0:
+                raise RuntimeError("GeoTIFF has no valid FWI pixels.")
 
             return {
                 "driver": dataset.driver,
@@ -159,131 +171,99 @@ def validate_downloaded_geotiff(file_path: Path) -> dict[str, Any]:
                     "right": dataset.bounds.right,
                     "top": dataset.bounds.top,
                 },
-                "valid_pixel_count": valid_value_count,
-                "fwi_min": minimum,
-                "fwi_max": maximum,
-                "fwi_mean": mean,
+                "valid_pixel_count": valid_pixel_count,
+                "fwi_min": float(first_band.min()),
+                "fwi_max": float(first_band.max()),
+                "fwi_mean": float(first_band.mean()),
             }
 
-    except rasterio.errors.RasterioError as error:
-        raise SystemExit(
-            "The response was not a readable GeoTIFF. "
-            f"Raster validation error: {error}"
+    except RasterioError as error:
+        raise RuntimeError(
+            f"Downloaded file cannot be opened as GeoTIFF: {error}"
         ) from error
 
 
-def response_looks_like_error(response: requests.Response) -> bool:
-    """Detect common WMS error payloads before writing a TIFF file."""
-    content_type = response.headers.get("Content-Type", "").lower()
-    first_bytes = response.content[:500].lstrip().lower()
-
-    if any(
-        media_type in content_type
-        for media_type in ("xml", "html", "json", "text/plain")
-    ):
-        return True
-
-    return (
-        first_bytes.startswith(b"<?xml")
-        or first_bytes.startswith(b"<serviceexception")
-        or first_bytes.startswith(b"<html")
-        or first_bytes.startswith(b"{")
-        or first_bytes.startswith(b"[")
-    )
-
-
-def save_error_response(
-    output_dir: Path,
-    target_date: str,
-    response: requests.Response,
-) -> Path:
-    """Save a non-raster WMS response for inspection."""
-    error_file = output_dir / f"fwi_download_error_{target_date}.txt"
-
-    error_file.write_bytes(response.content)
-
-    return error_file
-
-
-def write_json(file_path: Path, payload: dict[str, Any]) -> None:
-    """Write UTF-8 formatted JSON."""
-    file_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2),
+def write_metadata(metadata_path: Path, metadata: dict[str, Any]) -> None:
+    """ثبت متادیتای کامل برای بازتولیدپذیری محاسبهٔ FIRIS."""
+    metadata_path.write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
 
 
 def main() -> None:
-    """Download, validate, and document one FWI raster."""
     args = parse_args()
-
-    if args.width < 1 or args.height < 1:
-        raise SystemExit("--width and --height must both be greater than zero.")
-
     target_date = get_target_date(args.target_date)
-    bbox = validate_bbox(args.bbox)
 
     project_root = Path(__file__).resolve().parents[1]
     output_dir = project_root / "data" / "raw" / "fwi"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    output_file = output_dir / f"fwi_ecmwf_fars_{target_date}.tif"
-    metadata_file = output_dir / f"fwi_ecmwf_fars_{target_date}.json"
+    output_tif = output_dir / f"fwi_ecmwf_fars_{target_date}.tif"
+    output_json = output_dir / f"fwi_ecmwf_fars_{target_date}.json"
 
-    if output_file.exists() and not args.overwrite:
-        print(f"FWI file already exists: {output_file}")
+    if output_tif.exists() and not args.overwrite:
+        print(f"FWI file already exists: {output_tif}")
         print("Use --overwrite to download it again.")
         return
 
     params = {
         "SERVICE": "WMS",
-        "VERSION": "1.1.1",
+        "VERSION": WMS_VERSION,
         "REQUEST": "GetMap",
         "LAYERS": LAYER_NAME,
         "STYLES": "",
-        "SRS": CRS,
-        "BBOX": bbox,
-        "WIDTH": str(args.width),
-        "HEIGHT": str(args.height),
+        "SRS": SRS,
+        "BBOX": FARS_BBOX,
+        "WIDTH": str(WIDTH),
+        "HEIGHT": str(HEIGHT),
         "FORMAT": "image/tiff",
-        "TRANSPARENT": "TRUE",
+        "TRANSPARENT": "FALSE",
         "TIME": target_date,
     }
 
-    print(f"Downloading ECMWF FWI for Fars: {target_date}")
-    print(f"WMS URL: {WMS_URL}")
-    print(f"Layer: {LAYER_NAME}")
-    print(f"BBOX: {bbox}")
-    print(f"Output: {output_file}")
+    print("=" * 70)
+    print("FIRIS - ECMWF FWI downloader")
+    print("=" * 70)
+    print(f"Target date : {target_date}")
+    print(f"Layer       : {LAYER_NAME}")
+    print(f"BBOX        : {FARS_BBOX}")
+    print(f"Output TIFF : {output_tif}")
+    print()
 
     try:
         response = requests.get(
             WMS_URL,
             params=params,
             timeout=REQUEST_TIMEOUT_SECONDS,
+            headers={
+                "User-Agent": "FIRIS/1.0 (GitHub Actions; Fars Fire Risk System)"
+            },
         )
         response.raise_for_status()
+
     except requests.RequestException as error:
         raise SystemExit(f"FWI download failed: {error}") from error
 
-    content_type = response.headers.get("Content-Type", "").lower()
-
-    print(f"HTTP status: {response.status_code}")
-    print(f"Content-Type: {content_type or 'not provided'}")
+    print(f"HTTP status     : {response.status_code}")
+    print(
+        "Content-Type    : "
+        f"{response.headers.get('Content-Type', 'not provided')}"
+    )
     print(f"Downloaded bytes: {len(response.content)}")
 
     if not response.content:
-        raise SystemExit("The WMS server returned an empty response.")
+        raise SystemExit("FWI download failed: server returned an empty response.")
 
-    if response_looks_like_error(response):
-        error_file = save_error_response(output_dir, target_date, response)
+    if response_is_error_payload(response):
+        error_path = write_error_response(output_dir, target_date, response)
 
         raise SystemExit(
-            "The WMS server returned an error payload instead of a GeoTIFF. "
-            f"Saved response for inspection: {error_file}"
+            "FWI download failed: WMS returned an error document, not GeoTIFF. "
+            f"Error response saved to: {error_path}"
         )
 
-    temporary_file: Path | None = None
+    temporary_path: Path | None = None
 
     try:
         with tempfile.NamedTemporaryFile(
@@ -292,45 +272,62 @@ def main() -> None:
             prefix=f".fwi_ecmwf_fars_{target_date}_",
             dir=output_dir,
             delete=False,
-        ) as temporary_output:
-            temporary_output.write(response.content)
-            temporary_file = Path(temporary_output.name)
+        ) as temporary_file:
+            temporary_file.write(response.content)
+            temporary_path = Path(temporary_file.name)
 
-        raster_metadata = validate_downloaded_geotiff(temporary_file)
+        raster_info = validate_geotiff(temporary_path)
 
-        os.replace(temporary_file, output_file)
-        temporary_file = None
+        # جایگزینی اتمیک؛ فایل ناقص در خروجی نهایی باقی نمی‌ماند.
+        os.replace(temporary_path, output_tif)
+        temporary_path = None
 
-        download_metadata = {
-            "source": "Copernicus GWIS WMS / ECMWF",
-            "wms_url": WMS_URL,
-            "layer": LAYER_NAME,
-            "request_date": target_date,
-            "downloaded_at_utc": datetime.now(timezone.utc).isoformat(),
-            "request_parameters": params,
-            "http_status": response.status_code,
-            "content_type": content_type,
-            "file_name": output_file.name,
-            "file_size_bytes": output_file.stat().st_size,
-            "raster": raster_metadata,
-        }
+    except RuntimeError as error:
+        invalid_file = output_dir / f"fwi_invalid_response_{target_date}.tif"
 
-        write_json(metadata_file, download_metadata)
+        if temporary_path is not None and temporary_path.exists():
+            os.replace(temporary_path, invalid_file)
+            temporary_path = None
+
+        raise SystemExit(
+            f"FWI download failed: {error}\n"
+            f"Invalid response saved to: {invalid_file}"
+        ) from error
 
     finally:
-        if temporary_file is not None and temporary_file.exists():
-            temporary_file.unlink()
+        if temporary_path is not None and temporary_path.exists():
+            temporary_path.unlink()
 
-    print("FWI download and GeoTIFF validation completed successfully.")
-    print(f"GeoTIFF: {output_file}")
-    print(f"Metadata: {metadata_file}")
+    metadata = {
+        "project": "FIRIS",
+        "indicator": "ECMWF Fire Weather Index (FWI)",
+        "source": "Copernicus GWIS WMS",
+        "source_url": WMS_URL,
+        "layer": LAYER_NAME,
+        "target_date": target_date,
+        "downloaded_at_utc": datetime.now(timezone.utc).isoformat(),
+        "request_parameters": params,
+        "request_url": response.url,
+        "http_status": response.status_code,
+        "content_type": response.headers.get("Content-Type", ""),
+        "output_file": output_tif.name,
+        "output_file_size_bytes": output_tif.stat().st_size,
+        "raster": raster_info,
+    }
+
+    write_metadata(output_json, metadata)
+
+    print()
+    print("FWI GeoTIFF downloaded and validated successfully.")
+    print(f"GeoTIFF : {output_tif}")
+    print(f"Metadata: {output_json}")
     print(
         "FWI statistics: "
-        f"min={raster_metadata['fwi_min']:.3f}, "
-        f"max={raster_metadata['fwi_max']:.3f}, "
-        f"mean={raster_metadata['fwi_mean']:.3f}, "
-        f"valid_pixels={raster_metadata['valid_pixel_count']}"
+        f"min={raster_info['fwi_min']:.3f}, "
+        f"max={raster_info['fwi_max']:.3f}, "
+        f"mean={raster_info['fwi_mean']:.3f}"
     )
+    print(f"Valid pixels: {raster_info['valid_pixel_count']}")
 
 
 if __name__ == "__main__":
