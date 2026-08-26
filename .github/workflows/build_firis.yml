@@ -11,15 +11,13 @@ on:
       - main
     paths:
       - "scripts/**"
-      - "data/**"
+      - "data/raw/**"
       - "Global_fuelbeds_parameters_v1.2.xlsx"
-      - "requirements.txt"
       - ".github/workflows/build_firis.yml"
 
 permissions:
   contents: write
 
-# جلوگیری از اجرای هم‌زمان Workflowها و Conflict هنگام push
 concurrency:
   group: firis-build-main
   cancel-in-progress: false
@@ -34,7 +32,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -48,13 +45,8 @@ jobs:
 
           python -m pip install --upgrade pip
 
-          if [ -f requirements.txt ]; then
-            echo "Installing requirements.txt ..."
-            pip install -r requirements.txt
-          else
-            echo "requirements.txt not found; installing required libraries ..."
-            pip install numpy pandas rasterio openpyxl
-          fi
+          # کتابخانه‌های لازم برای پردازش GeoTIFF و تولید PNG
+          pip install numpy pandas rasterio openpyxl pillow
 
       - name: Show available input files
         shell: bash
@@ -62,9 +54,9 @@ jobs:
           set -euo pipefail
 
           echo "============================================================"
-          echo "Available raster files:"
+          echo "Available input raster files:"
           echo "============================================================"
-          find data -type f \( -iname "*.tif" -o -iname "*.tiff" \) | sort || true
+          find data/raw -type f \( -iname "*.tif" -o -iname "*.tiff" \) | sort || true
 
           echo ""
           echo "============================================================"
@@ -73,26 +65,20 @@ jobs:
           find . -type f \( -iname "*.xlsx" -o -iname "*.xls" \) | sort || true
 
       - name: Locate FIRIS input files
-        id: input_files
         shell: bash
         run: |
           set -euo pipefail
 
-          # فقط داده‌های ورودی بررسی شوند؛ خروجی‌های قبلی وارد انتخاب نشوند.
-          SEARCH_DIR="data"
+          SEARCH_DIR="data/raw"
 
           find_single_raster() {
             local label="$1"
             local pattern="$2"
 
             mapfile -t matches < <(
-              find "${SEARCH_DIR}" \
-                -type f \
+              find "${SEARCH_DIR}" -type f \
                 \( -iname "*.tif" -o -iname "*.tiff" \) \
-                ! -path "data/outputs/*" \
-                ! -path "docs/*" \
-                -iname "${pattern}" \
-                | sort
+                -iname "${pattern}" | sort
             )
 
             if [ "${#matches[@]}" -eq 0 ]; then
@@ -104,14 +90,13 @@ jobs:
             if [ "${#matches[@]}" -gt 1 ]; then
               echo "ERROR: بیش از یک فایل برای ${label} پیدا شد:"
               printf ' - %s\n' "${matches[@]}"
-              echo "نام فایل‌ها را یکتا کنید یا الگوی جستجو را در Workflow دقیق‌تر کنید."
+              echo "نام فایل‌ها را یکتا کنید یا الگوی جستجو را دقیق‌تر کنید."
               exit 1
             fi
 
             echo "${matches[0]}"
           }
 
-          # فایل‌هایی که نامشان شامل fwi، fuel و dem باشد پیدا می‌شوند.
           FWI_RASTER="$(find_single_raster "FWI raster" "*fwi*.tif")"
           FUEL_RASTER="$(find_single_raster "Fuel raster" "*fuel*.tif")"
           DEM_RASTER="$(find_single_raster "DEM raster" "*dem*.tif")"
@@ -119,19 +104,17 @@ jobs:
           FUEL_EXCEL="Global_fuelbeds_parameters_v1.2.xlsx"
 
           if [ ! -f "${FUEL_EXCEL}" ]; then
-            echo "ERROR: فایل اکسل سوخت پیدا نشد: ${FUEL_EXCEL}"
+            echo "ERROR: فایل اکسل سوخت پیدا نشد:"
+            echo "${FUEL_EXCEL}"
             exit 1
           fi
 
-          echo "============================================================"
           echo "Selected FIRIS inputs:"
-          echo "============================================================"
           echo "FWI raster : ${FWI_RASTER}"
           echo "Fuel raster: ${FUEL_RASTER}"
           echo "DEM raster : ${DEM_RASTER}"
           echo "Fuel Excel : ${FUEL_EXCEL}"
 
-          # انتقال متغیرها به Step بعدی
           echo "FWI_RASTER=${FWI_RASTER}" >> "$GITHUB_ENV"
           echo "FUEL_RASTER=${FUEL_RASTER}" >> "$GITHUB_ENV"
           echo "DEM_RASTER=${DEM_RASTER}" >> "$GITHUB_ENV"
@@ -144,18 +127,7 @@ jobs:
 
           mkdir -p data/outputs
 
-          # تاریخ خروجی مطابق تاریخ اجرای Workflow
           RUN_DATE="$(date -u +'%Y-%m-%d')"
-
-          echo "============================================================"
-          echo "Running build_firis.py"
-          echo "============================================================"
-          echo "Run date    : ${RUN_DATE}"
-          echo "FWI raster  : ${FWI_RASTER}"
-          echo "Fuel raster : ${FUEL_RASTER}"
-          echo "DEM raster  : ${DEM_RASTER}"
-          echo "Fuel Excel  : ${FUEL_EXCEL}"
-          echo "Output dir  : data/outputs"
 
           python scripts/build_firis.py \
             --fwi-raster "${FWI_RASTER}" \
@@ -170,10 +142,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          mkdir -p docs/data
+          mkdir -p data/web
 
           python scripts/build_web_map.py \
-            --output-dir "docs/data"
+            --input "data/outputs/fli_fars_$(date -u +'%Y-%m-%d').tif" \
+            --output-dir "data/web"
 
       - name: Show generated files
         shell: bash
@@ -183,21 +156,19 @@ jobs:
           echo "============================================================"
           echo "FIRIS outputs:"
           echo "============================================================"
-          find data/outputs -maxdepth 1 -type f -printf "%f  %k KB\n" | sort
+          find data/outputs -maxdepth 1 -type f -printf "%f %k KB\n" | sort
 
           echo ""
           echo "============================================================"
           echo "Web-map outputs:"
           echo "============================================================"
-          find docs/data -maxdepth 1 -type f -printf "%f  %k KB\n" | sort
+          find data/web -maxdepth 1 -type f -printf "%f %k KB\n" | sort
 
           echo ""
-          echo "============================================================"
-          echo "Latest metadata:"
-          echo "============================================================"
-          cat docs/data/fli_latest.json
+          echo "Latest web metadata:"
+          cat data/web/fli_latest.json
 
-      - name: Commit and push generated outputs safely
+      - name: Commit and push generated outputs
         shell: bash
         run: |
           set -euo pipefail
@@ -205,7 +176,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add data/outputs/ docs/data/
+          git add data/outputs/ data/web/
 
           if git diff --cached --quiet; then
             echo "No generated-file changes to commit."
@@ -213,29 +184,4 @@ jobs:
           fi
 
           git commit -m "chore(firis): update FLI and web-map outputs [skip ci]"
-
-          # تلاش مجدد برای مدیریت Push هم‌زمان یا rejected
-          for attempt in 1 2 3 4 5; do
-            echo "Push attempt ${attempt}/5 ..."
-
-            git fetch origin main
-
-            # در تعارض فایل‌های تولیدشده، خروجی جدید Workflow اولویت دارد.
-            if ! git rebase -X theirs origin/main; then
-              echo "Rebase conflict occurred; aborting and retrying ..."
-              git rebase --abort || true
-              sleep $((attempt * 5))
-              continue
-            fi
-
-            if git push origin HEAD:main; then
-              echo "Generated outputs pushed successfully."
-              exit 0
-            fi
-
-            echo "Push rejected; retrying ..."
-            sleep $((attempt * 5))
-          done
-
-          echo "ERROR: Push failed after 5 attempts."
-          exit 1
+          git push origin HEAD:main
