@@ -27,8 +27,11 @@ jobs:
 
       OUTPUT_DIR: data/outputs
 
-      FUEL_CODE_COLUMN: fuel_code
-      FUEL_SCORE_COLUMN: fuel_score
+      # ستون واقعی کد Fuel در Excel
+      FUEL_CODE_COLUMN: JOIN_VALUE
+
+      # AUTO یعنی اسکریپت امتیاز Fuel را خودکار محاسبه می‌کند.
+      FUEL_SCORE_COLUMN: AUTO
 
     steps:
       - name: Checkout repository
@@ -53,8 +56,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          echo "Checking FIRIS input files..."
-
           for file in \
             "$FWI_RASTER" \
             "$FUEL_RASTER" \
@@ -70,31 +71,6 @@ jobs:
           done
 
           mkdir -p "$OUTPUT_DIR"
-
-      - name: Show fuel Excel sheets and columns
-        shell: bash
-        run: |
-          python - <<'PY'
-          import os
-          import pandas as pd
-
-          excel_path = os.environ["FUEL_EXCEL"]
-
-          workbook = pd.ExcelFile(excel_path)
-
-          print(f"Excel file: {excel_path}")
-          print(f"Sheets: {workbook.sheet_names}")
-
-          for sheet in workbook.sheet_names:
-              df = pd.read_excel(excel_path, sheet_name=sheet, nrows=5)
-
-              print("\n" + "=" * 70)
-              print(f"Sheet: {sheet}")
-              print("Columns:")
-              print(df.columns.tolist())
-              print("\nSample rows:")
-              print(df.to_string(index=False))
-          PY
 
       - name: Set run date
         id: run_date
@@ -125,11 +101,11 @@ jobs:
           TIF_FILE="$OUTPUT_DIR/fli_fars_${{ steps.run_date.outputs.value }}.tif"
           JSON_FILE="$OUTPUT_DIR/firis_report_${{ steps.run_date.outputs.value }}.json"
 
-          echo "Generated files:"
-          find "$OUTPUT_DIR" -maxdepth 1 -type f | sort
-
           test -f "$TIF_FILE"
           test -f "$JSON_FILE"
+
+          echo "Generated files:"
+          find "$OUTPUT_DIR" -maxdepth 1 -type f | sort
 
           echo ""
           echo "FIRIS report:"
