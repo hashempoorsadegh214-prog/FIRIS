@@ -17,7 +17,7 @@ on:
 permissions:
   contents: write
 
-# جلوگیری از اجرای هم‌زمان چند Workflow مربوط به FIRIS
+# جلوگیری از تداخل دو اجرای هم‌زمان Workflow
 concurrency:
   group: firis-build-publish-main
   cancel-in-progress: false
@@ -27,23 +27,27 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
+      # تاریخ تولید خروجی
       FIRIS_DATE: "2026-08-27"
 
+      # مسیر فایل‌های ورودی
       FWI_RASTER: "data/raw/fwi/fwi_ecmwf_fars_2026-08-27.tif"
       FUEL_RASTER: "data/raw/fuel/fars_fuel.tif"
       DEM_RASTER: "data/raw/topography/dem_fars.tif"
       FUEL_EXCEL: "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
 
+      # تنظیمات جدول سوخت
       FUEL_CODE_COLUMN: "JOIN_VALUE"
       FUEL_SCORE_COLUMN: "AUTO"
 
+      # پوشه خروجی
       OUTPUT_DIR: "data/outputs"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          # برای fetch، rebase و push لازم است.
+          # برای rebase و push به تاریخچهٔ کامل Git نیاز داریم.
           fetch-depth: 0
 
       - name: Set up Python
@@ -55,8 +59,29 @@ jobs:
       - name: Install Python dependencies
         run: |
           set -e
+
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+
+          # اگر requirements.txt وجود دارد، از آن استفاده کن.
+          if [ -f "requirements.txt" ]; then
+            echo "requirements.txt found. Installing dependencies from it..."
+            pip install -r requirements.txt
+          else
+            echo "requirements.txt was not found."
+            echo "Installing required FIRIS libraries directly..."
+
+            pip install \
+              "numpy>=1.26.0" \
+              "pandas>=2.1.0" \
+              "rasterio>=1.3.10" \
+              "openpyxl>=3.1.0"
+          fi
+
+          echo "Installed package versions:"
+          python -c "import numpy; print('numpy:', numpy.__version__)"
+          python -c "import pandas; print('pandas:', pandas.__version__)"
+          python -c "import rasterio; print('rasterio:', rasterio.__version__)"
+          python -c "import openpyxl; print('openpyxl:', openpyxl.__version__)"
 
       - name: Check input files
         run: |
@@ -64,10 +89,25 @@ jobs:
 
           echo "Checking input files..."
 
-          test -f "$FWI_RASTER"
-          test -f "$FUEL_RASTER"
-          test -f "$DEM_RASTER"
-          test -f "$FUEL_EXCEL"
+          if [ ! -f "$FWI_RASTER" ]; then
+            echo "ERROR: FWI raster not found: $FWI_RASTER"
+            exit 1
+          fi
+
+          if [ ! -f "$FUEL_RASTER" ]; then
+            echo "ERROR: Fuel raster not found: $FUEL_RASTER"
+            exit 1
+          fi
+
+          if [ ! -f "$DEM_RASTER" ]; then
+            echo "ERROR: DEM raster not found: $DEM_RASTER"
+            exit 1
+          fi
+
+          if [ ! -f "$FUEL_EXCEL" ]; then
+            echo "ERROR: Fuel Excel file not found: $FUEL_EXCEL"
+            exit 1
+          fi
 
           echo "All input files exist."
 
@@ -75,7 +115,7 @@ jobs:
         run: |
           mkdir -p "$OUTPUT_DIR"
 
-      - name: Build FIRIS
+      - name: Build FIRIS layers and FLI
         run: |
           set -e
 
@@ -92,7 +132,8 @@ jobs:
       - name: Show generated outputs
         run: |
           set -e
-          echo "Files in output directory:"
+
+          echo "Generated files:"
           ls -lah "$OUTPUT_DIR"
 
       - name: Commit and push generated outputs safely
@@ -102,10 +143,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # فقط فایل‌های خروجی تولیدشده وارد Commit شوند
+          # فقط خروجی‌های نهایی را برای Commit انتخاب می‌کند.
           git add data/outputs/
 
-          # اگر خروجی نسبت به Git تغییری نکرده، کار تمام است.
+          # اگر خروجی جدیدی ایجاد یا تغییر نکرده است.
           if git diff --cached --quiet; then
             echo "No output changes to commit."
             exit 0
@@ -113,26 +154,20 @@ jobs:
 
           git commit -m "chore(firis): update FLI ${FIRIS_DATE} [skip ci]"
 
-          # اگر هم‌زمان Commit دیگری روی main ایجاد شد،
-          # این بخش تا 5 بار fetch + rebase + push را تکرار می‌کند.
+          # در صورت تغییر main توسط کاربر یا اجرای دیگر، Push را تکرار می‌کند.
           for attempt in 1 2 3 4 5; do
             echo "----------------------------------------"
-            echo "Push attempt: ${attempt}/5"
+            echo "Push attempt ${attempt}/5"
 
-            # دریافت آخرین وضعیت main از GitHub
             git fetch origin main
-
-            # قرار دادن Commit خروجی روی آخرین Commit شاخه main
             git rebase origin/main
 
-            # ارسال Commit به GitHub
             if git push origin HEAD:main; then
               echo "FIRIS outputs pushed successfully."
               exit 0
             fi
 
-            echo "Push rejected: main changed during workflow execution."
-            echo "Waiting before next attempt..."
+            echo "Push was rejected because main changed concurrently."
             sleep $((attempt * 5))
           done
 
