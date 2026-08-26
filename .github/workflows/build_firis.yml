@@ -38,13 +38,19 @@ jobs:
       - name: Build FLI raster and metadata
         run: python scripts/build_firis.py
 
+      - name: Verify generated FIRIS outputs
+        run: |
+          echo "Generated output files:"
+          ls -lh data/outputs/
+          test -f data/outputs/fli_fars_*.tif
+          test -f data/outputs/firis_report_*.json
+
       - name: Commit generated FIRIS outputs
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add data/processed/firis data/processed/fli 2>/dev/null || true
-          git add data/processed/*.tif data/processed/*.json 2>/dev/null || true
+          git add data/outputs/
 
           if git diff --cached --quiet; then
             echo "No FIRIS output changes to commit."
