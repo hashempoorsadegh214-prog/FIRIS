@@ -2,22 +2,37 @@ name: Build FIRIS Fire Likelihood Index
 
 on:
   workflow_dispatch:
-
-  push:
-    paths:
-      - "data/raw/fwi/**"
-      - "data/raw/fuel/**"
-      - "data/raw/topography/**"
-      - "scripts/build_firis.py"
-      - "scripts/requirements.txt"
-      - ".github/workflows/build_firis.yml"
+  schedule:
+    # هر روز ساعت 06:00 UTC
+    - cron: "0 6 * * *"
 
 permissions:
   contents: write
 
+concurrency:
+  group: build-firis
+  cancel-in-progress: false
+
 jobs:
   build-firis:
+    name: Build FLI raster and report
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # ==========================================================
+    # مسیر فایل‌ها را در این قسمت با مسیر واقعی مخزن تنظیم کنید
+    # ==========================================================
+    env:
+      FWI_RASTER: data/inputs/fwi_fars.tif
+      FUEL_RASTER: data/inputs/fuelbeds_fars.tif
+      DEM_RASTER: data/inputs/dem_fars.tif
+      FUEL_EXCEL: data/inputs/Global_fuelbeds_parameters_v1.2.xlsx
+
+      OUTPUT_DIR: data/outputs
+
+      # این دو نام باید با ستون‌های واقعی اکسل هماهنگ شوند.
+      FUEL_CODE_COLUMN: fuel_code
+      FUEL_SCORE_COLUMN: fuel_score
 
     steps:
       - name: Checkout repository
@@ -29,32 +44,155 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r scripts/requirements.txt
 
-      - name: Build FLI raster and metadata
-        run: python scripts/build_firis.py
-
-      - name: Verify generated FIRIS outputs
+      - name: Show repository input files
+        shell: bash
         run: |
-          echo "Generated output files:"
-          ls -lh data/outputs/
-          test -f data/outputs/fli_fars_*.tif
-          test -f data/outputs/firis_report_*.json
+          echo "=============================================="
+          echo "All data files in repository"
+          echo "=============================================="
 
-      - name: Commit generated FIRIS outputs
+          if [ -d "data" ]; then
+            find data -type f | sort
+          else
+            echo "WARNING: data directory does not exist."
+          fi
+
+          echo ""
+          echo "=============================================="
+          echo "GeoTIFF files"
+          echo "=============================================="
+          find . -type f \( -iname "*.tif" -o -iname "*.tiff" \) | sort || true
+
+          echo ""
+          echo "=============================================="
+          echo "Excel files"
+          echo "=============================================="
+          find . -type f \( -iname "*.xlsx" -o -iname "*.xls" \) | sort || true
+
+      - name: Validate required input files
+        shell: bash
         run: |
+          set -euo pipefail
+
+          echo "Checking configured input paths..."
+
+          for file in \
+            "$FWI_RASTER" \
+            "$FUEL_RASTER" \
+            "$DEM_RASTER" \
+            "$FUEL_EXCEL"
+          do
+            if [ ! -f "$file" ]; then
+              echo "::error::Required input file was not found: $file"
+              echo ""
+              echo "Available TIFF/XLSX files:"
+              find . -type f \( -iname "*.tif" -o -iname "*.tiff" -o -iname "*.xlsx" -o -iname "*.xls" \) | sort || true
+              exit 1
+            fi
+
+            echo "FOUND: $file"
+          done
+
+          mkdir -p "$OUTPUT_DIR"
+
+      - name: Inspect fuel Excel file
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+          import pandas as pd
+
+          path = os.environ["FUEL_EXCEL"]
+
+          workbook = pd.ExcelFile(path)
+          print(f"Excel file: {path}")
+          print(f"Available sheets: {workbook.sheet_names}")
+
+          for sheet_name in workbook.sheet_names:
+              print("\n" + "=" * 70)
+              print(f"Sheet: {sheet_name}")
+
+              df = pd.read_excel(path, sheet_name=sheet_name, nrows=5)
+
+              print("Columns:")
+              print(df.columns.tolist())
+
+              print("\nFirst rows:")
+              print(df.to_string(index=False))
+          PY
+
+      - name: Set build date
+        id: build_date
+        shell: bash
+        run: |
+          echo "value=$(date -u +'%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      - name: Build FIRIS FLI raster and JSON report
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python scripts/build_firis.py \
+            --fwi-raster "$FWI_RASTER" \
+            --fuel-raster "$FUEL_RASTER" \
+            --dem-raster "$DEM_RASTER" \
+            --fuel-excel "$FUEL_EXCEL" \
+            --fuel-code-column "$FUEL_CODE_COLUMN" \
+            --fuel-score-column "$FUEL_SCORE_COLUMN" \
+            --output-dir "$OUTPUT_DIR" \
+            --run-date "${{ steps.build_date.outputs.value }}"
+
+      - name: Verify generated files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "=============================================="
+          echo "Generated FIRIS outputs"
+          echo "=============================================="
+
+          find "$OUTPUT_DIR" -maxdepth 1 -type f -printf "%f  %k KB\n" | sort
+
+          TIF_FILE="$OUTPUT_DIR/fli_fars_${{ steps.build_date.outputs.value }}.tif"
+          JSON_FILE="$OUTPUT_DIR/firis_report_${{ steps.build_date.outputs.value }}.json"
+
+          if [ ! -f "$TIF_FILE" ]; then
+            echo "::error::FLI GeoTIFF was not generated: $TIF_FILE"
+            exit 1
+          fi
+
+          if [ ! -f "$JSON_FILE" ]; then
+            echo "::error::JSON report was not generated: $JSON_FILE"
+            exit 1
+          fi
+
+          echo ""
+          echo "=============================================="
+          echo "JSON report"
+          echo "=============================================="
+          cat "$JSON_FILE"
+
+      - name: Commit and push output files
+        shell: bash
+        run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add data/outputs/
 
           if git diff --cached --quiet; then
-            echo "No FIRIS output changes to commit."
+            echo "No changes detected in output files; nothing to commit."
           else
-            git commit -m "chore: update FIRIS FLI outputs [skip ci]"
-            git push
+            git commit -m "chore(firis): update FLI outputs for ${{ steps.build_date.outputs.value }}"
+            git push origin HEAD:${{ github.ref_name }}
           fi
