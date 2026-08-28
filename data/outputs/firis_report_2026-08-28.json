@@ -1,6 +1,6 @@
 {
   "project": "FIRIS - Fars Integrated Fire Information System",
-  "generated_at_utc": "2026-08-28T07:23:34.015740+00:00",
+  "generated_at_utc": "2026-08-28T08:04:43.605831+00:00",
   "run_date": "2026-08-28",
   "boundary": "fars.geojson",
   "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
@@ -21,7 +21,15 @@
       "bottom": 26.999999999999996,
       "right": 55.0,
       "top": 32.0
-    }
+    },
+    "transform": [
+      0.0025000000000000014,
+      0.0,
+      50.0,
+      0.0,
+      -0.0025000000000000014,
+      32.0
+    ]
   },
   "input_metadata": {
     "FWI": {
@@ -36,7 +44,15 @@
         "right": 55.0,
         "top": 32.0
       },
-      "nodata": null
+      "nodata": null,
+      "transform": [
+        0.0025000000000000014,
+        0.0,
+        50.0,
+        0.0,
+        -0.0025000000000000014,
+        32.0
+      ]
     },
     "Fuel": {
       "crs": "EPSG:4326",
@@ -50,7 +66,15 @@
         "right": 56.41036942234943,
         "top": 31.328246616383456
       },
-      "nodata": 2147483647.0
+      "nodata": 2147483647.0,
+      "transform": [
+        0.0027769971134153806,
+        0.0,
+        49.45121465613049,
+        0.0,
+        -0.0027769971134153806,
+        31.328246616383456
+      ]
     },
     "DEM": {
       "crs": "EPSG:4326",
@@ -64,7 +88,15 @@
         "right": 55.578552795035,
         "top": 31.670868088895663
       },
-      "nodata": null
+      "nodata": null,
+      "transform": [
+        0.0008983152841195214,
+        0.0,
+        50.60188612101285,
+        0.0,
+        -0.0008983152841195214,
+        31.670868088895663
+      ]
     }
   },
   "alignment": {
@@ -76,6 +108,170 @@
     "F_FWI": "clip(FWI / 100, 0, 1)",
     "F_Fuel": "Fuelbeds_metric weighted score",
     "F_Topo": "clip(slope_degrees / 45, 0, 1)"
+  },
+  "grid_validation": {
+    "F_FWI": {
+      "path": "data/outputs/f_fwi_fars_2026-08-28.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.0025000000000000014,
+        "cell_size_y": 0.0025000000000000014,
+        "bounds": {
+          "left": 50.0,
+          "bottom": 26.999999999999996,
+          "right": 55.0,
+          "top": 32.0
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.0025000000000000014,
+          0.0,
+          50.0,
+          0.0,
+          -0.0025000000000000014,
+          32.0
+        ]
+      }
+    },
+    "F_Fuel": {
+      "path": "data/outputs/f_fuel_fars_2026-08-28.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.0025000000000000014,
+        "cell_size_y": 0.0025000000000000014,
+        "bounds": {
+          "left": 50.0,
+          "bottom": 26.999999999999996,
+          "right": 55.0,
+          "top": 32.0
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.0025000000000000014,
+          0.0,
+          50.0,
+          0.0,
+          -0.0025000000000000014,
+          32.0
+        ]
+      }
+    },
+    "Slope": {
+      "path": "data/outputs/slope_fars_2026-08-28.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.0025000000000000014,
+        "cell_size_y": 0.0025000000000000014,
+        "bounds": {
+          "left": 50.0,
+          "bottom": 26.999999999999996,
+          "right": 55.0,
+          "top": 32.0
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.0025000000000000014,
+          0.0,
+          50.0,
+          0.0,
+          -0.0025000000000000014,
+          32.0
+        ]
+      }
+    },
+    "F_Topo": {
+      "path": "data/outputs/f_topo_fars_2026-08-28.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.0025000000000000014,
+        "cell_size_y": 0.0025000000000000014,
+        "bounds": {
+          "left": 50.0,
+          "bottom": 26.999999999999996,
+          "right": 55.0,
+          "top": 32.0
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.0025000000000000014,
+          0.0,
+          50.0,
+          0.0,
+          -0.0025000000000000014,
+          32.0
+        ]
+      }
+    },
+    "FLI": {
+      "path": "data/outputs/fli_fars_2026-08-28.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.0025000000000000014,
+        "cell_size_y": 0.0025000000000000014,
+        "bounds": {
+          "left": 50.0,
+          "bottom": 26.999999999999996,
+          "right": 55.0,
+          "top": 32.0
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.0025000000000000014,
+          0.0,
+          50.0,
+          0.0,
+          -0.0025000000000000014,
+          32.0
+        ]
+      }
+    },
+    "FuelCoverage": {
+      "path": "data/outputs/fuel_coverage_fars_2026-08-28.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.0025000000000000014,
+        "cell_size_y": 0.0025000000000000014,
+        "bounds": {
+          "left": 50.0,
+          "bottom": 26.999999999999996,
+          "right": 55.0,
+          "top": 32.0
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.0025000000000000014,
+          0.0,
+          50.0,
+          0.0,
+          -0.0025000000000000014,
+          32.0
+        ]
+      }
+    }
   },
   "coverage_inside_fars": {
     "province_pixels": 1711149,
@@ -154,6 +350,7 @@
   },
   "interpretation": {
     "NoData_policy": "NoData is preserved; missing source coverage is never extrapolated.",
-    "coverage_warning": true
+    "coverage_warning": true,
+    "grid_policy": "All final output rasters must match the FWI reference grid in CRS, dimensions, transform and bounds."
   }
 }
