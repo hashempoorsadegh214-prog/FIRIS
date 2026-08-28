@@ -1,18 +1,18 @@
 {
   "title": "FIRIS - Fars Fire Risk Index",
   "source_file": "fli_fars_2026-08-28.tif",
-  "generated_at_utc": "2026-08-28T13:30:23.133715+00:00",
+  "generated_at_utc": "2026-08-28T13:40:56.473376+00:00",
   "crs": "EPSG:4326",
   "image": "fli_latest.png",
   "grid": "fli_latest_grid.json",
   "bounds": [
     [
-      26.999999999999996,
-      50.0
+      26.945617,
+      50.5031831
     ],
     [
-      32.0,
-      55.0
+      31.7695989,
+      55.68006520000001
     ]
   ],
   "raster": {
@@ -20,28 +20,28 @@
     "epsg": 4326,
     "width": 2000,
     "height": 2000,
-    "cell_size_x": 0.0025000000000000014,
-    "cell_size_y": 0.0025000000000000014,
+    "cell_size_x": 0.002588441050000003,
+    "cell_size_y": 0.002411990949999999,
     "bounds": {
-      "left": 50.0,
-      "bottom": 26.999999999999996,
-      "right": 55.0,
-      "top": 32.0
+      "left": 50.5031831,
+      "bottom": 26.945617,
+      "right": 55.68006520000001,
+      "top": 31.7695989
     },
     "transform": [
-      0.0025000000000000014,
+      0.002588441050000003,
       0.0,
-      50.0,
+      50.5031831,
       0.0,
-      -0.0025000000000000014,
-      32.0
+      -0.002411990949999999,
+      31.7695989
     ]
   },
   "statistics": {
     "min": 0.0,
-    "max": 66.54,
-    "mean": 36.9,
-    "valid_pixels": 890169
+    "max": 64.49,
+    "mean": 36.36,
+    "valid_pixels": 904755
   },
   "legend": [
     {
@@ -78,9 +78,9 @@
   "boundary": {
     "file": "fars.geojson",
     "mask_applied": true,
-    "original_valid_pixels": 890711,
-    "valid_pixels_inside_fars": 890169,
-    "valid_pixels_removed_outside_fars": 542
+    "original_valid_pixels": 904755,
+    "valid_pixels_inside_fars": 904755,
+    "valid_pixels_removed_outside_fars": 0
   },
   "spatial_policy": {
     "reference_grid": "FLI source raster",
