@@ -96,7 +96,7 @@ jobs:
           FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
 
           # IMPORTANT:
-          # Use the ORIGINAL fuel raster.
+          # Use the original Fuel raster.
           # Alignment to the FWI grid is performed inside build_firis.py.
           FUEL_RASTER="data/raw/fuel/fars_fuel.tif"
 
@@ -108,6 +108,7 @@ jobs:
           echo "FUEL_RASTER = ${FUEL_RASTER}"
           echo "DEM_RASTER  = ${DEM_RASTER}"
           echo "FUEL_EXCEL  = ${FUEL_EXCEL}"
+          echo "BOUNDARY    = fars.geojson"
 
           if [ ! -f "${FWI_RASTER}" ]; then
             echo ""
@@ -149,7 +150,7 @@ jobs:
 
 
       # ============================================================
-      # SHOW SOURCE RASTER INFORMATION
+      # SOURCE RASTER INFORMATION
       # ============================================================
 
       - name: Inspect source rasters
@@ -157,13 +158,18 @@ jobs:
         run: |
           set -euo pipefail
 
+          export FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
+          export FUEL_RASTER="data/raw/fuel/fars_fuel.tif"
+          export DEM_RASTER="data/raw/topography/dem_fars.tif"
+
           python - <<'PY'
+          import os
           import rasterio
 
           files = [
-              "data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif",
-              "data/raw/fuel/fars_fuel.tif",
-              "data/raw/topography/dem_fars.tif",
+              ("FWI", os.environ["FWI_RASTER"]),
+              ("Fuel", os.environ["FUEL_RASTER"]),
+              ("DEM", os.environ["DEM_RASTER"]),
           ]
 
           print("")
@@ -171,10 +177,10 @@ jobs:
           print("SOURCE RASTER INFORMATION")
           print("=" * 70)
 
-          for path in files:
+          for name, path in files:
 
               print("")
-              print("FILE:", path)
+              print(f"{name}: {path}")
               print("-" * 70)
 
               with rasterio.open(path) as src:
@@ -251,11 +257,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          export FIRIS_DATE="${RUN_DATE}"
+
           python - <<'PY'
+          import os
           import rasterio
           from pathlib import Path
 
-          date = "${RUN_DATE}"
+          date = os.environ["FIRIS_DATE"]
 
           output_dir = Path("data/outputs")
 
@@ -298,12 +307,13 @@ jobs:
               ref_height = ref.height
               ref_transform = ref.transform
               ref_bounds = ref.bounds
+              ref_res = ref.res
 
               print("")
               print("REFERENCE GRID = F_FWI")
               print("CRS       :", ref_crs)
               print("SIZE      :", ref_width, "x", ref_height)
-              print("CELL      :", ref.res)
+              print("CELL      :", ref_res)
               print("BOUNDS    :", ref_bounds)
               print("TRANSFORM :", ref_transform)
 
@@ -338,7 +348,7 @@ jobs:
                   ):
                       problems.append("TRANSFORM")
 
-                  if not src.bounds == ref_bounds:
+                  if src.bounds != ref_bounds:
                       problems.append("BOUNDS")
 
                   if problems:
