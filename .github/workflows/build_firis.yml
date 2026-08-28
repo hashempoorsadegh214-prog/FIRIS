@@ -1,3 +1,4 @@
+
 name: Build FIRIS
 
 on:
@@ -71,7 +72,7 @@ jobs:
 
 
       # ========================================================
-      # DETECT FWI FORECAST
+      # DETECT LATEST VALID FWI
       # ========================================================
 
       - name: Detect forecast FWI
@@ -82,10 +83,12 @@ jobs:
           python - <<'PY'
           import json
           import os
-          from pathlib import Path
           from datetime import datetime
+          from pathlib import Path
 
-          directory = Path("data/raw/fwi")
+          directory = Path(
+              "data/raw/fwi"
+          )
 
           if not directory.is_dir():
               raise SystemExit(
@@ -93,7 +96,9 @@ jobs:
               )
 
           metadata_files = sorted(
-              directory.glob("fwi_ecmwf_fars_*.json")
+              directory.glob(
+                  "fwi_ecmwf_fars_*.json"
+              )
           )
 
           if not metadata_files:
@@ -103,48 +108,67 @@ jobs:
 
           candidates = []
 
-          for path in metadata_files:
+          for metadata_path in metadata_files:
 
               try:
 
-                  with path.open(
+                  with metadata_path.open(
                       "r",
                       encoding="utf-8"
                   ) as file:
 
-                      metadata = json.load(file)
-
-                  target_date = (
-                      metadata.get("target_date")
-                      or metadata.get("forecast_date")
-                  )
-
-                  raster_name = metadata.get(
-                      "output_file"
-                  )
-
-                  if not raster_name:
-                      raster_name = (
-                          path.stem + ".tif"
+                      metadata = json.load(
+                          file
                       )
 
-                  if not target_date:
+                  forecast_date = (
+                      metadata.get(
+                          "target_date"
+                      )
+                      or
+                      metadata.get(
+                          "forecast_date"
+                      )
+                  )
+
+                  if not forecast_date:
                       continue
 
                   try:
+
                       datetime.strptime(
-                          str(target_date),
+                          str(forecast_date),
                           "%Y-%m-%d"
                       )
+
                   except ValueError:
+
                       print(
-                          f"WARNING: Invalid date in {path}: "
-                          f"{target_date}"
+                          "WARNING: Invalid forecast date:",
+                          metadata_path,
+                          forecast_date
                       )
+
                       continue
 
+                  raster_name = (
+                      metadata.get(
+                          "output_file"
+                      )
+                  )
+
+                  if not raster_name:
+
+                      raster_name = (
+                          metadata_path.stem
+                          +
+                          ".tif"
+                      )
+
                   raster_path = (
-                      directory / str(raster_name)
+                      directory
+                      /
+                      str(raster_name)
                   )
 
                   if not raster_path.is_file():
@@ -154,30 +178,39 @@ jobs:
                       )
 
                       if alternative.is_file():
+
                           raster_path = alternative
+
                       else:
+
                           print(
-                              "WARNING: FWI raster not found "
-                              f"for {path}: {raster_path}"
+                              "WARNING: Raster not found:",
+                              raster_path
                           )
+
                           continue
 
                   candidates.append(
                       (
-                          str(target_date),
+                          str(forecast_date),
                           raster_path,
-                          path
+                          metadata_path
                       )
                   )
 
               except Exception as error:
 
                   print(
-                      f"WARNING: Could not read "
-                      f"{path}: {error}"
+                      "WARNING: Could not read:",
+                      metadata_path
+                  )
+
+                  print(
+                      error
                   )
 
           if not candidates:
+
               raise SystemExit(
                   "ERROR: No valid FWI metadata with "
                   "target_date or forecast_date found."
@@ -210,11 +243,23 @@ jobs:
           print("FORECAST FWI DETECTION")
           print("=" * 70)
           print("")
-          print("Metadata file :", metadata_path)
-          print("Forecast date :", forecast_date)
-          print("FWI raster    :", raster_path)
+          print(
+              "Metadata file :",
+              metadata_path
+          )
+          print(
+              "Forecast date :",
+              forecast_date
+          )
+          print(
+              "FWI raster    :",
+              raster_path
+          )
           print("")
-          print("✓ Forecast FWI selected successfully.")
+          print(
+              "✓ Forecast FWI selected successfully."
+          )
+
           PY
 
 
@@ -231,9 +276,17 @@ jobs:
           DEM_RASTER="data/raw/topography/dem_fars.tif"
           FUEL_EXCEL="data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
 
-          echo "FUEL_RASTER=${FUEL_RASTER}" >> "${GITHUB_ENV}"
-          echo "DEM_RASTER=${DEM_RASTER}" >> "${GITHUB_ENV}"
-          echo "FUEL_EXCEL=${FUEL_EXCEL}" >> "${GITHUB_ENV}"
+          echo \
+            "FUEL_RASTER=${FUEL_RASTER}" \
+            >> "${GITHUB_ENV}"
+
+          echo \
+            "DEM_RASTER=${DEM_RASTER}" \
+            >> "${GITHUB_ENV}"
+
+          echo \
+            "FUEL_EXCEL=${FUEL_EXCEL}" \
+            >> "${GITHUB_ENV}"
 
 
       # ========================================================
@@ -246,11 +299,21 @@ jobs:
           set -euo pipefail
 
           required_files=(
+
             "${FWI_RASTER}"
+
             "${FUEL_RASTER}"
+
             "${DEM_RASTER}"
+
             "${FUEL_EXCEL}"
+
             "fars.geojson"
+
+            "protected_areas.geojson"
+
+            "hunting_banned.geojson"
+
           )
 
           echo ""
@@ -267,6 +330,7 @@ jobs:
               echo "${file}"
 
               exit 1
+
             fi
 
             echo "✓ ${file}"
@@ -274,7 +338,7 @@ jobs:
           done
 
           echo ""
-          echo "All required files found."
+          echo "All required input files found."
 
 
       # ========================================================
@@ -298,12 +362,24 @@ jobs:
           print("SELECTED FORECAST FWI")
           print("=" * 70)
 
-          print("Forecast date:", date)
-          print("File:", path)
+          print(
+              "Forecast date:",
+              date
+          )
 
-          with rasterio.open(path) as src:
+          print(
+              "File:",
+              path
+          )
 
-              print("CRS:", src.crs)
+          with rasterio.open(
+              path
+          ) as src:
+
+              print(
+                  "CRS:",
+                  src.crs
+              )
 
               print(
                   "Size:",
@@ -323,19 +399,22 @@ jobs:
               )
 
               if src.crs is None:
+
                   raise RuntimeError(
                       "FWI raster has no CRS."
                   )
 
               if src.crs.to_epsg() != 4326:
+
                   raise RuntimeError(
                       "FWI raster must be EPSG:4326."
                   )
+
           PY
 
 
       # ========================================================
-      # OUTPUT DIRECTORIES
+      # PREPARE OUTPUT DIRECTORIES
       # ========================================================
 
       - name: Prepare output directories
@@ -365,7 +444,7 @@ jobs:
 
 
       # ========================================================
-      # RUN FIRIS
+      # BUILD FIRIS
       # ========================================================
 
       - name: Run FIRIS
@@ -416,6 +495,7 @@ jobs:
             echo "${FLI_RASTER}"
 
             exit 1
+
           fi
 
           echo ""
@@ -441,6 +521,7 @@ jobs:
             echo "${FLI_RASTER}"
 
             exit 1
+
           fi
 
           echo ""
@@ -455,7 +536,16 @@ jobs:
 
 
       # ========================================================
-      # BUILD EXCEL REPORT
+      # BUILD DETAILED EXCEL REPORT
+      #
+      # protected_areas.geojson
+      #   -> مناطق چهارگانه
+      #
+      # hunting_banned.geojson
+      #   -> مناطق شکار ممنوع
+      #
+      # The report script calculates the mean directly
+      # from the full-resolution FLI raster for every polygon.
       # ========================================================
 
       - name: Build Excel report
@@ -464,6 +554,7 @@ jobs:
           set -euo pipefail
 
           FLI_RASTER="data/outputs/fli_fars_${FWI_DATE}.tif"
+
           REPORT_FILE="data/report/firis_report.xlsx"
 
           if [ ! -f "${FLI_RASTER}" ]; then
@@ -473,17 +564,20 @@ jobs:
             echo "${FLI_RASTER}"
 
             exit 1
+
           fi
 
           echo ""
           echo "============================================================"
-          echo "BUILDING EXCEL REPORT"
+          echo "BUILDING DETAILED EXCEL REPORT"
           echo "============================================================"
 
           python scripts/build_report.py \
             --input "${FLI_RASTER}" \
             --output "${REPORT_FILE}" \
-            --run-date "${FWI_DATE}"
+            --run-date "${FWI_DATE}" \
+            --protected "protected_areas.geojson" \
+            --hunting "hunting_banned.geojson"
 
           if [ ! -f "${REPORT_FILE}" ]; then
 
@@ -492,33 +586,40 @@ jobs:
             echo "${REPORT_FILE}"
 
             exit 1
+
           fi
 
           echo ""
-          echo "✓ Excel report created:"
+          echo "✓ Detailed Excel report created:"
           echo "${REPORT_FILE}"
 
 
       # ========================================================
-      # VERIFY WEB OUTPUTS
+      # VERIFY OUTPUTS
       # ========================================================
 
-      - name: Verify web outputs
+      - name: Verify outputs
         shell: bash
         run: |
           set -euo pipefail
 
           required_files=(
+
             "data/web/fli_polygons.geojson"
+
             "data/web/fli_latest.json"
+
             "data/web/fli_latest_grid.json"
+
             "data/web/fli_latest.png"
+
             "data/report/firis_report.xlsx"
+
           )
 
           echo ""
           echo "============================================================"
-          echo "VERIFYING WEB OUTPUTS"
+          echo "VERIFYING OUTPUT FILES"
           echo "============================================================"
 
           for file in "${required_files[@]}"; do
@@ -530,6 +631,7 @@ jobs:
               echo "${file}"
 
               exit 1
+
             fi
 
             echo "✓ ${file}"
@@ -550,9 +652,14 @@ jobs:
           import json
           import os
 
-          expected = os.environ["FWI_DATE"]
+          expected = os.environ[
+              "FWI_DATE"
+          ]
 
-          path = "data/web/fli_latest.json"
+          path = (
+              "data/web/"
+              "fli_latest.json"
+          )
 
           with open(
               path,
@@ -560,11 +667,18 @@ jobs:
               encoding="utf-8"
           ) as file:
 
-              metadata = json.load(file)
+              metadata = json.load(
+                  file
+              )
 
           actual = (
-              metadata.get("forecast_date")
-              or metadata.get("target_date")
+              metadata.get(
+                  "forecast_date"
+              )
+              or
+              metadata.get(
+                  "target_date"
+              )
           )
 
           print("")
@@ -572,8 +686,15 @@ jobs:
           print("WEB FORECAST DATE VALIDATION")
           print("=" * 70)
 
-          print("Expected:", expected)
-          print("Actual  :", actual)
+          print(
+              "Expected:",
+              expected
+          )
+
+          print(
+              "Actual  :",
+              actual
+          )
 
           if actual != expected:
 
@@ -586,6 +707,7 @@ jobs:
           print(
               "✓ Web forecast date is correct."
           )
+
           PY
 
 
@@ -606,7 +728,10 @@ jobs:
           import rasterio
 
 
-          date = os.environ["FWI_DATE"]
+          date = os.environ[
+              "FWI_DATE"
+          ]
+
 
           directory = Path(
               "data/outputs"
@@ -708,18 +833,27 @@ jobs:
           print("=" * 70)
 
           print("")
-          print("REFERENCE = F_FWI")
-          print("CRS       :", ref_crs)
+          print(
+              "REFERENCE = F_FWI"
+          )
+
+          print(
+              "CRS       :",
+              ref_crs
+          )
+
           print(
               "SIZE      :",
               ref_width,
               "x",
               ref_height
           )
+
           print(
               "RES       :",
               tuple(ref_res)
           )
+
           print(
               "BOUNDS    :",
               tuple(ref_bounds)
@@ -731,7 +865,8 @@ jobs:
               if not path.exists():
 
                   print(
-                      f"✗ {name:<16} FILE NOT FOUND"
+                      f"✗ {name:<16}"
+                      f"FILE NOT FOUND"
                   )
 
                   failures.append(
@@ -850,14 +985,16 @@ jobs:
                       print(
                           f"✗ {name:<16}"
                           f"GRID MISMATCH: "
-                          + ", ".join(
+                          +
+                          ", ".join(
                               problems
                           )
                       )
 
                       failures.append(
                           f"{name}: "
-                          + ", ".join(
+                          +
+                          ", ".join(
                               problems
                           )
                       )
@@ -900,10 +1037,151 @@ jobs:
 
 
       # ========================================================
+      # VERIFY EXCEL CONTENT
+      # ========================================================
+
+      - name: Verify Excel report content
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          from pathlib import Path
+
+          import openpyxl
+
+
+          path = Path(
+              "data/report/firis_report.xlsx"
+          )
+
+
+          if not path.is_file():
+
+              raise SystemExit(
+                  "ERROR: Excel report not found."
+              )
+
+
+          workbook = openpyxl.load_workbook(
+              path,
+              read_only=True,
+              data_only=True
+          )
+
+
+          required_sheets = {
+
+              "خلاصه",
+
+              "مناطق_شکار_ممنوع",
+
+              "مناطق_چهارگانه",
+
+              "طبقات_خطر",
+
+              "اطلاعات_فنی"
+
+          }
+
+
+          actual_sheets = set(
+              workbook.sheetnames
+          )
+
+
+          print("")
+          print("=" * 70)
+          print("EXCEL REPORT VALIDATION")
+          print("=" * 70)
+
+          print("")
+          print(
+              "Sheets found:"
+          )
+
+          for sheet in workbook.sheetnames:
+
+              print(
+                  " -",
+                  sheet
+              )
+
+
+          missing = (
+              required_sheets
+              -
+              actual_sheets
+          )
+
+
+          if missing:
+
+              raise SystemExit(
+                  "ERROR: Missing Excel sheets: "
+                  +
+                  ", ".join(
+                      sorted(
+                          missing
+                      )
+                  )
+              )
+
+
+          print("")
+          print(
+              "✓ All required Excel sheets exist."
+          )
+
+
+          for sheet_name in [
+
+              "مناطق_شکار_ممنوع",
+
+              "مناطق_چهارگانه"
+
+          ]:
+
+              worksheet =
+                  workbook[
+                      sheet_name
+                  ]
+
+
+              row_count =
+                  max(
+                      worksheet.max_row - 1,
+                      0
+                  )
+
+
+              print(
+                  f"{sheet_name}: "
+                  f"{row_count} region rows"
+              )
+
+
+              if row_count == 0:
+
+                  raise SystemExit(
+                      "ERROR: Excel regional "
+                      f"sheet is empty: {sheet_name}"
+                  )
+
+
+          print("")
+          print(
+              "✓ Regional Excel content is present."
+          )
+
+          PY
+
+
+      # ========================================================
       # SHOW FINAL FORECAST
       # ========================================================
 
-      - name: Show final forecast information
+      - name: Show final forecast
         shell: bash
         run: |
           set -euo pipefail
@@ -912,17 +1190,21 @@ jobs:
           import json
           import os
 
+
           date = os.environ[
               "FWI_DATE"
           ]
+
 
           fwi_path = (
               f"data/raw/fwi/"
               f"fwi_ecmwf_fars_{date}.json"
           )
 
+
           web_path = (
-              "data/web/fli_latest.json"
+              "data/web/"
+              "fli_latest.json"
           )
 
 
@@ -932,7 +1214,9 @@ jobs:
               encoding="utf-8"
           ) as file:
 
-              fwi = json.load(file)
+              fwi = json.load(
+                  file
+              )
 
 
           with open(
@@ -941,17 +1225,30 @@ jobs:
               encoding="utf-8"
           ) as file:
 
-              web = json.load(file)
+              web = json.load(
+                  file
+              )
 
 
           fwi_date = (
-              fwi.get("target_date")
-              or fwi.get("forecast_date")
+              fwi.get(
+                  "target_date"
+              )
+              or
+              fwi.get(
+                  "forecast_date"
+              )
           )
 
+
           web_date = (
-              web.get("forecast_date")
-              or web.get("target_date")
+              web.get(
+                  "forecast_date"
+              )
+              or
+              web.get(
+                  "target_date"
+              )
           )
 
 
@@ -962,32 +1259,31 @@ jobs:
 
           print("")
           print(
-              "FWI target date :",
+              "FWI target date:",
               fwi_date
           )
 
           print(
-              "FLI target date :",
+              "FLI target date:",
               web_date
           )
 
-          print(
-              "Web layer       :",
-              web.get(
-                  "primary_web_layer"
-              )
-          )
 
-          if fwi_date != web_date:
+          if (
+              fwi_date
+              !=
+              web_date
+          ):
 
               raise SystemExit(
-                  "ERROR: FWI and FLI forecast dates "
+                  "ERROR: FWI and FLI dates "
                   "are not synchronized."
               )
 
+
           print("")
           print(
-              "✓ FWI → FLI → Web dates are synchronized."
+              "✓ FWI → FLI → Web dates synchronized."
           )
 
           PY
@@ -1007,25 +1303,33 @@ jobs:
           echo "OUTPUT FILES"
           echo "============================================================"
 
-          find data/outputs \
+          echo ""
+          echo "data/outputs"
+
+          find \
+            data/outputs \
             -maxdepth 1 \
             -type f \
             -print \
             | sort
 
-          echo ""
-          echo "WEB FILES"
 
-          find data/web \
+          echo ""
+          echo "data/web"
+
+          find \
+            data/web \
             -maxdepth 1 \
             -type f \
             -print \
             | sort
 
-          echo ""
-          echo "REPORT FILES"
 
-          find data/report \
+          echo ""
+          echo "data/report"
+
+          find \
+            data/report \
             -maxdepth 1 \
             -type f \
             -print \
@@ -1062,12 +1366,13 @@ jobs:
             echo "No output changes to commit."
 
             exit 0
+
           fi
 
 
           git commit \
             -m \
-            "chore(firis): update tomorrow forecast outputs [skip ci]"
+            "chore(firis): update forecast web and regional report [skip ci]"
 
 
       # ========================================================
