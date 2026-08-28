@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-Convert FIRIS FLI GeoTIFF to a transparent PNG overlay for Leaflet
-and create metadata JSON containing WGS84 bounds.
-
-Output files:
-    data/web/fli_latest.png
-    data/web/fli_latest.json
-"""
 
 import argparse
 import json
@@ -16,182 +8,425 @@ from pathlib import Path
 import numpy as np
 import rasterio
 from PIL import Image
-from rasterio.crs import CRS
-from rasterio.enums import Resampling
-from rasterio.transform import array_bounds
-from rasterio.warp import calculate_default_transform, reproject
+from rasterio.windows import Window
 
 
-WGS84 = CRS.from_epsg(4326)
+LEGEND = [
+    {"min": 0, "max": 20, "label": "کم", "color": "#2e7d32"},
+    {"min": 20, "max": 40, "label": "متوسط", "color": "#fdd835"},
+    {"min": 40, "max": 60, "label": "زیاد", "color": "#fb8c00"},
+    {"min": 60, "max": 80, "label": "خیلی زیاد", "color": "#e53935"},
+    {"min": 80, "max": 100, "label": "بحرانی", "color": "#880e4f"},
+]
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Create PNG and JSON files for the FIRIS Leaflet web map."
+        description="Build FIRIS web map files"
     )
+
     parser.add_argument(
         "--input",
-        required=True,
-        help="Path to input FLI GeoTIFF, e.g. data/outputs/fli_fars_2026-08-27.tif",
+        required=True
     )
+
     parser.add_argument(
         "--output-dir",
-        required=True,
-        help="Output directory, e.g. data/web",
+        required=True
     )
+
     return parser.parse_args()
 
 
-def normalize_fli(values: np.ndarray) -> np.ndarray:
-    """
-    FLI normally ranges from 0 to 100.
-    Values outside this range are clipped safely.
-    """
-    return np.clip(values.astype(np.float32), 0.0, 100.0)
+def colorize(values, valid):
 
+    rgba = np.zeros(
+        (
+            values.shape[0],
+            values.shape[1],
+            4
+        ),
+        dtype=np.uint8
+    )
 
-def fli_to_rgba(fli: np.ndarray, valid_mask: np.ndarray) -> np.ndarray:
-    """
-    Create a fire-risk color ramp:
+    classes = [
+        (
+            valid & (values < 20),
+            (46, 125, 50, 215)
+        ),
+        (
+            valid & (values >= 20) & (values < 40),
+            (253, 216, 53, 220)
+        ),
+        (
+            valid & (values >= 40) & (values < 60),
+            (251, 140, 0, 225)
+        ),
+        (
+            valid & (values >= 60) & (values < 80),
+            (229, 57, 53, 230)
+        ),
+        (
+            valid & (values >= 80),
+            (136, 14, 79, 235)
+        ),
+    ]
 
-    0-20   : green
-    20-40  : yellow
-    40-60  : orange
-    60-80  : red
-    80-100 : dark red
-    """
-    rgba = np.zeros((fli.shape[0], fli.shape[1], 4), dtype=np.uint8)
-
-    # Very low risk: green
-    mask = valid_mask & (fli < 20)
-    rgba[mask] = [46, 125, 50, 190]
-
-    # Low to moderate: yellow
-    mask = valid_mask & (fli >= 20) & (fli < 40)
-    rgba[mask] = [253, 216, 53, 200]
-
-    # Moderate to high: orange
-    mask = valid_mask & (fli >= 40) & (fli < 60)
-    rgba[mask] = [251, 140, 0, 210]
-
-    # High: red
-    mask = valid_mask & (fli >= 60) & (fli < 80)
-    rgba[mask] = [229, 57, 53, 220]
-
-    # Very high / extreme: dark red
-    mask = valid_mask & (fli >= 80)
-    rgba[mask] = [136, 14, 79, 230]
+    for mask, color in classes:
+        rgba[mask] = color
 
     return rgba
 
 
-def read_as_wgs84(input_path: Path):
-    """Read source raster and reproject it to EPSG:4326 if required."""
-    with rasterio.open(input_path) as src:
-        source_data = src.read(1, masked=True)
-
-        if src.crs is None:
-            raise ValueError(
-                "Input GeoTIFF has no CRS. A valid geographic coordinate system is required."
-            )
-
-        if src.crs == WGS84:
-            data = source_data
-            bounds = src.bounds
-            return data, bounds
-
-        transform, width, height = calculate_default_transform(
-            src.crs,
-            WGS84,
-            src.width,
-            src.height,
-            *src.bounds,
-        )
-
-        destination = np.full((height, width), np.nan, dtype=np.float32)
-
-        reproject(
-            source=np.asarray(source_data.filled(np.nan), dtype=np.float32),
-            destination=destination,
-            src_transform=src.transform,
-            src_crs=src.crs,
-            src_nodata=src.nodata,
-            dst_transform=transform,
-            dst_crs=WGS84,
-            dst_nodata=np.nan,
-            resampling=Resampling.bilinear,
-        )
-
-        south, west, north, east = array_bounds(height, width, transform)
-
-        return np.ma.masked_invalid(destination), rasterio.coords.BoundingBox(
-            left=west,
-            bottom=south,
-            right=east,
-            top=north,
-        )
-
-
 def main():
+
     args = parse_args()
 
     input_path = Path(args.input)
     output_dir = Path(args.output_dir)
 
-    if not input_path.is_file():
-        raise FileNotFoundError(f"FLI GeoTIFF not found: {input_path}")
+    output_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    output_dir.mkdir(parents=True, exist_ok=True)
+    png_path = (
+        output_dir /
+        "fli_latest.png"
+    )
 
-    png_path = output_dir / "fli_latest.png"
-    json_path = output_dir / "fli_latest.json"
+    json_path = (
+        output_dir /
+        "fli_latest.json"
+    )
 
-    raster, bounds = read_as_wgs84(input_path)
+    grid_path = (
+        output_dir /
+        "fli_latest_grid.json"
+    )
 
-    raw_values = np.asarray(raster.filled(np.nan), dtype=np.float32)
-    valid_mask = np.isfinite(raw_values)
+    with rasterio.open(input_path) as src:
 
-    if not np.any(valid_mask):
-        raise ValueError("The input FLI raster contains no valid pixels.")
+        if src.crs is None:
+            raise ValueError(
+                "FLI raster has no CRS."
+            )
 
-    fli = normalize_fli(np.nan_to_num(raw_values, nan=0.0))
-    rgba = fli_to_rgba(fli, valid_mask)
+        if src.crs.to_epsg() != 4326:
+            raise ValueError(
+                f"FLI CRS must be EPSG:4326. "
+                f"Current CRS: {src.crs}"
+            )
 
-    image = Image.fromarray(rgba, mode="RGBA")
-    image.save(png_path, format="PNG", optimize=True)
+        data = src.read(
+            1,
+            masked=True
+        )
 
-    valid_values = raw_values[valid_mask]
+        values = np.asarray(
+            data.filled(np.nan),
+            dtype=np.float32
+        )
+
+        valid = (
+            np.isfinite(values)
+            & (values >= 0)
+            & (values <= 100)
+        )
+
+        if not np.any(valid):
+            raise ValueError(
+                "No valid FLI pixels found."
+            )
+
+        rows, cols = np.where(valid)
+
+        row_min = int(rows.min())
+        row_max = int(rows.max())
+
+        col_min = int(cols.min())
+        col_max = int(cols.max())
+
+        height = (
+            row_max -
+            row_min +
+            1
+        )
+
+        width = (
+            col_max -
+            col_min +
+            1
+        )
+
+        window = Window(
+            col_min,
+            row_min,
+            width,
+            height
+        )
+
+        cropped = values[
+            row_min:row_max + 1,
+            col_min:col_max + 1
+        ]
+
+        cropped_valid = valid[
+            row_min:row_max + 1,
+            col_min:col_max + 1
+        ]
+
+        rgba = colorize(
+            cropped,
+            cropped_valid
+        )
+
+        image = Image.fromarray(
+            rgba,
+            "RGBA"
+        )
+
+        image.save(
+            png_path,
+            optimize=True
+        )
+
+        transform = (
+            src.window_transform(window)
+        )
+
+        left = float(
+            transform.c
+        )
+
+        top = float(
+            transform.f
+        )
+
+        right = (
+            left +
+            width * transform.a
+        )
+
+        bottom = (
+            top +
+            height * transform.e
+        )
+
+        valid_values = values[valid]
+
+        statistics = {
+            "min": round(
+                float(valid_values.min()),
+                2
+            ),
+            "max": round(
+                float(valid_values.max()),
+                2
+            ),
+            "mean": round(
+                float(valid_values.mean()),
+                2
+            )
+        }
+
+        # ----------------------------------------------------
+        # Lightweight grid for pixel popup
+        # ----------------------------------------------------
+
+        max_dimension = 350
+
+        row_step = max(
+            1,
+            int(
+                np.ceil(
+                    height /
+                    max_dimension
+                )
+            )
+        )
+
+        col_step = max(
+            1,
+            int(
+                np.ceil(
+                    width /
+                    max_dimension
+                )
+            )
+        )
+
+        sample = cropped[
+            ::row_step,
+            ::col_step
+        ]
+
+        sample = np.where(
+            np.isfinite(sample),
+            sample,
+            -9999
+        )
+
+        grid = {
+            "bounds": [
+                [
+                    bottom,
+                    left
+                ],
+                [
+                    top,
+                    right
+                ]
+            ],
+            "rows": int(
+                sample.shape[0]
+            ),
+            "cols": int(
+                sample.shape[1]
+            ),
+            "row_step": int(
+                row_step
+            ),
+            "col_step": int(
+                col_step
+            ),
+            "origin": {
+                "left": left,
+                "top": top
+            },
+            "cell_size": {
+                "x": float(
+                    src.res[0]
+                ),
+                "y": float(
+                    abs(src.res[1])
+                )
+            },
+            "values": (
+                np.round(
+                    sample,
+                    2
+                ).tolist()
+            )
+        }
 
     metadata = {
-        "title": "FIRIS – Fars Fire Risk Index",
-        "source_file": input_path.name,
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "crs": "EPSG:4326",
-        "image": "fli_latest.png",
+
+        "title":
+            "FIRIS - Fars Fire Risk Index",
+
+        "source_file":
+            input_path.name,
+
+        "generated_at_utc":
+            datetime.now(
+                timezone.utc
+            ).isoformat(),
+
+        "crs":
+            "EPSG:4326",
+
+        "image":
+            "fli_latest.png",
+
+        "grid":
+            "fli_latest_grid.json",
+
         "bounds": [
-            [round(bounds.bottom, 8), round(bounds.left, 8)],
-            [round(bounds.top, 8), round(bounds.right, 8)],
+            [
+                bottom,
+                left
+            ],
+            [
+                top,
+                right
+            ]
         ],
-        "statistics": {
-            "min": round(float(np.min(valid_values)), 2),
-            "max": round(float(np.max(valid_values)), 2),
-            "mean": round(float(np.mean(valid_values)), 2),
+
+        "raster": {
+
+            "width":
+                int(width),
+
+            "height":
+                int(height),
+
+            "cell_size_x":
+                float(src.res[0]),
+
+            "cell_size_y":
+                float(
+                    abs(src.res[1])
+                )
         },
-        "legend": [
-            {"min": 0, "max": 20, "label": "کم", "color": "#2e7d32"},
-            {"min": 20, "max": 40, "label": "متوسط", "color": "#fdd835"},
-            {"min": 40, "max": 60, "label": "نسبتاً زیاد", "color": "#fb8c00"},
-            {"min": 60, "max": 80, "label": "زیاد", "color": "#e53935"},
-            {"min": 80, "max": 100, "label": "بسیار زیاد", "color": "#880e4f"},
-        ],
+
+        "statistics":
+            statistics,
+
+        "legend":
+            LEGEND
     }
 
-    with json_path.open("w", encoding="utf-8") as file:
-        json.dump(metadata, file, ensure_ascii=False, indent=2)
+    json_path.write_text(
+        json.dumps(
+            metadata,
+            ensure_ascii=False,
+            indent=2
+        ),
+        encoding="utf-8"
+    )
 
-    print(f"Created PNG : {png_path}")
-    print(f"Created JSON: {json_path}")
-    print(f"Bounds      : {metadata['bounds']}")
+    grid_path.write_text(
+        json.dumps(
+            grid,
+            ensure_ascii=False,
+            separators=(
+                ",",
+                ":"
+            )
+        ),
+        encoding="utf-8"
+    )
+
+    print(
+        "============================================================"
+    )
+
+    print(
+        "FIRIS WEB MAP BUILD"
+    )
+
+    print(
+        "============================================================"
+    )
+
+    print(
+        f"Input : {input_path}"
+    )
+
+    print(
+        f"PNG   : {png_path}"
+    )
+
+    print(
+        f"JSON  : {json_path}"
+    )
+
+    print(
+        f"GRID  : {grid_path}"
+    )
+
+    print(
+        f"Bounds: "
+        f"{bottom:.8f}, "
+        f"{left:.8f}, "
+        f"{top:.8f}, "
+        f"{right:.8f}"
+    )
+
+    print(
+        f"Stats : {statistics}"
+    )
 
 
 if __name__ == "__main__":
