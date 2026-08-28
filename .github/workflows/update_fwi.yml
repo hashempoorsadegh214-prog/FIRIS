@@ -1,12 +1,26 @@
-name: Update FIRIS FWI
+name: Build FIRIS
 
 on:
 
   workflow_dispatch:
 
-  schedule:
+  push:
+    paths:
 
-    - cron: "30 5 * * *"
+      - "scripts/**"
+      - "data/raw/**"
+      - "fars.geojson"
+      - "protected_areas.geojson"
+      - "hunting_banned.geojson"
+      - "index.html"
+      - ".github/workflows/build_firis.yml"
+
+
+concurrency:
+
+  group: firis-build
+
+  cancel-in-progress: true
 
 
 permissions:
@@ -14,16 +28,9 @@ permissions:
   contents: write
 
 
-concurrency:
-
-  group: firis-fwi-download
-
-  cancel-in-progress: true
-
-
 jobs:
 
-  download-fwi:
+  build-firis:
 
     runs-on: ubuntu-latest
 
@@ -72,60 +79,26 @@ jobs:
           python -m pip install --upgrade pip
 
           pip install \
-            -r scripts/requirements.txt
+            numpy \
+            pandas \
+            openpyxl \
+            rasterio \
+            shapely \
+            pyproj \
+            pillow
 
 
       # ========================================================
-      # CHECK BOUNDARY
+      # FIND LATEST FWI
+      #
+      # IMPORTANT:
+      # We DO NOT use today's date.
+      #
+      # We use the forecast_date stored inside the
+      # FWI metadata.
       # ========================================================
 
-      - name: Check Fars boundary
-
-        shell: bash
-
-        run: |
-
-          set -euo pipefail
-
-          if [ ! -f "fars.geojson" ]; then
-
-            echo ""
-            echo "ERROR: fars.geojson not found."
-
-            exit 1
-
-          fi
-
-          echo "✓ fars.geojson exists."
-
-
-      # ========================================================
-      # DOWNLOAD TOMORROW FWI
-      # ========================================================
-
-      - name: Download tomorrow FWI
-
-        shell: bash
-
-        run: |
-
-          set -euo pipefail
-
-          echo ""
-          echo "============================================================"
-          echo "AUTOMATIC TOMORROW FWI"
-          echo "============================================================"
-
-          python scripts/update_fwi.py \
-            --boundary "fars.geojson" \
-            --overwrite
-
-
-      # ========================================================
-      # DETERMINE FWI DATE FROM CREATED FILE
-      # ========================================================
-
-      - name: Detect forecast FWI file
+      - name: Detect forecast FWI
 
         shell: bash
 
@@ -143,44 +116,110 @@ jobs:
               "data/raw/fwi"
           )
 
-          files = sorted(
+          metadata_files = sorted(
               directory.glob(
                   "fwi_ecmwf_fars_*.json"
               )
           )
 
-          if not files:
+
+          if not metadata_files:
 
               raise SystemExit(
-                  "No FWI metadata file was created."
+                  "No FWI metadata files found."
               )
 
-          latest = files[-1]
 
-          with latest.open(
-              "r",
-              encoding="utf-8"
-          ) as file:
+          candidates = []
 
-              metadata = json.load(file)
 
-          forecast_date = (
-              metadata.get(
-                  "forecast_date"
+          for path in metadata_files:
+
+              try:
+
+                  with path.open(
+                      "r",
+                      encoding="utf-8"
+                  ) as file:
+
+                      metadata = json.load(file)
+
+                  forecast_date = (
+                      metadata.get(
+                          "forecast_date"
+                      )
+                  )
+
+                  raster = (
+                      metadata.get(
+                          "output_file"
+                      )
+                  )
+
+                  if (
+                      forecast_date
+                      and
+                      raster
+                  ):
+
+                      candidates.append(
+                          (
+                              forecast_date,
+                              raster
+                          )
+                      )
+
+              except Exception:
+
+                  continue
+
+
+          if not candidates:
+
+              raise SystemExit(
+                  "No valid FWI metadata with "
+                  "forecast_date found."
               )
+
+
+          candidates.sort(
+              key=lambda x: x[0]
           )
 
-          if not forecast_date:
+
+          forecast_date, raster_name = (
+              candidates[-1]
+          )
+
+
+          fwi_path = (
+              directory /
+              raster_name
+          )
+
+
+          if not fwi_path.is_file():
 
               raise SystemExit(
-                  "forecast_date missing "
-                  "from FWI metadata."
+                  f"FWI raster not found: {fwi_path}"
               )
+
+
+          print("")
+          print("=" * 70)
+          print("FORECAST FWI")
+          print("=" * 70)
 
           print(
-              f"Detected forecast date: "
-              f"{forecast_date}"
+              "Forecast date:",
+              forecast_date
           )
+
+          print(
+              "FWI file:",
+              fwi_path
+          )
+
 
           with open(
               os.environ["GITHUB_ENV"],
@@ -192,14 +231,18 @@ jobs:
                   f"FWI_DATE={forecast_date}\n"
               )
 
+              env.write(
+                  f"FWI_RASTER={fwi_path}\n"
+              )
+
           PY
 
 
       # ========================================================
-      # VERIFY FWI
+      # INPUT FILES
       # ========================================================
 
-      - name: Verify tomorrow FWI
+      - name: Define inputs
 
         shell: bash
 
@@ -207,111 +250,88 @@ jobs:
 
           set -euo pipefail
 
-          FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.tif"
+          FUEL_RASTER="data/raw/fuel/fars_fuel.tif"
 
-          FWI_META="data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.json"
+          DEM_RASTER="data/raw/topography/dem_fars.tif"
 
-
-          if [ ! -f "${FWI_FILE}" ]; then
-
-            echo ""
-            echo "ERROR: FWI file not found:"
-            echo "${FWI_FILE}"
-
-            exit 1
-
-          fi
+          FUEL_EXCEL="data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
 
 
-          if [ ! -f "${FWI_META}" ]; then
+          echo "FUEL_RASTER=${FUEL_RASTER}" \
+            >> "${GITHUB_ENV}"
 
-            echo ""
-            echo "ERROR: FWI metadata not found:"
-            echo "${FWI_META}"
+          echo "DEM_RASTER=${DEM_RASTER}" \
+            >> "${GITHUB_ENV}"
 
-            exit 1
-
-          fi
-
-
-          python - <<'PY'
-
-          import json
-          import os
-          import rasterio
-
-          date = os.environ["FWI_DATE"]
-
-          tif = (
-              f"data/raw/fwi/"
-              f"fwi_ecmwf_fars_{date}.tif"
-          )
-
-          meta = (
-              f"data/raw/fwi/"
-              f"fwi_ecmwf_fars_{date}.json"
-          )
-
-          print("")
-          print("=" * 70)
-          print("FWI VERIFICATION")
-          print("=" * 70)
-
-          with open(
-              meta,
-              "r",
-              encoding="utf-8"
-          ) as file:
-
-              info = json.load(file)
-
-          print(
-              "Forecast date :",
-              info.get(
-                  "forecast_date"
-              )
-          )
-
-          print(
-              "Iran datetime :",
-              info.get(
-                  "current_iran_datetime"
-              )
-          )
-
-          print(
-              "Request BBOX  :",
-              info.get(
-                  "request_bbox"
-              )
-          )
-
-          with rasterio.open(
-              tif
-          ) as src:
-
-              print(
-                  "Raster bounds :",
-                  src.bounds
-              )
-
-              print(
-                  "Raster size   :",
-                  src.width,
-                  "x",
-                  src.height
-              )
-
-              print(
-                  "Raster CRS    :",
-                  src.crs
-              )
-
-          PY
+          echo "FUEL_EXCEL=${FUEL_EXCEL}" \
+            >> "${GITHUB_ENV}"
 
 
       # ========================================================
-      # CONTROL POINT CHECK
+      # CHECK INPUTS
+      # ========================================================
+
+      - name: Check inputs
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          required_files=(
+
+            "${FWI_RASTER}"
+
+            "${FUEL_RASTER}"
+
+            "${DEM_RASTER}"
+
+            "${FUEL_EXCEL}"
+
+            "fars.geojson"
+
+          )
+
+
+          for file in "${required_files[@]}"; do
+
+            if [ ! -f "${file}" ]; then
+
+              echo ""
+              echo "ERROR:"
+              echo "${file}"
+
+              exit 1
+
+            fi
+
+            echo "✓ ${file}"
+
+          done
+
+
+      # ========================================================
+      # OUTPUT DIRECTORIES
+      # ========================================================
+
+      - name: Prepare directories
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          mkdir -p data/outputs
+
+          mkdir -p data/web
+
+          mkdir -p data/report
+
+
+      # ========================================================
+      # CONTROL POINTS
       # ========================================================
 
       - name: Check Fars control points
@@ -323,19 +343,17 @@ jobs:
           set -euo pipefail
 
           python scripts/check_control_points.py \
-            --raster \
-              "data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.tif" \
-            --boundary \
-              "fars.geojson" \
+            --raster "${FWI_RASTER}" \
+            --boundary "fars.geojson" \
             --output \
               "data/outputs/control_points_${FWI_DATE}.json"
 
 
       # ========================================================
-      # SHOW CONTROL POINTS
+      # BUILD FIRIS
       # ========================================================
 
-      - name: Show control point report
+      - name: Run FIRIS
 
         shell: bash
 
@@ -343,15 +361,442 @@ jobs:
 
           set -euo pipefail
 
-          cat \
-            "data/outputs/control_points_${FWI_DATE}.json"
+          echo ""
+          echo "============================================================"
+          echo "BUILDING FIRIS"
+          echo "============================================================"
+
+          echo "Forecast date: ${FWI_DATE}"
+
+          python scripts/build_firis.py \
+            --fwi-raster "${FWI_RASTER}" \
+            --fuel-raster "${FUEL_RASTER}" \
+            --dem-raster "${DEM_RASTER}" \
+            --fuel-excel "${FUEL_EXCEL}" \
+            --boundary "fars.geojson" \
+            --output-dir "data/outputs" \
+            --run-date "${FWI_DATE}"
+
+
+      # ========================================================
+      # BUILD WEB
+      # ========================================================
+
+      - name: Build web map
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          FLI_RASTER=\
+            "data/outputs/fli_fars_${FWI_DATE}.tif"
+
+
+          if [ ! -f "${FLI_RASTER}" ]; then
+
+            echo ""
+            echo "ERROR: FLI not found:"
+            echo "${FLI_RASTER}"
+
+            exit 1
+
+          fi
+
+
+          python scripts/build_web_map.py \
+            --input "${FLI_RASTER}" \
+            --output-dir "data/web" \
+            --boundary "fars.geojson"
+
+
+      # ========================================================
+      # EXCEL
+      # ========================================================
+
+      - name: Build Excel report
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          FLI_RASTER=\
+            "data/outputs/fli_fars_${FWI_DATE}.tif"
+
+          REPORT=\
+            "data/report/firis_report.xlsx"
+
+
+          python scripts/build_report.py \
+            --input "${FLI_RASTER}" \
+            --output "${REPORT}" \
+            --run-date "${FWI_DATE}"
+
+
+          test -f "${REPORT}"
+
+
+      # ========================================================
+      # VERIFY WEB OUTPUT
+      # ========================================================
+
+      - name: Verify web output
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          required_files=(
+
+            "data/web/fli_polygons.geojson"
+
+            "data/web/fli_latest.json"
+
+            "data/web/fli_latest_grid.json"
+
+            "data/web/fli_latest.png"
+
+            "data/report/firis_report.xlsx"
+
+          )
+
+
+          for file in "${required_files[@]}"; do
+
+            if [ ! -f "${file}" ]; then
+
+              echo ""
+              echo "ERROR: Missing:"
+              echo "${file}"
+
+              exit 1
+
+            fi
+
+            echo "✓ ${file}"
+
+          done
+
+
+      # ========================================================
+      # FINAL GRID VALIDATION
+      # ========================================================
+
+      - name: Validate final grids
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          python - <<'PY'
+
+          import os
+          from pathlib import Path
+
+          import numpy as np
+          import rasterio
+
+
+          date = os.environ[
+              "FWI_DATE"
+          ]
+
+
+          directory = Path(
+              "data/outputs"
+          )
+
+
+          files = {
+
+              "F_FWI":
+                  directory /
+                  f"f_fwi_fars_{date}.tif",
+
+              "F_Fuel":
+                  directory /
+                  f"f_fuel_fars_{date}.tif",
+
+              "Slope":
+                  directory /
+                  f"slope_fars_{date}.tif",
+
+              "F_Topo":
+                  directory /
+                  f"f_topo_fars_{date}.tif",
+
+              "FLI":
+                  directory /
+                  f"fli_fars_{date}.tif",
+
+              "FuelCoverage":
+                  directory /
+                  f"fuel_coverage_fars_{date}.tif"
+
+          }
+
+
+          reference = files[
+              "F_FWI"
+          ]
+
+
+          with rasterio.open(
+              reference
+          ) as ref:
+
+              ref_bounds = np.array(
+
+                  [
+
+                      ref.bounds.left,
+                      ref.bounds.bottom,
+                      ref.bounds.right,
+                      ref.bounds.top
+
+                  ],
+
+                  dtype=np.float64
+              )
+
+              ref_transform = np.array(
+
+                  [
+
+                      ref.transform.a,
+                      ref.transform.b,
+                      ref.transform.c,
+                      ref.transform.d,
+                      ref.transform.e,
+                      ref.transform.f
+
+                  ],
+
+                  dtype=np.float64
+              )
+
+              ref_crs = ref.crs
+
+              ref_width = ref.width
+
+              ref_height = ref.height
+
+
+          tolerance = 1e-8
+
+
+          print("")
+          print("=" * 70)
+          print("FINAL GRID VALIDATION")
+          print("=" * 70)
+
+
+          failures = []
+
+
+          for name, path in files.items():
+
+              with rasterio.open(
+                  path
+              ) as src:
+
+                  problems = []
+
+
+                  if src.crs != ref_crs:
+                      problems.append(
+                          "CRS"
+                      )
+
+
+                  if src.width != ref_width:
+                      problems.append(
+                          "WIDTH"
+                      )
+
+
+                  if src.height != ref_height:
+                      problems.append(
+                          "HEIGHT"
+                      )
+
+
+                  src_bounds = np.array(
+
+                      [
+
+                          src.bounds.left,
+                          src.bounds.bottom,
+                          src.bounds.right,
+                          src.bounds.top
+
+                      ],
+
+                      dtype=np.float64
+                  )
+
+
+                  if not np.allclose(
+
+                      src_bounds,
+                      ref_bounds,
+                      rtol=0.0,
+                      atol=tolerance
+
+                  ):
+
+                      problems.append(
+                          "BOUNDS"
+                      )
+
+
+                  src_transform = np.array(
+
+                      [
+
+                          src.transform.a,
+                          src.transform.b,
+                          src.transform.c,
+                          src.transform.d,
+                          src.transform.e,
+                          src.transform.f
+
+                      ],
+
+                      dtype=np.float64
+                  )
+
+
+                  if not np.allclose(
+
+                      src_transform,
+                      ref_transform,
+                      rtol=0.0,
+                      atol=tolerance
+
+                  ):
+
+                      problems.append(
+                          "TRANSFORM"
+                      )
+
+
+                  if problems:
+
+                      print(
+                          f"✗ {name}: "
+                          +
+                          ", ".join(
+                              problems
+                          )
+                      )
+
+                      failures.append(
+                          name
+                      )
+
+                  else:
+
+                      print(
+                          f"✓ {name:<16} GRID MATCH"
+                      )
+
+
+          if failures:
+
+              print("")
+
+              print(
+                  "GRID VALIDATION FAILED"
+              )
+
+              raise SystemExit(1)
+
+
+          print("")
+
+          print(
+              "✓ ALL OUTPUT GRIDS MATCH FWI"
+          )
+
+          PY
+
+
+      # ========================================================
+      # SHOW FORECAST DATE
+      # ========================================================
+
+      - name: Show forecast information
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          python - <<'PY'
+
+          import json
+          import os
+
+          date = os.environ[
+              "FWI_DATE"
+          ]
+
+          path = (
+              f"data/raw/fwi/"
+              f"fwi_ecmwf_fars_{date}.json"
+          )
+
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as file:
+
+              data = json.load(file)
+
+          print("")
+          print("=" * 70)
+          print("FIRIS FORECAST")
+          print("=" * 70)
+
+          print(
+              "Forecast date:",
+              data.get(
+                  "forecast_date"
+              )
+          )
+
+          print(
+              "Iran current time:",
+              data.get(
+                  "current_iran_datetime"
+              )
+          )
+
+          print(
+              "Definition:",
+              data.get(
+                  "forecast_definition"
+              )
+          )
+
+          PY
 
 
       # ========================================================
       # COMMIT
       # ========================================================
 
-      - name: Commit FWI
+      - name: Commit outputs
 
         shell: bash
 
@@ -367,15 +812,17 @@ jobs:
             user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
 
+
           git add \
-            data/raw/fwi \
-            "data/outputs/control_points_${FWI_DATE}.json"
+            data/outputs \
+            data/web \
+            data/report
 
 
           if git diff --cached --quiet; then
 
             echo ""
-            echo "No changes to commit."
+            echo "No output changes."
 
             exit 0
 
@@ -384,14 +831,14 @@ jobs:
 
           git commit \
             -m \
-            "chore: automatic tomorrow FWI update"
+            "chore(firis): update tomorrow forecast [skip ci]"
 
 
       # ========================================================
       # PUSH
       # ========================================================
 
-      - name: Push
+      - name: Push outputs
 
         shell: bash
 
@@ -403,5 +850,8 @@ jobs:
 
           echo ""
           echo "============================================================"
-          echo "TOMORROW FWI PUSHED SUCCESSFULLY"
+          echo "FIRIS BUILD COMPLETED"
           echo "============================================================"
+
+          echo "Forecast date:"
+          echo "${FWI_DATE}"
