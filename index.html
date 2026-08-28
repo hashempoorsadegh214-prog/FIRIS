@@ -1,25 +1,21 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
 
-  <title>FIRIS | سامانه نقشه خطر آتش‌سوزی فارس</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
 
-  <!-- Leaflet CSS: آدرس صحیح -->
+  <title>FIRIS | سامانه خطر آتش‌سوزی فارس</title>
+
   <link
     rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"
-  />
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  >
 
   <style>
-    :root {
-      --header-red-dark: #7f1d1d;
-      --header-red: #b91c1c;
-      --page-bg: #f8fafc;
-      --text-color: #1f2937;
-      --border-color: #d1d5db;
-    }
 
     * {
       box-sizing: border-box;
@@ -27,359 +23,1237 @@
 
     html,
     body {
-      width: 100%;
-      min-height: 100%;
       margin: 0;
       padding: 0;
-    }
-
-    body {
-      background: var(--page-bg);
-      color: var(--text-color);
-      font-family: Tahoma, Arial, sans-serif;
-    }
-
-    header {
-      padding: 16px 20px;
-      color: #ffffff;
-      background: linear-gradient(
-        135deg,
-        var(--header-red-dark),
-        var(--header-red)
-      );
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
-    }
-
-    header h1 {
-      margin: 0 0 7px;
-      font-size: 22px;
-    }
-
-    header p {
-      margin: 0;
-      font-size: 14px;
-      opacity: 0.95;
-    }
-
-    /* ارتفاع و فضای نمایش صحیح نقشه */
-    #map {
-      width: 100%;
-      height: calc(100vh - 177px);
-      min-height: 500px;
-      direction: ltr;
-      background: #dbeafe;
-    }
-
-    .info-panel {
-      padding: 12px 18px;
-      border-top: 1px solid var(--border-color);
-      background: #ffffff;
-      font-size: 14px;
-      line-height: 1.8;
-    }
-
-    #status {
-      color: #374151;
-    }
-
-    #status.success {
-      color: #166534;
-    }
-
-    #status.error {
-      color: #b91c1c;
-      font-weight: bold;
-    }
-
-    /* 
-      این بخش برای جلوگیری از پراکنده شدن Tileهای نقشه ضروری است.
-      گاهی CSSهای عمومی سایت روی اندازهٔ تصاویر Leaflet اثر می‌گذارند.
-    */
-    .leaflet-container {
       width: 100%;
       height: 100%;
-      overflow: hidden;
+      font-family:
+        Tahoma,
+        Arial,
+        sans-serif;
+      background: #f4f6f8;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* =========================
+       HEADER
+       ========================= */
+
+    .header {
+      height: 82px;
+      flex: 0 0 82px;
+      background: linear-gradient(
+        135deg,
+        #7f1010,
+        #b71c1c
+      );
+      color: white;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow:
+        0 2px 10px rgba(0,0,0,.18);
+      z-index: 1000;
+    }
+
+    .title {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 5px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      opacity: .9;
+    }
+
+    .header-badge {
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.25);
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    /* =========================
+       MAP
+       ========================= */
+
+    #map {
+      flex: 1 1 auto;
+      width: 100%;
+      min-height: 0;
       position: relative;
-      font-family: Arial, sans-serif;
     }
 
-    .leaflet-container img,
-    .leaflet-container .leaflet-tile {
-      max-width: none !important;
-      max-height: none !important;
+    .leaflet-container {
+      font-family:
+        Tahoma,
+        Arial,
+        sans-serif;
+      background: #e8edf0;
     }
 
-    .leaflet-pane,
-    .leaflet-map-pane,
-    .leaflet-tile-pane,
-    .leaflet-overlay-pane {
+    /* =========================
+       INFO PANEL
+       ========================= */
+
+    .info-panel {
       position: absolute;
-      top: 0;
-      left: 0;
+      top: 16px;
+      left: 16px;
+      width: 245px;
+      background: rgba(255,255,255,.96);
+      border-radius: 14px;
+      box-shadow:
+        0 4px 20px rgba(0,0,0,.18);
+      padding: 15px;
+      z-index: 900;
+      direction: rtl;
     }
 
-    .leaflet-control-layers {
-      direction: rtl;
-      text-align: right;
-      font-family: Tahoma, Arial, sans-serif;
+    .info-title {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      color: #222;
     }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid #eee;
+      font-size: 12px;
+    }
+
+    .info-row:last-child {
+      border-bottom: 0;
+    }
+
+    /* =========================
+       GAUGE
+       ========================= */
+
+    .gauge-panel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 230px;
+      background: rgba(255,255,255,.97);
+      border-radius: 16px;
+      box-shadow:
+        0 4px 20px rgba(0,0,0,.20);
+      padding: 15px;
+      z-index: 900;
+      text-align: center;
+      direction: rtl;
+    }
+
+    .gauge-title {
+      font-size: 15px;
+      font-weight: 800;
+      margin-bottom: 10px;
+    }
+
+    .gauge {
+      width: 150px;
+      height: 150px;
+      margin: 0 auto 8px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background:
+        conic-gradient(
+          #2e7d32 0deg 72deg,
+          #fdd835 72deg 144deg,
+          #fb8c00 144deg 216deg,
+          #e53935 216deg 288deg,
+          #880e4f 288deg 360deg
+        );
+      position: relative;
+    }
+
+    .gauge::before {
+      content: "";
+      position: absolute;
+      width: 116px;
+      height: 116px;
+      border-radius: 50%;
+      background: white;
+    }
+
+    .gauge-content {
+      position: relative;
+      z-index: 2;
+    }
+
+    .gauge-value {
+      font-size: 31px;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .gauge-label {
+      margin-top: 7px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .gauge-location {
+      font-size: 11px;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    /* =========================
+       LEGEND
+       ========================= */
 
     .legend {
-      direction: rtl;
-      min-width: 170px;
-      padding: 10px 12px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.94);
-      box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
-      color: #111827;
-      font-family: Tahoma, Arial, sans-serif;
-      font-size: 13px;
-      line-height: 1.9;
+      position: absolute;
+      bottom: 20px;
+      left: 16px;
+      background: rgba(255,255,255,.96);
+      border-radius: 12px;
+      box-shadow:
+        0 3px 14px rgba(0,0,0,.18);
+      padding: 12px 14px;
+      z-index: 900;
+      min-width: 175px;
     }
 
     .legend-title {
-      margin-bottom: 5px;
-      font-weight: bold;
+      font-size: 14px;
+      font-weight: 800;
+      margin-bottom: 8px;
     }
 
-    .legend-row {
+    .legend-item {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 8px;
+      font-size: 12px;
+      margin: 5px 0;
     }
 
-    .color-box {
+    .legend-color {
       width: 18px;
-      height: 14px;
-      border: 1px solid rgba(0, 0, 0, 0.25);
+      height: 13px;
+      border-radius: 3px;
+      border: 1px solid rgba(0,0,0,.15);
     }
 
-    @media (max-width: 600px) {
-      header h1 {
-        font-size: 18px;
+    /* =========================
+       STATUS
+       ========================= */
+
+    .status-bar {
+      height: 42px;
+      flex: 0 0 42px;
+      background: white;
+      border-top: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #333;
+      direction: rtl;
+      z-index: 1000;
+    }
+
+    .status-ok {
+      color: #176b2c;
+      font-weight: 700;
+    }
+
+    .status-error {
+      color: #b71c1c;
+      font-weight: 700;
+    }
+
+    /* =========================
+       POPUP
+       ========================= */
+
+    .fli-popup {
+      direction: rtl;
+      text-align: right;
+      min-width: 190px;
+    }
+
+    .fli-popup-title {
+      font-size: 15px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+
+    .fli-popup-value {
+      font-size: 27px;
+      font-weight: 900;
+      margin: 5px 0;
+    }
+
+    .fli-popup-risk {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 6px;
+      color: white;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .fli-popup-coord {
+      font-size: 11px;
+      color: #666;
+    }
+
+    /* =========================
+       MOBILE
+       ========================= */
+
+    @media (max-width: 800px) {
+
+      .header {
+        height: 68px;
+        flex-basis: 68px;
+        padding: 9px 13px;
       }
 
-      #map {
-        height: calc(100vh - 195px);
-        min-height: 420px;
+      .title {
+        font-size: 17px;
+      }
+
+      .subtitle {
+        font-size: 10px;
+      }
+
+      .header-badge {
+        display: none;
       }
 
       .info-panel {
-        font-size: 12px;
+        top: 10px;
+        left: 10px;
+        width: 185px;
+        padding: 10px;
+      }
+
+      .gauge-panel {
+        top: 10px;
+        right: 10px;
+        width: 175px;
+        padding: 10px;
+      }
+
+      .gauge {
+        width: 110px;
+        height: 110px;
+      }
+
+      .gauge::before {
+        width: 84px;
+        height: 84px;
+      }
+
+      .gauge-value {
+        font-size: 23px;
+      }
+
+      .legend {
+        bottom: 10px;
+        left: 10px;
+        min-width: 145px;
+      }
+
+      .status-bar {
+        font-size: 10px;
       }
     }
+
   </style>
 </head>
 
 <body>
-  <header>
-    <h1>FIRIS | سامانه نقشه خطر آتش‌سوزی استان فارس</h1>
-    <p>Fire Risk Index System — لایه شاخص خطر آتش‌سوزی (FLI)</p>
+
+<div id="app">
+
+  <!-- HEADER -->
+
+  <header class="header">
+
+    <div>
+      <div class="title">
+        سامانه نقشه خطر آتش‌سوزی استان فارس | FIRIS
+      </div>
+
+      <div class="subtitle">
+        Fars Integrated Fire Information System
+        — شاخص ترکیبی خطر آتش‌سوزی (FLI)
+      </div>
+    </div>
+
+    <div class="header-badge">
+      پایش و پهنه‌بندی خطر حریق
+    </div>
+
   </header>
 
-  <main>
-    <div id="map"></div>
 
-    <section class="info-panel">
-      <strong>وضعیت لایه:</strong>
-      <span id="status">در حال دریافت داده‌های نقشه...</span>
-    </section>
-  </main>
+  <!-- MAP -->
 
-  <!-- Leaflet JavaScript: آدرس صحیح -->
-  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <div id="map">
 
-  <script>
-    "use strict";
+    <!-- GENERAL INFO -->
 
-    /*
-      آدرس‌های دقیق GitHub Pages پروژه FIRIS
-    */
-    const METADATA_URL =
-      "https://hashempoorsadegh214-prog.github.io/FIRIS/data/web/fli_latest.json";
+    <div class="info-panel">
 
-    const OVERLAY_URL =
-      "https://hashempoorsadegh214-prog.github.io/FIRIS/data/web/fli_latest.png";
+      <div class="info-title">
+        اطلاعات شاخص
+      </div>
 
-    const statusElement = document.getElementById("status");
+      <div class="info-row">
+        <span>شاخص</span>
+        <strong>FLI</strong>
+      </div>
 
-    function setStatus(message, type = "") {
-      statusElement.textContent = message;
-      statusElement.className = type;
-    }
+      <div class="info-row">
+        <span>حداقل</span>
+        <strong id="minValue">—</strong>
+      </div>
 
-    /*
-      نمای اولیهٔ استان فارس.
-      بعد از دریافت فایل JSON، نقشه خودکار روی محدودهٔ واقعی FLI زوم می‌شود.
-    */
-    const map = L.map("map", {
-      center: [29.6, 53.5],
-      zoom: 7,
-      zoomControl: true
-    });
+      <div class="info-row">
+        <span>حداکثر</span>
+        <strong id="maxValue">—</strong>
+      </div>
 
-    const osmLayer = L.tileLayer(
-      "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-      {
-        maxZoom: 19,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }
-    ).addTo(map);
+      <div class="info-row">
+        <span>میانگین</span>
+        <strong id="meanValue">—</strong>
+      </div>
 
-    const satelliteLayer = L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      {
-        maxZoom: 19,
-        attribution: "Tiles &copy; Esri"
-      }
+    </div>
+
+
+    <!-- GAUGE -->
+
+    <div class="gauge-panel">
+
+      <div class="gauge-title">
+        وضعیت خطر منطقه انتخاب‌شده
+      </div>
+
+      <div class="gauge">
+
+        <div class="gauge-content">
+
+          <div
+            id="gaugeValue"
+            class="gauge-value"
+          >
+            —
+          </div>
+
+          <div
+            id="gaugeLabel"
+            class="gauge-label"
+          >
+            روی نقشه کلیک کنید
+          </div>
+
+        </div>
+
+      </div>
+
+      <div
+        id="gaugeLocation"
+        class="gauge-location"
+      >
+        —
+      </div>
+
+    </div>
+
+
+    <!-- LEGEND -->
+
+    <div class="legend">
+
+      <div class="legend-title">
+        راهنمای شاخص خطر FLI
+      </div>
+
+      <div class="legend-item">
+        <span
+          class="legend-color"
+          style="background:#2e7d32"
+        ></span>
+        <span>کم: 0–20</span>
+      </div>
+
+      <div class="legend-item">
+        <span
+          class="legend-color"
+          style="background:#fdd835"
+        ></span>
+        <span>متوسط: 20–40</span>
+      </div>
+
+      <div class="legend-item">
+        <span
+          class="legend-color"
+          style="background:#fb8c00"
+        ></span>
+        <span>زیاد: 40–60</span>
+      </div>
+
+      <div class="legend-item">
+        <span
+          class="legend-color"
+          style="background:#e53935"
+        ></span>
+        <span>خیلی زیاد: 60–80</span>
+      </div>
+
+      <div class="legend-item">
+        <span
+          class="legend-color"
+          style="background:#880e4f"
+        ></span>
+        <span>بحرانی: 80–100</span>
+      </div>
+
+    </div>
+
+  </div>
+
+
+  <!-- STATUS -->
+
+  <div
+    id="status"
+    class="status-bar"
+  >
+    در حال بارگذاری اطلاعات FIRIS...
+  </div>
+
+</div>
+
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+
+"use strict";
+
+
+/* ============================================================
+   GLOBAL DATA
+   ============================================================ */
+
+let map = null;
+
+let fliLayer = null;
+
+let boundaryLayer = null;
+
+let fliMetadata = null;
+
+let fliGrid = null;
+
+
+/* ============================================================
+   INITIAL MAP
+   ============================================================ */
+
+map = L.map(
+  "map",
+  {
+    zoomControl: true,
+    preferCanvas: true
+  }
+);
+
+
+/* ============================================================
+   BASE MAP
+   ============================================================ */
+
+const osm = L.tileLayer(
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  {
+    maxZoom: 18,
+    attribution:
+      "&copy; OpenStreetMap contributors"
+  }
+).addTo(map);
+
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+
+function setStatus(
+  text,
+  ok = true
+) {
+
+  const el =
+    document.getElementById(
+      "status"
     );
 
-    const layerControl = L.control.layers(
+  el.textContent = text;
+
+  el.className =
+    ok
+      ? "status-bar status-ok"
+      : "status-bar status-error";
+}
+
+
+function formatNumber(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    !Number.isFinite(value)
+  ) {
+    return "—";
+  }
+
+  return Number(value)
+    .toLocaleString(
+      "fa-IR",
       {
-        "نقشه خیابانی": osmLayer,
-        "تصویر ماهواره‌ای": satelliteLayer
-      },
-      {},
+        maximumFractionDigits: 2
+      }
+    );
+}
+
+
+/* ============================================================
+   RISK CLASS
+   ============================================================ */
+
+function getRisk(value) {
+
+  if (!Number.isFinite(value)) {
+
+    return {
+      label: "بدون داده",
+      color: "#777"
+    };
+
+  }
+
+  if (value < 20) {
+
+    return {
+      label: "کم",
+      color: "#2e7d32"
+    };
+
+  }
+
+  if (value < 40) {
+
+    return {
+      label: "متوسط",
+      color: "#c7a900"
+    };
+
+  }
+
+  if (value < 60) {
+
+    return {
+      label: "زیاد",
+      color: "#fb8c00"
+    };
+
+  }
+
+  if (value < 80) {
+
+    return {
+      label: "خیلی زیاد",
+      color: "#e53935"
+    };
+
+  }
+
+  return {
+    label: "بحرانی",
+    color: "#880e4f"
+  };
+}
+
+
+/* ============================================================
+   GAUGE
+   ============================================================ */
+
+function updateGauge(
+  value,
+  lat,
+  lon
+) {
+
+  const valueEl =
+    document.getElementById(
+      "gaugeValue"
+    );
+
+  const labelEl =
+    document.getElementById(
+      "gaugeLabel"
+    );
+
+  const locationEl =
+    document.getElementById(
+      "gaugeLocation"
+    );
+
+  if (!Number.isFinite(value)) {
+
+    valueEl.textContent = "—";
+
+    labelEl.textContent =
+      "بدون داده";
+
+    locationEl.textContent =
+      "این نقطه داده معتبر ندارد";
+
+    return;
+  }
+
+  const risk =
+    getRisk(value);
+
+  valueEl.textContent =
+    formatNumber(value);
+
+  labelEl.textContent =
+    risk.label;
+
+  labelEl.style.color =
+    risk.color;
+
+  locationEl.textContent =
+    `${lat.toFixed(4)}° , ${lon.toFixed(4)}°`;
+}
+
+
+/* ============================================================
+   PIXEL VALUE FROM GRID
+   ============================================================ */
+
+function getGridValue(
+  lat,
+  lon
+) {
+
+  if (
+    !fliGrid ||
+    !fliGrid.bounds
+  ) {
+    return null;
+  }
+
+  const bounds =
+    fliGrid.bounds;
+
+  const south =
+    bounds[0][0];
+
+  const west =
+    bounds[0][1];
+
+  const north =
+    bounds[1][0];
+
+  const east =
+    bounds[1][1];
+
+  if (
+    lat < south ||
+    lat > north ||
+    lon < west ||
+    lon > east
+  ) {
+    return null;
+  }
+
+  const rows =
+    fliGrid.rows;
+
+  const cols =
+    fliGrid.cols;
+
+  let row =
+    Math.floor(
+      ((north - lat) /
+        (north - south)) *
+      rows
+    );
+
+  let col =
+    Math.floor(
+      ((lon - west) /
+        (east - west)) *
+      cols
+    );
+
+  row =
+    Math.max(
+      0,
+      Math.min(
+        rows - 1,
+        row
+      )
+    );
+
+  col =
+    Math.max(
+      0,
+      Math.min(
+        cols - 1,
+        col
+      )
+    );
+
+  const value =
+    fliGrid.values?.[row]?.[col];
+
+  if (
+    value === undefined ||
+    value === null ||
+    value < 0
+  ) {
+    return null;
+  }
+
+  return Number(value);
+}
+
+
+/* ============================================================
+   MAP CLICK
+   ============================================================ */
+
+map.on(
+  "click",
+  function(event) {
+
+    const lat =
+      event.latlng.lat;
+
+    const lon =
+      event.latlng.lng;
+
+    const value =
+      getGridValue(
+        lat,
+        lon
+      );
+
+    updateGauge(
+      value,
+      lat,
+      lon
+    );
+
+    if (
+      !Number.isFinite(value)
+    ) {
+      return;
+    }
+
+    const risk =
+      getRisk(value);
+
+    const popup = `
+
+      <div class="fli-popup">
+
+        <div class="fli-popup-title">
+          شاخص خطر آتش‌سوزی
+        </div>
+
+        <div
+          class="fli-popup-value"
+          style="color:${risk.color}"
+        >
+          ${formatNumber(value)}
+        </div>
+
+        <div
+          class="fli-popup-risk"
+          style="background:${risk.color}"
+        >
+          ${risk.label}
+        </div>
+
+        <div class="fli-popup-coord">
+          عرض جغرافیایی:
+          ${lat.toFixed(5)}
+        </div>
+
+        <div class="fli-popup-coord">
+          طول جغرافیایی:
+          ${lon.toFixed(5)}
+        </div>
+
+      </div>
+
+    `;
+
+    L.popup({
+      maxWidth: 260
+    })
+    .setLatLng(
+      event.latlng
+    )
+    .setContent(
+      popup
+    )
+    .openOn(map);
+
+  }
+);
+
+
+/* ============================================================
+   LOAD BOUNDARY
+   ============================================================ */
+
+async function loadBoundary() {
+
+  try {
+
+    const response =
+      await fetch(
+        "fars.geojson",
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (!response.ok) {
+      throw new Error(
+        "Boundary HTTP " +
+        response.status
+      );
+    }
+
+    const geojson =
+      await response.json();
+
+    boundaryLayer =
+      L.geoJSON(
+        geojson,
+        {
+          style: {
+            color: "#111",
+            weight: 2.5,
+            opacity: .95,
+            fill: false
+          },
+          interactive: false
+        }
+      ).addTo(map);
+
+    return true;
+
+  } catch (error) {
+
+    console.error(
+      "Boundary error:",
+      error
+    );
+
+    return false;
+  }
+}
+
+
+/* ============================================================
+   LOAD FLI
+   ============================================================ */
+
+async function loadFLI() {
+
+  try {
+
+    setStatus(
+      "در حال بارگذاری شاخص FLI..."
+    );
+
+    const metadataResponse =
+      await fetch(
+        "data/web/fli_latest.json",
+        {
+          cache: "no-store"
+        }
+      );
+
+    if (!metadataResponse.ok) {
+      throw new Error(
+        "FLI metadata HTTP " +
+        metadataResponse.status
+      );
+    }
+
+    fliMetadata =
+      await metadataResponse.json();
+
+
+    /* -----------------------------------------
+       STATISTICS
+       ----------------------------------------- */
+
+    document.getElementById(
+      "minValue"
+    ).textContent =
+      formatNumber(
+        fliMetadata.statistics?.min
+      );
+
+    document.getElementById(
+      "maxValue"
+    ).textContent =
+      formatNumber(
+        fliMetadata.statistics?.max
+      );
+
+    document.getElementById(
+      "meanValue"
+    ).textContent =
+      formatNumber(
+        fliMetadata.statistics?.mean
+      );
+
+
+    /* -----------------------------------------
+       GRID
+       ----------------------------------------- */
+
+    try {
+
+      const gridResponse =
+        await fetch(
+          "data/web/fli_latest_grid.json",
+          {
+            cache: "no-store"
+          }
+        );
+
+      if (gridResponse.ok) {
+
+        fliGrid =
+          await gridResponse.json();
+
+      }
+
+    } catch (gridError) {
+
+      console.warn(
+        "Grid unavailable:",
+        gridError
+      );
+
+    }
+
+
+    /* -----------------------------------------
+       BOUNDS
+       ----------------------------------------- */
+
+    if (
+      !fliMetadata.bounds ||
+      fliMetadata.bounds.length !== 2
+    ) {
+
+      throw new Error(
+        "FLI bounds are missing."
+      );
+
+    }
+
+    const imageBounds =
+      L.latLngBounds(
+        fliMetadata.bounds[0],
+        fliMetadata.bounds[1]
+      );
+
+
+    /* -----------------------------------------
+       IMAGE OVERLAY
+       ----------------------------------------- */
+
+    fliLayer =
+      L.imageOverlay(
+        "data/web/fli_latest.png?" +
+        Date.now(),
+        imageBounds,
+        {
+          opacity: .72,
+          interactive: false,
+          crossOrigin: true,
+          className:
+            "fli-overlay"
+        }
+      );
+
+
+    fliLayer.addTo(map);
+
+
+    /* -----------------------------------------
+       BOUNDARY
+       ----------------------------------------- */
+
+    await loadBoundary();
+
+
+    /* -----------------------------------------
+       FIT TO FARS BOUNDARY
+       ----------------------------------------- */
+
+    if (
+      boundaryLayer &&
+      boundaryLayer.getBounds().isValid()
+    ) {
+
+      map.fitBounds(
+        boundaryLayer.getBounds(),
+        {
+          paddingTopLeft: [
+            20,
+            20
+          ],
+          paddingBottomRight: [
+            20,
+            20
+          ],
+          maxZoom: 9
+        }
+      );
+
+    } else {
+
+      map.fitBounds(
+        imageBounds,
+        {
+          padding: [
+            20,
+            20
+          ]
+        }
+      );
+
+    }
+
+
+    /* -----------------------------------------
+       STATUS
+       ----------------------------------------- */
+
+    const mean =
+      fliMetadata.statistics?.mean;
+
+    const date =
+      fliMetadata.generated_at_utc
+      || "—";
+
+    setStatus(
+      `لایه FLI با موفقیت بارگذاری شد | ` +
+      `میانگین: ${formatNumber(mean)} | ` +
+      `تولید: ${date}`,
+      true
+    );
+
+  } catch (error) {
+
+    console.error(
+      "FLI loading error:",
+      error
+    );
+
+    setStatus(
+      "خطا در بارگذاری لایه FLI: " +
+      error.message,
+      false
+    );
+
+  }
+}
+
+
+/* ============================================================
+   LAYER CONTROL
+   ============================================================ */
+
+const overlays = {};
+
+setTimeout(
+  function() {
+
+    const baseLayers = {
+      "نقشه خیابانی":
+        osm
+    };
+
+    if (fliLayer) {
+
+      overlays[
+        "شاخص خطر آتش‌سوزی FLI"
+      ] =
+        fliLayer;
+
+    }
+
+    if (boundaryLayer) {
+
+      overlays[
+        "مرز استان فارس"
+      ] =
+        boundaryLayer;
+
+    }
+
+    L.control.layers(
+      baseLayers,
+      overlays,
       {
         collapsed: false,
         position: "topright"
       }
     ).addTo(map);
 
-    function addLegend(items) {
-      const legend = L.control({ position: "bottomleft" });
+  },
+  2500
+);
 
-      legend.onAdd = function () {
-        const div = L.DomUtil.create("div", "legend");
 
-        let html = '<div class="legend-title">راهنمای شاخص خطر FLI</div>';
+/* ============================================================
+   START
+   ============================================================ */
 
-        const defaultLegend = [
-          { min: 0, max: 20, label: "کم", color: "#2e7d32" },
-          { min: 20, max: 40, label: "متوسط", color: "#fdd835" },
-          { min: 40, max: 60, label: "نسبتاً زیاد", color: "#fb8c00" },
-          { min: 60, max: 80, label: "زیاد", color: "#e53935" },
-          { min: 80, max: 100, label: "بسیار زیاد", color: "#880e4f" }
-        ];
+loadFLI();
 
-        const legendItems =
-          Array.isArray(items) && items.length > 0 ? items : defaultLegend;
+</script>
 
-        legendItems.forEach((item) => {
-          html += `
-            <div class="legend-row">
-              <span class="color-box" style="background: ${item.color};"></span>
-              <span>${item.label}: ${item.min} تا ${item.max}</span>
-            </div>
-          `;
-        });
-
-        div.innerHTML = html;
-
-        L.DomEvent.disableClickPropagation(div);
-        L.DomEvent.disableScrollPropagation(div);
-
-        return div;
-      };
-
-      legend.addTo(map);
-    }
-
-    async function loadFirisLayer() {
-      try {
-        /*
-          ?v= زمان فعلی:
-          برای جلوگیری از دیدن نسخهٔ کش‌شدهٔ قدیمی GitHub Pages یا مرورگر
-        */
-        const version = Date.now();
-
-        const response = await fetch(`${METADATA_URL}?v=${version}`, {
-          cache: "no-store"
-        });
-
-        if (!response.ok) {
-          throw new Error(
-            `فایل JSON یافت نشد یا قابل خواندن نیست. کد HTTP: ${response.status}`
-          );
-        }
-
-        const metadata = await response.json();
-
-        if (
-          !Array.isArray(metadata.bounds) ||
-          metadata.bounds.length !== 2 ||
-          !Array.isArray(metadata.bounds[0]) ||
-          !Array.isArray(metadata.bounds[1])
-        ) {
-          throw new Error(
-            "مختصات bounds در فایل fli_latest.json معتبر نیست."
-          );
-        }
-
-        /*
-          اگر نام image در JSON موجود باشد، همان فایل خوانده می‌شود.
-          در غیر این صورت از آدرس دقیق ثابت PNG استفاده می‌کنیم.
-        */
-        let imageUrl = `${OVERLAY_URL}?v=${version}`;
-
-        if (typeof metadata.image === "string" && metadata.image.trim() !== "") {
-          imageUrl =
-            `https://hashempoorsadegh214-prog.github.io/FIRIS/data/web/` +
-            `${metadata.image}?v=${version}`;
-        }
-
-        const firisOverlay = L.imageOverlay(imageUrl, metadata.bounds, {
-          opacity: 0.74,
-          interactive: true
-        }).addTo(map);
-
-        layerControl.addOverlay(
-          firisOverlay,
-          "شاخص خطر آتش‌سوزی FIRIS"
-        );
-
-        map.fitBounds(metadata.bounds, {
-          padding: [20, 20],
-          maxZoom: 10
-        });
-
-        addLegend(metadata.legend);
-
-        const statistics = metadata.statistics || {};
-
-        const minValue =
-          statistics.min !== undefined ? statistics.min : "نامشخص";
-
-        const maxValue =
-          statistics.max !== undefined ? statistics.max : "نامشخص";
-
-        let generatedAt = "نامشخص";
-
-        if (metadata.generated_at_utc) {
-          generatedAt = new Date(metadata.generated_at_utc).toLocaleString(
-            "fa-IR"
-          );
-        }
-
-        setStatus(
-          `لایه FLI با موفقیت بارگذاری شد | کمینه: ${minValue} | بیشینه: ${maxValue} | زمان تولید: ${generatedAt}`,
-          "success"
-        );
-
-        console.log("FIRIS metadata:", metadata);
-        console.log("FIRIS overlay URL:", imageUrl);
-      } catch (error) {
-        console.error("FIRIS loading error:", error);
-
-        setStatus(
-          "خطا در دریافت لایه FLI. بررسی کنید فایل‌های fli_latest.json و fli_latest.png در مسیر data/web مخزن ایجاد شده باشند.",
-          "error"
-        );
-      }
-    }
-
-    loadFirisLayer();
-  </script>
 </body>
 </html>
