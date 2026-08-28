@@ -1,3 +1,4 @@
+```python
 #!/usr/bin/env python3
 """
 FIRIS - Fars Integrated Fire Information System
@@ -11,18 +12,27 @@ Build Fire Likelihood Index (FLI):
         + 0.20 * F_Topo
     )
 
-Normalization:
-    F_FWI  = clip(FWI / 100.0, 0, 1)
-    F_Topo = clip(slope_degrees / 45.0, 0, 1)
-    F_Fuel = weighted normalized fuelbed parameters from Fuelbeds_metric
+Important raster rule
+---------------------
+FWI is the final target grid.
+
+Fuel:
+    nearest-neighbour -> FWI grid
+
+DEM:
+    slope is calculated FIRST on the native DEM grid
+    using metric cell spacing
+    THEN slope is resampled to the FWI grid using bilinear
+
+This avoids calculating slope from an already coarsened DEM.
 
 Outputs:
-    data/outputs/f_fwi_fars_YYYY-MM-DD.tif
-    data/outputs/f_fuel_fars_YYYY-MM-DD.tif
-    data/outputs/slope_fars_YYYY-MM-DD.tif
-    data/outputs/f_topo_fars_YYYY-MM-DD.tif
-    data/outputs/fli_fars_YYYY-MM-DD.tif
-    data/outputs/firis_report_YYYY-MM-DD.json
+    f_fwi_fars_YYYY-MM-DD.tif
+    f_fuel_fars_YYYY-MM-DD.tif
+    slope_fars_YYYY-MM-DD.tif
+    f_topo_fars_YYYY-MM-DD.tif
+    fli_fars_YYYY-MM-DD.tif
+    firis_report_YYYY-MM-DD.json
 """
 
 from __future__ import annotations
@@ -38,11 +48,17 @@ import numpy as np
 import pandas as pd
 import rasterio
 from rasterio.enums import Resampling
-from rasterio.warp import reproject
+from rasterio.transform import array_bounds
+from rasterio.warp import (
+    calculate_default_transform,
+    reproject,
+    transform_bounds,
+)
+from rasterio.crs import CRS
 
 
 # ============================================================
-# Model constants
+# MODEL CONSTANTS
 # ============================================================
 
 WEIGHT_FWI = 0.45
@@ -64,101 +80,100 @@ FUEL_COMPONENT_WEIGHTS = {
 
 
 # ============================================================
-# Arguments
+# ARGUMENTS
 # ============================================================
 
 def parse_arguments() -> argparse.Namespace:
+
     parser = argparse.ArgumentParser(
-        description="Build FIRIS Fire Likelihood Index rasters and JSON report."
+        description="Build FIRIS Fire Likelihood Index."
     )
 
     parser.add_argument(
         "--fwi-raster",
         type=Path,
         required=True,
-        help="Input FWI GeoTIFF.",
     )
+
     parser.add_argument(
         "--fuel-raster",
         type=Path,
         required=True,
-        help="Input fuel-code GeoTIFF.",
     )
+
     parser.add_argument(
         "--dem-raster",
         type=Path,
         required=True,
-        help="Input DEM GeoTIFF.",
     )
+
     parser.add_argument(
         "--fuel-excel",
         type=Path,
         required=True,
-        help="Global_fuelbeds_parameters_v1.2.xlsx path.",
     )
+
     parser.add_argument(
         "--fuel-code-column",
         default="JOIN_VALUE",
-        help="Fuel code column in Excel. Default: JOIN_VALUE",
     )
+
     parser.add_argument(
         "--fuel-score-column",
         default="AUTO",
-        help="Use AUTO for calculated weighted fuel score.",
     )
+
     parser.add_argument(
         "--output-dir",
         type=Path,
         required=True,
-        help="Output directory.",
     )
+
     parser.add_argument(
         "--run-date",
         required=True,
-        help="Run date, for example 2026-08-27.",
     )
 
     return parser.parse_args()
 
 
 # ============================================================
-# General helpers
+# BASIC HELPERS
 # ============================================================
 
 def require_file(path: Path, label: str) -> None:
+
     if not path.is_file():
-        raise FileNotFoundError(f"{label} not found: {path}")
+        raise FileNotFoundError(
+            f"{label} not found: {path}"
+        )
+
+
+def finite_values(array: np.ndarray) -> np.ndarray:
+
+    values = np.asarray(array, dtype=np.float64)
+
+    return values[np.isfinite(values)]
 
 
 def to_json_number(value: Any) -> float | None:
-    """
-    Convert a numeric value to JSON-safe finite float.
-    NaN / +Infinity / -Infinity become None.
-    """
+
     try:
-        numeric_value = float(value)
+        number = float(value)
     except (TypeError, ValueError):
         return None
 
-    if not math.isfinite(numeric_value):
+    if not math.isfinite(number):
         return None
 
-    return round(numeric_value, 6)
+    return round(number, 6)
 
 
 def calculate_statistics(array: np.ndarray) -> dict[str, Any]:
-    """
-    Calculate statistics only from finite values.
 
-    Important:
-    - np.min(array) on an array containing NaN returns NaN.
-    - This function first removes NaN / Inf.
-    - Output is always valid standard JSON.
-    """
-    values = np.asarray(array, dtype=np.float64)
-    valid_values = values[np.isfinite(values)]
+    values = finite_values(array)
 
-    if valid_values.size == 0:
+    if values.size == 0:
         return {
             "valid_pixel_count": 0,
             "min": None,
@@ -168,53 +183,89 @@ def calculate_statistics(array: np.ndarray) -> dict[str, Any]:
         }
 
     return {
-        "valid_pixel_count": int(valid_values.size),
-        "min": to_json_number(np.min(valid_values)),
-        "max": to_json_number(np.max(valid_values)),
-        "mean": to_json_number(np.mean(valid_values)),
-        "std": to_json_number(np.std(valid_values)),
+        "valid_pixel_count": int(values.size),
+        "min": to_json_number(np.min(values)),
+        "max": to_json_number(np.max(values)),
+        "mean": to_json_number(np.mean(values)),
+        "std": to_json_number(np.std(values)),
     }
 
 
-def normalize_min_max(values: pd.Series) -> pd.Series:
-    """
-    Normalize numeric values to [0, 1].
-    Invalid values are converted to zero.
-    """
-    numeric_values = pd.to_numeric(values, errors="coerce").fillna(0.0)
-    numeric_values = numeric_values.clip(lower=0.0)
+def normalize_series(values: pd.Series) -> pd.Series:
 
-    minimum = float(numeric_values.min())
-    maximum = float(numeric_values.max())
+    numeric = pd.to_numeric(
+        values,
+        errors="coerce"
+    ).fillna(0.0)
+
+    numeric = numeric.clip(lower=0.0)
+
+    minimum = float(numeric.min())
+    maximum = float(numeric.max())
 
     if math.isclose(minimum, maximum):
         return pd.Series(
-            np.zeros(len(numeric_values), dtype=np.float64),
-            index=numeric_values.index,
+            np.zeros(len(numeric), dtype=np.float64),
+            index=numeric.index,
         )
 
-    return (numeric_values - minimum) / (maximum - minimum)
+    return (
+        (numeric - minimum)
+        / (maximum - minimum)
+    )
+
+
+def find_column(
+    dataframe: pd.DataFrame,
+    candidates: list[str],
+) -> str | None:
+
+    normalized = {
+        str(column).strip().lower(): column
+        for column in dataframe.columns
+    }
+
+    for candidate in candidates:
+
+        key = candidate.strip().lower()
+
+        if key in normalized:
+            return normalized[key]
+
+    return None
 
 
 # ============================================================
-# Raster read / alignment
+# FWI REFERENCE GRID
 # ============================================================
 
-def read_reference_raster(
+def read_fwi_reference(
     raster_path: Path,
 ) -> tuple[np.ndarray, dict[str, Any]]:
-    """
-    Read FWI raster. Its grid becomes the target grid of all output files.
-    """
+
     with rasterio.open(raster_path) as src:
+
+        if src.crs is None:
+            raise ValueError(
+                "FWI raster has no CRS."
+            )
+
         data = src.read(1).astype(np.float32)
 
         if src.nodata is not None:
-            data[np.isclose(data, src.nodata)] = np.nan
+            data[
+                np.isclose(
+                    data,
+                    src.nodata
+                )
+            ] = np.nan
 
-        data[~np.isfinite(data)] = np.nan
+        data[
+            ~np.isfinite(data)
+        ] = np.nan
 
         profile = src.profile.copy()
+
         profile.update(
             driver="GTiff",
             dtype="float32",
@@ -230,397 +281,738 @@ def read_reference_raster(
             "width": src.width,
             "height": src.height,
             "profile": profile,
-            "resolution_x": abs(float(src.transform.a)),
-            "resolution_y": abs(float(src.transform.e)),
+            "resolution_x": abs(
+                float(src.transform.a)
+            ),
+            "resolution_y": abs(
+                float(src.transform.e)
+            ),
+            "bounds": src.bounds,
         }
-
-    if reference["crs"] is None:
-        raise ValueError("FWI raster has no CRS.")
 
     return data, reference
 
+
+# ============================================================
+# GENERIC RASTER ALIGNMENT
+# ============================================================
 
 def align_to_reference(
     raster_path: Path,
     reference: dict[str, Any],
     resampling: Resampling,
 ) -> np.ndarray:
-    """
-    Reproject/resample source raster to FWI target grid.
-    """
+
     destination = np.full(
-        (reference["height"], reference["width"]),
+        (
+            reference["height"],
+            reference["width"],
+        ),
         np.nan,
         dtype=np.float32,
     )
 
     with rasterio.open(raster_path) as src:
-        source = src.read(1).astype(np.float32)
+
+        if src.crs is None:
+            raise ValueError(
+                f"Raster has no CRS: {raster_path}"
+            )
+
+        source = src.read(1).astype(
+            np.float32
+        )
 
         if src.nodata is not None:
-            source[np.isclose(source, src.nodata)] = np.nan
+            source[
+                np.isclose(
+                    source,
+                    src.nodata
+                )
+            ] = np.nan
 
-        source[~np.isfinite(source)] = np.nan
+        source[
+            ~np.isfinite(source)
+        ] = np.nan
 
         reproject(
             source=source,
             destination=destination,
+
             src_transform=src.transform,
             src_crs=src.crs,
             src_nodata=np.nan,
+
             dst_transform=reference["transform"],
             dst_crs=reference["crs"],
             dst_nodata=np.nan,
+
             resampling=resampling,
         )
 
-    destination[~np.isfinite(destination)] = np.nan
+    destination[
+        ~np.isfinite(destination)
+    ] = np.nan
+
     return destination
 
 
 # ============================================================
-# Fuel mapping
+# DEM METRIC SLOPE
 # ============================================================
 
-def find_first_existing_column(
-    dataframe: pd.DataFrame,
-    candidates: list[str],
-) -> str | None:
-    """
-    Find first exact available column name from a candidate list.
-    """
-    for column_name in candidates:
-        if column_name in dataframe.columns:
-            return column_name
-    return None
+def metric_spacing_from_crs(
+    src,
+) -> tuple[float, float]:
+
+    crs = src.crs
+
+    xres = abs(float(src.transform.a))
+    yres = abs(float(src.transform.e))
+
+    if crs is None:
+        raise ValueError(
+            "DEM has no CRS."
+        )
+
+    # Projected CRS: units are normally metres.
+    if crs.is_projected:
+
+        unit_factor = 1.0
+
+        try:
+            axis_units = [
+                axis.unit_name
+                for axis in crs.axis_info
+            ]
+
+            if axis_units:
+                first_unit = (
+                    axis_units[0] or ""
+                ).lower()
+
+                if "foot" in first_unit:
+                    unit_factor = 0.3048
+
+        except Exception:
+            pass
+
+        return (
+            xres * unit_factor,
+            yres * unit_factor,
+        )
+
+    # Geographic CRS:
+    # Convert degree resolution to metres
+    # using latitude-dependent scale.
+    if crs.is_geographic:
+
+        height = src.height
+
+        row_center = height / 2.0
+
+        center_y = (
+            src.transform.f
+            + (
+                row_center
+                * src.transform.e
+            )
+        )
+
+        lat_rad = math.radians(
+            float(center_y)
+        )
+
+        meters_per_degree_lat = (
+            111132.92
+            - 559.82 * math.cos(
+                2 * lat_rad
+            )
+            + 1.175 * math.cos(
+                4 * lat_rad
+            )
+            - 0.0023 * math.cos(
+                6 * lat_rad
+            )
+        )
+
+        meters_per_degree_lon = (
+            111412.84 * math.cos(
+                lat_rad
+            )
+            - 93.5 * math.cos(
+                3 * lat_rad
+            )
+            + 0.118 * math.cos(
+                5 * lat_rad
+            )
+        )
+
+        return (
+            xres * meters_per_degree_lon,
+            yres * meters_per_degree_lat,
+        )
+
+    raise ValueError(
+        "Unsupported DEM CRS type."
+    )
 
 
-def load_fuel_mapping_auto(
+def calculate_native_dem_slope(
+    dem_path: Path,
+) -> np.ndarray:
+
+    with rasterio.open(dem_path) as src:
+
+        if src.crs is None:
+            raise ValueError(
+                "DEM has no CRS."
+            )
+
+        dem = src.read(1).astype(
+            np.float32
+        )
+
+        if src.nodata is not None:
+
+            dem[
+                np.isclose(
+                    dem,
+                    src.nodata
+                )
+            ] = np.nan
+
+        dem[
+            ~np.isfinite(dem)
+        ] = np.nan
+
+        valid = np.isfinite(dem)
+
+        slope = np.full(
+            dem.shape,
+            np.nan,
+            dtype=np.float32,
+        )
+
+        if not np.any(valid):
+            return slope
+
+        x_spacing, y_spacing = (
+            metric_spacing_from_crs(src)
+        )
+
+        median_elevation = float(
+            np.nanmedian(dem)
+        )
+
+        dem_gradient = np.where(
+            valid,
+            dem,
+            median_elevation,
+        ).astype(np.float32)
+
+        gradient_y, gradient_x = (
+            np.gradient(
+                dem_gradient,
+                y_spacing,
+                x_spacing,
+            )
+        )
+
+        slope_radians = np.arctan(
+            np.sqrt(
+                np.square(gradient_x)
+                + np.square(gradient_y)
+            )
+        )
+
+        slope = np.degrees(
+            slope_radians
+        ).astype(np.float32)
+
+        slope[~valid] = np.nan
+
+        slope[
+            ~np.isfinite(slope)
+        ] = np.nan
+
+        return slope
+
+
+def read_native_dem_slope_and_align(
+    dem_path: Path,
+    reference: dict[str, Any],
+) -> np.ndarray:
+
+    native_slope = calculate_native_dem_slope(
+        dem_path
+    )
+
+    destination = np.full(
+        (
+            reference["height"],
+            reference["width"],
+        ),
+        np.nan,
+        dtype=np.float32,
+    )
+
+    with rasterio.open(dem_path) as src:
+
+        reproject(
+            source=native_slope,
+            destination=destination,
+
+            src_transform=src.transform,
+            src_crs=src.crs,
+            src_nodata=np.nan,
+
+            dst_transform=reference["transform"],
+            dst_crs=reference["crs"],
+            dst_nodata=np.nan,
+
+            resampling=Resampling.bilinear,
+        )
+
+    destination[
+        ~np.isfinite(destination)
+    ] = np.nan
+
+    return destination
+
+
+# ============================================================
+# FUEL TABLE
+# ============================================================
+
+def load_fuel_mapping(
     excel_path: Path,
     code_column: str,
 ) -> tuple[dict[float, float], dict[str, Any]]:
-    """
-    Read Fuelbeds_metric and calculate F_Fuel in AUTO mode.
 
-    The code supports common Fuelbeds_metric column names. It combines
-    five normalized components:
-
-        FineFuel        35%
-        DeadWood        30%
-        ShrubStructure  15%
-        Litter          10%
-        CanopyStructure 10%
-    """
     sheet_name = "Fuelbeds_metric"
 
-    workbook = pd.ExcelFile(excel_path)
+    workbook = pd.ExcelFile(
+        excel_path
+    )
 
     if sheet_name not in workbook.sheet_names:
+
         raise ValueError(
             f"Sheet '{sheet_name}' not found. "
-            f"Available sheets: {workbook.sheet_names}"
+            f"Available sheets: "
+            f"{workbook.sheet_names}"
         )
 
-    dataframe = pd.read_excel(excel_path, sheet_name=sheet_name)
+    dataframe = pd.read_excel(
+        excel_path,
+        sheet_name=sheet_name,
+    )
 
-    if code_column not in dataframe.columns:
+    code_col = find_column(
+        dataframe,
+        [code_column],
+    )
+
+    if code_col is None:
+
         raise ValueError(
-            f"Fuel code column '{code_column}' not found in '{sheet_name}'. "
-            f"Available columns: {list(dataframe.columns)}"
+            f"Fuel code column '{code_column}' "
+            f"not found. Available columns: "
+            f"{list(dataframe.columns)}"
         )
 
-    # Candidate columns in Global Fuelbeds parameter tables.
-    # The first available name is selected for each component.
-    fine_fuel_column = find_first_existing_column(
+    # --------------------------------------------------------
+    # Actual Fuelbeds fields
+    # --------------------------------------------------------
+
+    woody_col = find_column(
         dataframe,
         [
-            "G_Load (Mg/ha)",
+            "Woody Cover (%)",
+            "Woody Cover",
+            "Woody_Cover",
+        ],
+    )
+
+    w1_col = find_column(
+        dataframe,
+        [
             "W_1hLoad (Mg/ha)",
             "W_1h Load (Mg/ha)",
+            "W_1hLoad",
         ],
     )
 
-    dead_wood_columns = [
-        col for col in [
-            find_first_existing_column(
-                dataframe,
-                ["W_10h Load (Mg/ha)", "W_10hLoad (Mg/ha)"],
-            ),
-            find_first_existing_column(
-                dataframe,
-                ["W_100h Load (Mg/ha)", "W_100hLoad (Mg/ha)"],
-            ),
-            find_first_existing_column(
-                dataframe,
-                ["W_1000h Load (Mg/ha)", "W_1000hLoad (Mg/ha)"],
-            ),
-        ]
-        if col is not None
-    ]
-
-    shrub_column = find_first_existing_column(
+    w10_col = find_column(
         dataframe,
         [
-            "Shrub_Load (Mg/ha)",
-            "Shrub Load (Mg/ha)",
-            "S_Load (Mg/ha)",
-            "ShrubCover",
-            "Shrub Cover (%)",
+            "W_10hLoad (Mg/ha)",
+            "W_10h Load (Mg/ha)",
+            "W_10hLoad",
         ],
     )
 
-    litter_column = find_first_existing_column(
+    w100_col = find_column(
         dataframe,
         [
-            "Litter_Load (Mg/ha)",
-            "Litter Load (Mg/ha)",
-            "L_Load (Mg/ha)",
+            "W_100hLoad (Mg/ha)",
+            "W_100h Load (Mg/ha)",
+            "W_100hLoad",
         ],
     )
 
-    canopy_column = find_first_existing_column(
+    w1000_col = find_column(
         dataframe,
         [
-            "CanopyCover",
-            "Canopy Cover (%)",
-            "Canopy_Cover (%)",
-            "C_Cover (%)",
-            "CrownCover",
+            "W_1000hLoad (Mg/ha)",
+            "W_1000h Load (Mg/ha)",
+            "W_1000hLoad",
         ],
     )
 
-    # Basic required values for AUTO score.
-    # Fine fuel and dead wood are the most important fire-spread parameters.
-    if fine_fuel_column is None:
+    litter_cover_col = find_column(
+        dataframe,
+        [
+            "Litter Cover (%)",
+            "Litter Cover",
+            "Litter_Cover",
+        ],
+    )
+
+    litter_depth_col = find_column(
+        dataframe,
+        [
+            "L_depth (cm)",
+            "L_depth",
+            "Litter Depth (cm)",
+        ],
+    )
+
+    if w1_col is None:
         raise ValueError(
-            "No fine-fuel column was found in Fuelbeds_metric. "
-            "Expected one of: G_Load (Mg/ha), W_1hLoad (Mg/ha)."
+            "W_1hLoad column was not found "
+            "in Fuelbeds_metric."
         )
 
-    if not dead_wood_columns:
+    if not any(
+        col is not None
+        for col in [
+            w10_col,
+            w100_col,
+            w1000_col,
+        ]
+    ):
         raise ValueError(
-            "No dead-wood columns were found in Fuelbeds_metric. "
-            "Expected W_10h / W_100h / W_1000h load columns."
+            "No W_10h/W_100h/W_1000h "
+            "columns were found."
         )
 
     working = dataframe.copy()
 
-    working[code_column] = pd.to_numeric(
-        working[code_column],
+    working[code_col] = pd.to_numeric(
+        working[code_col],
         errors="coerce",
     )
 
-    # FineFuel
-    fine_fuel = normalize_min_max(working[fine_fuel_column])
+    # --------------------------------------------------------
+    # Fine fuel
+    # --------------------------------------------------------
 
-    # DeadWood: weighted composition of 10h, 100h and 1000h fuels.
-    dead_wood_raw = pd.Series(
-        np.zeros(len(working), dtype=np.float64),
+    fine_fuel = normalize_series(
+        working[w1_col]
+    )
+
+    # --------------------------------------------------------
+    # Dead wood
+    # --------------------------------------------------------
+
+    dead_components = []
+
+    if w10_col is not None:
+        dead_components.append(
+            (
+                0.50,
+                normalize_series(
+                    working[w10_col]
+                ),
+            )
+        )
+
+    if w100_col is not None:
+        dead_components.append(
+            (
+                0.30,
+                normalize_series(
+                    working[w100_col]
+                ),
+            )
+        )
+
+    if w1000_col is not None:
+        dead_components.append(
+            (
+                0.20,
+                normalize_series(
+                    working[w1000_col]
+                ),
+            )
+        )
+
+    dead_wood = pd.Series(
+        0.0,
         index=working.index,
     )
 
-    dead_wood_weights = {
-        "W_10h": 0.50,
-        "W_100h": 0.30,
-        "W_1000h": 0.20,
-    }
+    weight_sum = 0.0
 
-    for column in dead_wood_columns:
-        numeric = pd.to_numeric(working[column], errors="coerce").fillna(0.0)
-        numeric = numeric.clip(lower=0.0)
+    for weight, values in dead_components:
 
-        if "10h" in column and "100h" not in column and "1000h" not in column:
-            weight = dead_wood_weights["W_10h"]
-        elif "1000h" in column:
-            weight = dead_wood_weights["W_1000h"]
-        else:
-            weight = dead_wood_weights["W_100h"]
+        dead_wood += (
+            weight * values
+        )
 
-        dead_wood_raw = dead_wood_raw + (weight * numeric)
+        weight_sum += weight
 
-    dead_wood = normalize_min_max(dead_wood_raw)
+    if weight_sum > 0:
+        dead_wood /= weight_sum
 
-    # If detailed structure columns are absent, use zero contribution.
-    # This preserves total score logic and avoids invalid values.
-    shrub_structure = (
-        normalize_min_max(working[shrub_column])
-        if shrub_column is not None
-        else pd.Series(0.0, index=working.index)
-    )
+    # --------------------------------------------------------
+    # Woody structure
+    # --------------------------------------------------------
 
-    litter = (
-        normalize_min_max(working[litter_column])
-        if litter_column is not None
-        else pd.Series(0.0, index=working.index)
-    )
+    if woody_col is not None:
 
-    canopy_structure = (
-        normalize_min_max(working[canopy_column])
-        if canopy_column is not None
-        else pd.Series(0.0, index=working.index)
+        woody = normalize_series(
+            working[woody_col]
+        )
+
+    else:
+
+        woody = pd.Series(
+            0.0,
+            index=working.index,
+        )
+
+    # --------------------------------------------------------
+    # Litter
+    # --------------------------------------------------------
+
+    litter_components = []
+
+    if litter_cover_col is not None:
+        litter_components.append(
+            normalize_series(
+                working[litter_cover_col]
+            )
+        )
+
+    if litter_depth_col is not None:
+        litter_components.append(
+            normalize_series(
+                working[litter_depth_col]
+            )
+        )
+
+    if litter_components:
+
+        litter = sum(
+            litter_components
+        ) / len(litter_components)
+
+    else:
+
+        litter = pd.Series(
+            0.0,
+            index=working.index,
+        )
+
+    # --------------------------------------------------------
+    # Preserve original model structure
+    #
+    # ShrubStructure and CanopyStructure are represented
+    # by woody structural cover when that field is available.
+    # --------------------------------------------------------
+
+    shrub_structure = woody.copy()
+    canopy_structure = woody.copy()
+
+    working["F_Fuel"] = (
+
+        FUEL_COMPONENT_WEIGHTS[
+            "FineFuel"
+        ] * fine_fuel
+
+        + FUEL_COMPONENT_WEIGHTS[
+            "DeadWood"
+        ] * dead_wood
+
+        + FUEL_COMPONENT_WEIGHTS[
+            "ShrubStructure"
+        ] * shrub_structure
+
+        + FUEL_COMPONENT_WEIGHTS[
+            "Litter"
+        ] * litter
+
+        + FUEL_COMPONENT_WEIGHTS[
+            "CanopyStructure"
+        ] * canopy_structure
     )
 
     working["F_Fuel"] = (
-        FUEL_COMPONENT_WEIGHTS["FineFuel"] * fine_fuel
-        + FUEL_COMPONENT_WEIGHTS["DeadWood"] * dead_wood
-        + FUEL_COMPONENT_WEIGHTS["ShrubStructure"] * shrub_structure
-        + FUEL_COMPONENT_WEIGHTS["Litter"] * litter
-        + FUEL_COMPONENT_WEIGHTS["CanopyStructure"] * canopy_structure
+        working["F_Fuel"]
+        .clip(0.0, 1.0)
     )
 
-    working["F_Fuel"] = working["F_Fuel"].clip(lower=0.0, upper=1.0)
+    working = working.dropna(
+        subset=[code_col]
+    )
 
-    before_cleanup = len(working)
+    working = working.drop_duplicates(
+        subset=[code_col],
+        keep="last",
+    )
 
-    working = working.dropna(subset=[code_column])
-    working = working.drop_duplicates(subset=[code_column], keep="last")
+    mapping = {}
 
-    duplicates_removed = before_cleanup - len(working)
+    for code, score in zip(
+        working[code_col],
+        working["F_Fuel"],
+    ):
 
-    mapping = {
-        float(code): float(score)
-        for code, score in zip(working[code_column], working["F_Fuel"])
-        if math.isfinite(float(code)) and math.isfinite(float(score))
-    }
+        code_float = float(code)
+        score_float = float(score)
+
+        if (
+            math.isfinite(code_float)
+            and math.isfinite(score_float)
+        ):
+            mapping[
+                code_float
+            ] = score_float
 
     if not mapping:
-        raise ValueError("No valid fuel mapping records were created.")
+        raise ValueError(
+            "No valid fuel mapping was created."
+        )
 
-    mapping_metadata = {
-        "reference_table_rows_after_cleanup": int(len(working)),
-        "duplicate_join_values_removed": int(duplicates_removed),
-        "fuel_component_weights": FUEL_COMPONENT_WEIGHTS,
+    metadata = {
+
+        "sheet": sheet_name,
+
+        "fuel_code_column": str(
+            code_col
+        ),
+
         "selected_source_columns": {
-            "FineFuel": fine_fuel_column,
-            "DeadWood": dead_wood_columns,
-            "ShrubStructure": shrub_column,
-            "Litter": litter_column,
-            "CanopyStructure": canopy_column,
+            "WoodyCover": woody_col,
+            "W_1hLoad": w1_col,
+            "W_10hLoad": w10_col,
+            "W_100hLoad": w100_col,
+            "W_1000hLoad": w1000_col,
+            "LitterCover": litter_cover_col,
+            "LitterDepth": litter_depth_col,
         },
-        "f_fuel_statistics_in_reference_table": {
-            "min": to_json_number(working["F_Fuel"].min()),
-            "max": to_json_number(working["F_Fuel"].max()),
-            "mean": to_json_number(working["F_Fuel"].mean()),
-        },
+
+        "fuel_component_weights":
+            FUEL_COMPONENT_WEIGHTS,
+
+        "mapping_entries":
+            len(mapping),
+
+        "reference_fuel_statistics":
+            calculate_statistics(
+                working["F_Fuel"].to_numpy()
+            ),
     }
 
-    print(f"Fuel mapping loaded from sheet: {sheet_name}")
-    print("Fuel score mode: AUTO")
-    print(f"Fuel mapping entries: {len(mapping)}")
+    print(
+        f"Fuel mapping entries: "
+        f"{len(mapping):,}"
+    )
 
-    return mapping, mapping_metadata
+    return mapping, metadata
 
+
+# ============================================================
+# FUEL RASTER -> F_FUEL
+# ============================================================
 
 def create_fuel_raster(
     fuel_codes: np.ndarray,
     mapping: dict[float, float],
-) -> tuple[np.ndarray, list[float], list[float]]:
-    """
-    Convert fuel-class raster to F_Fuel raster.
+) -> tuple[
+    np.ndarray,
+    list[float],
+    list[float],
+]:
 
-    Returns:
-        f_fuel_raster,
-        unique_codes_in_raster,
-        unmapped_codes
-    """
-    result = np.full(fuel_codes.shape, np.nan, dtype=np.float32)
+    result = np.full(
+        fuel_codes.shape,
+        np.nan,
+        dtype=np.float32,
+    )
 
-    valid_mask = np.isfinite(fuel_codes)
+    valid = np.isfinite(
+        fuel_codes
+    )
 
-    if not np.any(valid_mask):
+    if not np.any(valid):
+
         return result, [], []
 
-    unique_codes_array = np.unique(fuel_codes[valid_mask])
-    unique_codes = [float(code) for code in unique_codes_array.tolist()]
-
-    unmapped_codes: list[float] = []
-
-    for fuel_code in unique_codes:
-        if fuel_code in mapping:
-            result[fuel_codes == fuel_code] = mapping[fuel_code]
-        else:
-            unmapped_codes.append(fuel_code)
-
-    return result, unique_codes, unmapped_codes
-
-
-# ============================================================
-# Topography / slope
-# ============================================================
-
-def calculate_slope_degrees(
-    dem: np.ndarray,
-    resolution_x: float,
-    resolution_y: float,
-) -> np.ndarray:
-    """
-    Calculate slope in degrees.
-
-    Key correction:
-    Before np.gradient(), DEM NaN cells are filled temporarily with the
-    median elevation of valid DEM cells. Without this, one NaN spreads into
-    neighbouring gradient calculations and can cause NaN statistics.
-
-    Original invalid DEM cells are returned as NaN in final slope raster.
-    """
-    slope = np.full(dem.shape, np.nan, dtype=np.float32)
-
-    valid_mask = np.isfinite(dem)
-
-    if not np.any(valid_mask):
-        return slope
-
-    median_elevation = float(np.nanmedian(dem))
-
-    dem_for_gradient = np.where(
-        valid_mask,
-        dem,
-        median_elevation,
-    ).astype(np.float32)
-
-    gradient_y, gradient_x = np.gradient(
-        dem_for_gradient,
-        resolution_y,
-        resolution_x,
-    )
-
-    slope_radians = np.arctan(
-        np.sqrt(
-            np.square(gradient_x) + np.square(gradient_y)
+    unique_codes = [
+        float(code)
+        for code in np.unique(
+            fuel_codes[valid]
         )
+    ]
+
+    unmapped = []
+
+    for code in unique_codes:
+
+        mask = (
+            fuel_codes == code
+        )
+
+        if code in mapping:
+
+            result[mask] = (
+                mapping[code]
+            )
+
+        else:
+
+            unmapped.append(code)
+
+    return (
+        result,
+        unique_codes,
+        unmapped,
     )
-
-    calculated_slope = np.degrees(slope_radians).astype(np.float32)
-
-    # Preserve original DEM nodata locations.
-    calculated_slope[~valid_mask] = np.nan
-
-    # Final safety cleanup.
-    calculated_slope[~np.isfinite(calculated_slope)] = np.nan
-
-    return calculated_slope
 
 
 # ============================================================
-# Output functions
+# OUTPUT
 # ============================================================
 
 def write_geotiff(
-    output_path: Path,
+    path: Path,
     array: np.ndarray,
     profile: dict[str, Any],
 ) -> None:
-    """
-    Write a float32 GeoTIFF and convert NaN to standard raster nodata.
-    """
-    output_array = np.where(
+
+    output = np.where(
         np.isfinite(array),
         array,
         OUTPUT_NODATA,
     ).astype(np.float32)
 
-    output_profile = profile.copy()
-    output_profile.update(
+    out_profile = profile.copy()
+
+    out_profile.update(
         driver="GTiff",
         dtype="float32",
         count=1,
@@ -629,22 +1021,28 @@ def write_geotiff(
         predictor=3,
     )
 
-    with rasterio.open(output_path, "w", **output_profile) as dst:
-        dst.write(output_array, 1)
+    with rasterio.open(
+        path,
+        "w",
+        **out_profile,
+    ) as dst:
+
+        dst.write(
+            output,
+            1,
+        )
 
 
-def write_json_report(
-    output_path: Path,
+def write_json(
+    path: Path,
     report: dict[str, Any],
 ) -> None:
-    """
-    Write strict valid JSON.
 
-    allow_nan=False is intentionally used:
-    if a NaN somehow remains in report, program fails rather than writing
-    invalid JSON.
-    """
-    with output_path.open("w", encoding="utf-8") as file:
+    with path.open(
+        "w",
+        encoding="utf-8",
+    ) as file:
+
         json.dump(
             report,
             file,
@@ -652,205 +1050,544 @@ def write_json_report(
             indent=2,
             allow_nan=False,
         )
+
         file.write("\n")
 
 
 # ============================================================
-# Main pipeline
+# MAIN
 # ============================================================
 
 def main() -> None:
+
     args = parse_arguments()
 
-    require_file(args.fwi_raster, "FWI raster")
-    require_file(args.fuel_raster, "Fuel raster")
-    require_file(args.dem_raster, "DEM raster")
-    require_file(args.fuel_excel, "Fuel Excel")
+    require_file(
+        args.fwi_raster,
+        "FWI raster",
+    )
 
-    if args.fuel_score_column.strip().upper() != "AUTO":
+    require_file(
+        args.fuel_raster,
+        "Fuel raster",
+    )
+
+    require_file(
+        args.dem_raster,
+        "DEM raster",
+    )
+
+    require_file(
+        args.fuel_excel,
+        "Fuel Excel",
+    )
+
+    if (
+        args.fuel_score_column
+        .strip()
+        .upper()
+        != "AUTO"
+    ):
         raise ValueError(
-            "This version is configured for AUTO fuel scoring. "
-            "Set FUEL_SCORE_COLUMN to AUTO in GitHub Actions."
+            "FIRIS uses AUTO fuel scoring."
         )
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    args.output_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    print("Reading FWI raster...")
-    fwi_original, reference = read_reference_raster(args.fwi_raster)
+    # --------------------------------------------------------
+    # 1. FWI reference
+    # --------------------------------------------------------
 
-    print("Aligning fuel raster to FWI grid...")
+    print(
+        "============================================================"
+    )
+    print(
+        "FIRIS FIRE LIKELIHOOD INDEX"
+    )
+    print(
+        "============================================================"
+    )
+
+    print(
+        "Reading FWI reference raster..."
+    )
+
+    fwi, reference = (
+        read_fwi_reference(
+            args.fwi_raster
+        )
+    )
+
+    print(
+        f"FWI CRS       : "
+        f"{reference['crs']}"
+    )
+
+    print(
+        f"FWI dimensions: "
+        f"{reference['width']} x "
+        f"{reference['height']}"
+    )
+
+    print(
+        f"FWI cell size : "
+        f"{reference['resolution_x']} x "
+        f"{reference['resolution_y']}"
+    )
+
+    # --------------------------------------------------------
+    # 2. Fuel -> FWI grid
+    # --------------------------------------------------------
+
+    print(
+        "Aligning fuel raster to FWI grid..."
+    )
+
     fuel_codes = align_to_reference(
         args.fuel_raster,
         reference,
         Resampling.nearest,
     )
 
-    print("Aligning DEM raster to FWI grid...")
-    dem = align_to_reference(
-        args.dem_raster,
-        reference,
-        Resampling.bilinear,
+    # --------------------------------------------------------
+    # 3. Native DEM slope -> FWI grid
+    # --------------------------------------------------------
+
+    print(
+        "Calculating slope on native DEM grid..."
     )
 
-    print("Loading fuel mapping from Excel...")
-    fuel_mapping, fuel_mapping_metadata = load_fuel_mapping_auto(
-        args.fuel_excel,
-        args.fuel_code_column,
+    slope_degrees = (
+        read_native_dem_slope_and_align(
+            args.dem_raster,
+            reference,
+        )
     )
 
-    print("Creating fuel-score raster...")
-    f_fuel, unique_fuel_codes, unmapped_codes = create_fuel_raster(
-        fuel_codes,
-        fuel_mapping,
+    # --------------------------------------------------------
+    # 4. Fuel mapping
+    # --------------------------------------------------------
+
+    print(
+        "Loading Fuelbeds_metric..."
     )
 
-    print("Calculating DEM slope...")
-    slope_degrees = calculate_slope_degrees(
-        dem,
-        reference["resolution_x"],
-        reference["resolution_y"],
+    fuel_mapping, fuel_metadata = (
+        load_fuel_mapping(
+            args.fuel_excel,
+            args.fuel_code_column,
+        )
     )
 
-    print("Normalizing FWI, Fuel and Topography components...")
+    print(
+        "Creating F_Fuel raster..."
+    )
 
-    # F_FWI = FWI / 100, clipped to 0..1
-    f_fwi = np.full(fwi_original.shape, np.nan, dtype=np.float32)
-    fwi_valid = np.isfinite(fwi_original)
+    f_fuel, unique_codes, unmapped_codes = (
+        create_fuel_raster(
+            fuel_codes,
+            fuel_mapping,
+        )
+    )
+
+    # --------------------------------------------------------
+    # 5. FWI normalization
+    # --------------------------------------------------------
+
+    f_fwi = np.full(
+        fwi.shape,
+        np.nan,
+        dtype=np.float32,
+    )
+
+    fwi_valid = np.isfinite(fwi)
+
     f_fwi[fwi_valid] = np.clip(
-        fwi_original[fwi_valid] / FWI_SCALE,
+        fwi[fwi_valid]
+        / FWI_SCALE,
         0.0,
         1.0,
     )
 
-    # F_Topo = slope / 45, clipped to 0..1
-    f_topo = np.full(slope_degrees.shape, np.nan, dtype=np.float32)
-    slope_valid = np.isfinite(slope_degrees)
+    # --------------------------------------------------------
+    # 6. Topography normalization
+    # --------------------------------------------------------
+
+    f_topo = np.full(
+        slope_degrees.shape,
+        np.nan,
+        dtype=np.float32,
+    )
+
+    slope_valid = np.isfinite(
+        slope_degrees
+    )
+
     f_topo[slope_valid] = np.clip(
-        slope_degrees[slope_valid] / SLOPE_SCALE_DEGREES,
+        slope_degrees[slope_valid]
+        / SLOPE_SCALE_DEGREES,
         0.0,
         1.0,
     )
 
-    # Final valid pixels require all three components.
-    final_valid_mask = (
+    # --------------------------------------------------------
+    # 7. Final common valid mask
+    # --------------------------------------------------------
+
+    valid_mask = (
         np.isfinite(f_fwi)
         & np.isfinite(f_fuel)
         & np.isfinite(f_topo)
     )
 
-    fli = np.full(fwi_original.shape, np.nan, dtype=np.float32)
-
-    fli[final_valid_mask] = 100.0 * (
-        WEIGHT_FWI * f_fwi[final_valid_mask]
-        + WEIGHT_FUEL * f_fuel[final_valid_mask]
-        + WEIGHT_TOPO * f_topo[final_valid_mask]
+    valid_count = int(
+        np.sum(valid_mask)
     )
 
-    fli = np.clip(fli, 0.0, 100.0).astype(np.float32)
+    total_count = int(
+        fwi.size
+    )
+
+    if valid_count == 0:
+
+        raise RuntimeError(
+            "No common valid pixels exist "
+            "between FWI, Fuel and Topography."
+        )
+
+    # --------------------------------------------------------
+    # 8. FLI
+    # --------------------------------------------------------
+
+    fli = np.full(
+        fwi.shape,
+        np.nan,
+        dtype=np.float32,
+    )
+
+    fli[valid_mask] = (
+        100.0
+        * (
+            WEIGHT_FWI
+            * f_fwi[valid_mask]
+
+            + WEIGHT_FUEL
+            * f_fuel[valid_mask]
+
+            + WEIGHT_TOPO
+            * f_topo[valid_mask]
+        )
+    )
+
+    fli = np.clip(
+        fli,
+        0.0,
+        100.0,
+    ).astype(np.float32)
+
+    # --------------------------------------------------------
+    # 9. Outputs
+    # --------------------------------------------------------
 
     run_date = args.run_date
 
-    output_f_fwi = args.output_dir / f"f_fwi_fars_{run_date}.tif"
-    output_f_fuel = args.output_dir / f"f_fuel_fars_{run_date}.tif"
-    output_slope = args.output_dir / f"slope_fars_{run_date}.tif"
-    output_f_topo = args.output_dir / f"f_topo_fars_{run_date}.tif"
-    output_fli = args.output_dir / f"fli_fars_{run_date}.tif"
-    output_report = args.output_dir / f"firis_report_{run_date}.json"
+    output_fwi = (
+        args.output_dir
+        / f"f_fwi_fars_{run_date}.tif"
+    )
 
-    print("Writing component GeoTIFF files...")
-    write_geotiff(output_f_fwi, f_fwi, reference["profile"])
-    write_geotiff(output_f_fuel, f_fuel, reference["profile"])
-    write_geotiff(output_slope, slope_degrees, reference["profile"])
-    write_geotiff(output_f_topo, f_topo, reference["profile"])
+    output_fuel = (
+        args.output_dir
+        / f"f_fuel_fars_{run_date}.tif"
+    )
 
-    print("Writing FLI GeoTIFF...")
-    write_geotiff(output_fli, fli, reference["profile"])
+    output_slope = (
+        args.output_dir
+        / f"slope_fars_{run_date}.tif"
+    )
+
+    output_topo = (
+        args.output_dir
+        / f"f_topo_fars_{run_date}.tif"
+    )
+
+    output_fli = (
+        args.output_dir
+        / f"fli_fars_{run_date}.tif"
+    )
+
+    output_report = (
+        args.output_dir
+        / f"firis_report_{run_date}.json"
+    )
+
+    print(
+        "Writing component rasters..."
+    )
+
+    write_geotiff(
+        output_fwi,
+        f_fwi,
+        reference["profile"],
+    )
+
+    write_geotiff(
+        output_fuel,
+        f_fuel,
+        reference["profile"],
+    )
+
+    write_geotiff(
+        output_slope,
+        slope_degrees,
+        reference["profile"],
+    )
+
+    write_geotiff(
+        output_topo,
+        f_topo,
+        reference["profile"],
+    )
+
+    print(
+        "Writing final FLI..."
+    )
+
+    write_geotiff(
+        output_fli,
+        fli,
+        reference["profile"],
+    )
+
+    # --------------------------------------------------------
+    # 10. Report
+    # --------------------------------------------------------
 
     report = {
-        "project": "FIRIS - Fars Integrated Fire Information System",
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
-        "run_date": run_date,
-        "formula": (
+
+        "project":
+            "FIRIS - Fars Integrated Fire Information System",
+
+        "generated_at_utc":
+            datetime.now(
+                timezone.utc
+            ).isoformat(),
+
+        "run_date":
+            run_date,
+
+        "formula":
             "FLI = 100 * "
-            "(0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)"
-        ),
+            "(0.45 * F_FWI + "
+            "0.35 * F_Fuel + "
+            "0.20 * F_Topo)",
+
         "weights": {
             "F_FWI": WEIGHT_FWI,
             "F_Fuel": WEIGHT_FUEL,
             "F_Topo": WEIGHT_TOPO,
         },
+
         "normalization": {
-            "F_FWI": (
-                "clip(FWI / 100.0, 0, 1); "
-                "FWI values at or above the scale receive 1."
-            ),
-            "F_Fuel": (
-                "Weighted normalized fuelbed parameters from Fuelbeds_metric "
-                "using FineFuel=35%, DeadWood=30%, ShrubStructure=15%, "
-                "Litter=10%, CanopyStructure=10%."
-            ),
-            "F_Topo": (
-                "clip(slope_degrees / 45.0, 0, 1); "
-                "slopes at or above the scale receive 1."
-            ),
+
+            "F_FWI":
+                "clip(FWI / 100, 0, 1)",
+
+            "F_Fuel":
+                "Weighted normalized Fuelbeds_metric variables",
+
+            "F_Topo":
+                "clip(slope_degrees / 45, 0, 1)",
         },
-        "inputs": {
-            "fwi_raster": str(args.fwi_raster),
-            "fuel_raster": str(args.fuel_raster),
-            "fuel_table": str(args.fuel_excel),
-            "dem_raster": str(args.dem_raster),
+
+        "alignment": {
+
+            "reference":
+                "FWI",
+
+            "fuel":
+                "Nearest neighbour to FWI grid",
+
+            "dem":
+                "Native DEM slope calculation, "
+                "then bilinear resampling to FWI grid",
+
+            "final_grid":
+                "FWI grid",
         },
+
         "target_grid": {
-            "crs": str(reference["crs"]),
-            "width": int(reference["width"]),
-            "height": int(reference["height"]),
-            "transform": [
-                float(value)
-                for value in reference["transform"][:6]
-            ],
+
+            "crs":
+                str(reference["crs"]),
+
+            "width":
+                int(reference["width"]),
+
+            "height":
+                int(reference["height"]),
+
+            "cell_size_x":
+                float(
+                    reference["resolution_x"]
+                ),
+
+            "cell_size_y":
+                float(
+                    reference["resolution_y"]
+                ),
+
+            "transform":
+                [
+                    float(value)
+                    for value in
+                    reference["transform"][:6]
+                ],
         },
+
+        "inputs": {
+
+            "fwi_raster":
+                str(args.fwi_raster),
+
+            "fuel_raster":
+                str(args.fuel_raster),
+
+            "dem_raster":
+                str(args.dem_raster),
+
+            "fuel_excel":
+                str(args.fuel_excel),
+        },
+
         "fuel_mapping": {
-            "unique_fuel_codes_in_raster": unique_fuel_codes,
-            "unique_fuel_code_count": int(len(unique_fuel_codes)),
-            "mapped_code_count": int(
-                len(unique_fuel_codes) - len(unmapped_codes)
-            ),
-            "unmapped_codes": unmapped_codes,
-            "unmapped_code_count": int(len(unmapped_codes)),
-            **fuel_mapping_metadata,
+
+            "unique_codes":
+                unique_codes,
+
+            "unique_code_count":
+                len(unique_codes),
+
+            "mapped_code_count":
+                len(unique_codes)
+                - len(unmapped_codes),
+
+            "unmapped_codes":
+                unmapped_codes,
+
+            "unmapped_code_count":
+                len(unmapped_codes),
+
+            **fuel_metadata,
         },
+
         "statistics": {
-            "fwi_original": calculate_statistics(fwi_original),
-            "f_fwi": calculate_statistics(f_fwi),
-            "f_fuel": calculate_statistics(f_fuel),
-            "slope_degrees": calculate_statistics(slope_degrees),
-            "f_topo": calculate_statistics(f_topo),
-            "fli": calculate_statistics(fli),
-            "final_model_valid_pixels": int(np.sum(final_valid_mask)),
+
+            "FWI":
+                calculate_statistics(fwi),
+
+            "F_FWI":
+                calculate_statistics(f_fwi),
+
+            "F_Fuel":
+                calculate_statistics(f_fuel),
+
+            "Slope_degrees":
+                calculate_statistics(
+                    slope_degrees
+                ),
+
+            "F_Topo":
+                calculate_statistics(f_topo),
+
+            "FLI":
+                calculate_statistics(fli),
+
+            "common_valid_pixels":
+                valid_count,
+
+            "total_target_pixels":
+                total_count,
+
+            "valid_percentage":
+                round(
+                    100.0
+                    * valid_count
+                    / total_count,
+                    4,
+                ),
         },
+
         "outputs": {
-            "f_fwi": str(output_f_fwi),
-            "f_fuel": str(output_f_fuel),
-            "slope": str(output_slope),
-            "f_topo": str(output_f_topo),
-            "fli": str(output_fli),
+
+            "f_fwi":
+                str(output_fwi),
+
+            "f_fuel":
+                str(output_fuel),
+
+            "slope":
+                str(output_slope),
+
+            "f_topo":
+                str(output_topo),
+
+            "fli":
+                str(output_fli),
         },
     }
 
-    print("Writing JSON report...")
-    write_json_report(output_report, report)
-
-    print("")
-    print("FIRIS build completed successfully.")
-    print(f"FLI GeoTIFF: {output_fli}")
-    print(f"JSON report: {output_report}")
-    print(
-        f"Valid FLI pixels: "
-        f"{int(np.sum(final_valid_mask)):,} / {fli.size:,}"
+    write_json(
+        output_report,
+        report,
     )
-    print(f"Fuel mapping entries: {len(fuel_mapping):,}")
-    print(f"Unmatched fuel pixels: {int(np.sum(np.isfinite(fuel_codes) & ~np.isfinite(f_fuel))):,}")
+
+    print(
+        "============================================================"
+    )
+
+    print(
+        "FIRIS build completed successfully."
+    )
+
+    print(
+        f"Target pixels : "
+        f"{total_count:,}"
+    )
+
+    print(
+        f"Valid pixels  : "
+        f"{valid_count:,}"
+    )
+
+    print(
+        f"Valid percent : "
+        f"{100.0 * valid_count / total_count:.2f}%"
+    )
+
+    print(
+        f"FLI output    : "
+        f"{output_fli}"
+    )
+
+    print(
+        f"Report        : "
+        f"{output_report}"
+    )
+
+    print(
+        f"Unmapped fuel codes: "
+        f"{len(unmapped_codes):,}"
+    )
+
+    print(
+        "============================================================"
+    )
 
 
 if __name__ == "__main__":
     main()
+```
