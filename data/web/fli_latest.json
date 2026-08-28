@@ -1,7 +1,7 @@
 {
   "title": "FIRIS - Fars Fire Risk Index",
   "source_file": "fli_fars_2026-08-28.tif",
-  "generated_at_utc": "2026-08-28T13:10:50.670489+00:00",
+  "generated_at_utc": "2026-08-28T13:22:58.385965+00:00",
   "crs": "EPSG:4326",
   "image": "fli_latest.png",
   "grid": "fli_latest_grid.json",
