@@ -1,19 +1,8 @@
-
 name: Update FIRIS FWI
 
 on:
 
   workflow_dispatch:
-
-    inputs:
-
-      target_date:
-
-        description: "FWI date in YYYY-MM-DD format"
-
-        required: false
-
-        type: string
 
   schedule:
 
@@ -21,6 +10,7 @@ on:
 
 
 permissions:
+
   contents: write
 
 
@@ -50,6 +40,7 @@ jobs:
         uses: actions/checkout@v4
 
         with:
+
           fetch-depth: 0
 
 
@@ -62,6 +53,7 @@ jobs:
         uses: actions/setup-python@v5
 
         with:
+
           python-version: "3.11"
 
 
@@ -95,11 +87,6 @@ jobs:
 
           set -euo pipefail
 
-          echo ""
-          echo "============================================================"
-          echo "CHECKING FARS BOUNDARY"
-          echo "============================================================"
-
           if [ ! -f "fars.geojson" ]; then
 
             echo ""
@@ -113,10 +100,10 @@ jobs:
 
 
       # ========================================================
-      # DOWNLOAD FWI
+      # DOWNLOAD TOMORROW FWI
       # ========================================================
 
-      - name: Download ECMWF FWI
+      - name: Download tomorrow FWI
 
         shell: bash
 
@@ -126,31 +113,19 @@ jobs:
 
           echo ""
           echo "============================================================"
-          echo "DOWNLOADING ECMWF FWI"
+          echo "AUTOMATIC TOMORROW FWI"
           echo "============================================================"
 
-
-          if [ -n "${{ inputs.target_date }}" ]; then
-
-            python scripts/update_fwi.py \
-              --date "${{ inputs.target_date }}" \
-              --boundary "fars.geojson" \
-              --overwrite
-
-          else
-
-            python scripts/update_fwi.py \
-              --boundary "fars.geojson" \
-              --overwrite
-
-          fi
+          python scripts/update_fwi.py \
+            --boundary "fars.geojson" \
+            --overwrite
 
 
       # ========================================================
-      # FIND DOWNLOADED DATE
+      # DETERMINE FWI DATE FROM CREATED FILE
       # ========================================================
 
-      - name: Set FWI date
+      - name: Detect forecast FWI file
 
         shell: bash
 
@@ -158,33 +133,73 @@ jobs:
 
           set -euo pipefail
 
+          python - <<'PY'
 
-          if [ -n "${{ inputs.target_date }}" ]; then
+          import json
+          import os
+          from pathlib import Path
 
-            FWI_DATE="${{ inputs.target_date }}"
+          directory = Path(
+              "data/raw/fwi"
+          )
 
-          else
+          files = sorted(
+              directory.glob(
+                  "fwi_ecmwf_fars_*.json"
+              )
+          )
 
-            FWI_DATE="$(
-              date -u -d "tomorrow" +%Y-%m-%d
-            )"
+          if not files:
 
-          fi
+              raise SystemExit(
+                  "No FWI metadata file was created."
+              )
 
+          latest = files[-1]
 
-          echo "FWI_DATE=${FWI_DATE}" \
-            >> "${GITHUB_ENV}"
+          with latest.open(
+              "r",
+              encoding="utf-8"
+          ) as file:
 
+              metadata = json.load(file)
 
-          echo ""
-          echo "FWI_DATE=${FWI_DATE}"
+          forecast_date = (
+              metadata.get(
+                  "forecast_date"
+              )
+          )
+
+          if not forecast_date:
+
+              raise SystemExit(
+                  "forecast_date missing "
+                  "from FWI metadata."
+              )
+
+          print(
+              f"Detected forecast date: "
+              f"{forecast_date}"
+          )
+
+          with open(
+              os.environ["GITHUB_ENV"],
+              "a",
+              encoding="utf-8"
+          ) as env:
+
+              env.write(
+                  f"FWI_DATE={forecast_date}\n"
+              )
+
+          PY
 
 
       # ========================================================
       # VERIFY FWI
       # ========================================================
 
-      - name: Verify FWI raster
+      - name: Verify tomorrow FWI
 
         shell: bash
 
@@ -192,22 +207,15 @@ jobs:
 
           set -euo pipefail
 
-
           FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.tif"
 
           FWI_META="data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.json"
 
 
-          echo ""
-          echo "============================================================"
-          echo "VERIFYING FWI RASTER"
-          echo "============================================================"
-
-
           if [ ! -f "${FWI_FILE}" ]; then
 
             echo ""
-            echo "ERROR: FWI GeoTIFF not found:"
+            echo "ERROR: FWI file not found:"
             echo "${FWI_FILE}"
 
             exit 1
@@ -232,16 +240,16 @@ jobs:
           import os
           import rasterio
 
-          fwi_date = os.environ["FWI_DATE"]
+          date = os.environ["FWI_DATE"]
 
           tif = (
               f"data/raw/fwi/"
-              f"fwi_ecmwf_fars_{fwi_date}.tif"
+              f"fwi_ecmwf_fars_{date}.tif"
           )
 
           meta = (
               f"data/raw/fwi/"
-              f"fwi_ecmwf_fars_{fwi_date}.json"
+              f"fwi_ecmwf_fars_{date}.json"
           )
 
           print("")
@@ -249,75 +257,64 @@ jobs:
           print("FWI VERIFICATION")
           print("=" * 70)
 
-          with rasterio.open(tif) as src:
-
-              print("")
-              print("RASTER")
-
-              print(
-                  "CRS        :",
-                  src.crs
-              )
-
-              print(
-                  "SIZE       :",
-                  src.width,
-                  "x",
-                  src.height
-              )
-
-              print(
-                  "RESOLUTION :",
-                  src.res
-              )
-
-              print(
-                  "BOUNDS     :",
-                  src.bounds
-              )
-
-              print(
-                  "TRANSFORM  :",
-                  src.transform
-              )
-
           with open(
               meta,
               "r",
               encoding="utf-8"
           ) as file:
 
-              metadata = json.load(file)
-
-          print("")
-          print("REQUEST BBOX")
+              info = json.load(file)
 
           print(
-              metadata.get(
+              "Forecast date :",
+              info.get(
+                  "forecast_date"
+              )
+          )
+
+          print(
+              "Iran datetime :",
+              info.get(
+                  "current_iran_datetime"
+              )
+          )
+
+          print(
+              "Request BBOX  :",
+              info.get(
                   "request_bbox"
               )
           )
 
-          print("")
-          print("BOUNDARY BBOX")
+          with rasterio.open(
+              tif
+          ) as src:
 
-          print(
-              metadata.get(
-                  "boundary_bbox"
+              print(
+                  "Raster bounds :",
+                  src.bounds
               )
-          )
 
-          print("")
-          print("Verification completed.")
+              print(
+                  "Raster size   :",
+                  src.width,
+                  "x",
+                  src.height
+              )
+
+              print(
+                  "Raster CRS    :",
+                  src.crs
+              )
 
           PY
 
 
       # ========================================================
-      # CONTROL POINT CHECK AGAINST NEW FWI
+      # CONTROL POINT CHECK
       # ========================================================
 
-      - name: Check control points against new FWI
+      - name: Check Fars control points
 
         shell: bash
 
@@ -325,19 +322,11 @@ jobs:
 
           set -euo pipefail
 
-
-          FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.tif"
-
-
-          echo ""
-          echo "============================================================"
-          echo "CHECKING BOUNDARY CONTROL POINTS"
-          echo "============================================================"
-
-
           python scripts/check_control_points.py \
-            --raster "${FWI_FILE}" \
-            --boundary "fars.geojson" \
+            --raster \
+              "data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.tif" \
+            --boundary \
+              "fars.geojson" \
             --output \
               "data/outputs/control_points_${FWI_DATE}.json"
 
@@ -354,21 +343,15 @@ jobs:
 
           set -euo pipefail
 
-          REPORT="data/outputs/control_points_${FWI_DATE}.json"
-
-          echo ""
-          echo "============================================================"
-          echo "CONTROL POINT REPORT"
-          echo "============================================================"
-
-          cat "${REPORT}"
+          cat \
+            "data/outputs/control_points_${FWI_DATE}.json"
 
 
       # ========================================================
       # COMMIT
       # ========================================================
 
-      - name: Commit FWI files
+      - name: Commit FWI
 
         shell: bash
 
@@ -376,26 +359,23 @@ jobs:
 
           set -euo pipefail
 
-
           git config \
             user.name \
             "github-actions[bot]"
-
 
           git config \
             user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
 
-
           git add \
             data/raw/fwi \
-            data/outputs/control_points_${FWI_DATE}.json
+            "data/outputs/control_points_${FWI_DATE}.json"
 
 
           if git diff --cached --quiet; then
 
             echo ""
-            echo "No FWI changes to commit."
+            echo "No changes to commit."
 
             exit 0
 
@@ -404,14 +384,14 @@ jobs:
 
           git commit \
             -m \
-            "chore: update ECMWF FWI for full Fars extent"
+            "chore: automatic tomorrow FWI update"
 
 
       # ========================================================
       # PUSH
       # ========================================================
 
-      - name: Push FWI update
+      - name: Push
 
         shell: bash
 
@@ -419,11 +399,9 @@ jobs:
 
           set -euo pipefail
 
-
           git push origin HEAD:main
-
 
           echo ""
           echo "============================================================"
-          echo "FWI UPDATE PUSHED SUCCESSFULLY"
+          echo "TOMORROW FWI PUSHED SUCCESSFULLY"
           echo "============================================================"
