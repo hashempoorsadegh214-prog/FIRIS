@@ -14,6 +14,7 @@ on:
       - "protected_areas.geojson"
       - "hunting_banned.geojson"
       - "index.html"
+      - "logo.webp"
       - ".github/workflows/build_firis.yml"
 
 
@@ -102,19 +103,13 @@ jobs:
 
 
       # ========================================================
-      # DETECT FORECAST FWI
+      # DETECT LATEST FORECAST FWI
       #
       # IMPORTANT:
-      # The FWI metadata currently uses:
+      # Current FWI metadata uses target_date.
+      # Older files may use forecast_date.
       #
-      #     target_date
-      #
-      # not:
-      #
-      #     forecast_date
-      #
-      # We therefore accept target_date first and forecast_date
-      # as backward compatibility.
+      # The newest valid FWI metadata is selected.
       # ========================================================
 
       - name: Detect forecast FWI
@@ -169,10 +164,6 @@ jobs:
                       )
 
 
-                  # ------------------------------------------------
-                  # CURRENT FORMAT
-                  # ------------------------------------------------
-
                   target_date = (
                       metadata.get(
                           "target_date"
@@ -184,10 +175,6 @@ jobs:
                   )
 
 
-                  # ------------------------------------------------
-                  # OUTPUT RASTER
-                  # ------------------------------------------------
-
                   raster_name = (
                       metadata.get(
                           "output_file"
@@ -195,17 +182,11 @@ jobs:
                   )
 
 
-                  # ------------------------------------------------
-                  # FALLBACK:
-                  # use filename if output_file is absent
-                  # ------------------------------------------------
-
                   if not raster_name:
 
                       raster_name = (
                           path.stem
-                          +
-                          ".tif"
+                          + ".tif"
                       )
 
 
@@ -227,7 +208,7 @@ jobs:
               except Exception as error:
 
                   print(
-                      f"WARNING: could not read "
+                      f"WARNING: Could not read "
                       f"{path}: {error}"
                   )
 
@@ -240,10 +221,6 @@ jobs:
               )
 
 
-          # --------------------------------------------------------
-          # SORT BY TARGET DATE
-          # --------------------------------------------------------
-
           candidates.sort(
               key=lambda item: item[0]
           )
@@ -254,10 +231,6 @@ jobs:
           )
 
 
-          # --------------------------------------------------------
-          # BUILD RASTER PATH
-          # --------------------------------------------------------
-
           raster_path = (
               directory
               /
@@ -267,17 +240,14 @@ jobs:
 
           if not raster_path.is_file():
 
-              # Some metadata stores only the filename,
-              # while some may contain a path.
-              alternate = (
-                  Path(
-                      str(raster_name)
-                  )
+              alternative = Path(
+                  str(raster_name)
               )
 
-              if alternate.is_file():
 
-                  raster_path = alternate
+              if alternative.is_file():
+
+                  raster_path = alternative
 
               else:
 
@@ -285,13 +255,9 @@ jobs:
                       "FWI raster referenced by metadata "
                       "was not found.\n"
                       f"Metadata: {metadata_path}\n"
-                      f"Raster:   {raster_path}"
+                      f"Raster: {raster_path}"
                   )
 
-
-          # --------------------------------------------------------
-          # ENVIRONMENT
-          # --------------------------------------------------------
 
           with open(
               os.environ["GITHUB_ENV"],
@@ -308,16 +274,17 @@ jobs:
               )
 
 
-          # --------------------------------------------------------
-          # LOG
-          # --------------------------------------------------------
-
           print("")
-          print("=" * 70)
-          print("FORECAST FWI DETECTION")
-          print("=" * 70)
+          print(
+              "=" * 70
+          )
+          print(
+              "FORECAST FWI DETECTION"
+          )
+          print(
+              "=" * 70
+          )
 
-          print("")
           print(
               "Metadata file :",
               metadata_path
@@ -333,10 +300,7 @@ jobs:
               raster_path
           )
 
-          print(
-              ""
-          )
-
+          print("")
           print(
               "✓ Forecast FWI selected successfully."
           )
@@ -345,7 +309,7 @@ jobs:
 
 
       # ========================================================
-      # INPUT FILES
+      # DEFINE INPUT FILES
       # ========================================================
 
       - name: Define input files
@@ -355,7 +319,6 @@ jobs:
         run: |
 
           set -euo pipefail
-
 
           FUEL_RASTER="data/raw/fuel/fars_fuel.tif"
 
@@ -420,17 +383,18 @@ jobs:
 
             fi
 
+
             echo "✓ ${file}"
 
           done
 
 
           echo ""
-          echo "All required inputs found."
+          echo "All required input files found."
 
 
       # ========================================================
-      # SHOW SELECTED FWI
+      # INSPECT FWI
       # ========================================================
 
       - name: Inspect selected FWI
@@ -459,7 +423,7 @@ jobs:
           print("=" * 70)
 
           print(
-              "Date:",
+              "Forecast date:",
               os.environ["FWI_DATE"]
           )
 
@@ -499,7 +463,7 @@ jobs:
 
 
       # ========================================================
-      # OUTPUT DIRECTORIES
+      # PREPARE OUTPUT DIRECTORIES
       # ========================================================
 
       - name: Prepare output directories
@@ -538,7 +502,7 @@ jobs:
 
 
       # ========================================================
-      # RUN FIRIS
+      # BUILD FIRIS
       # ========================================================
 
       - name: Run FIRIS
@@ -583,8 +547,7 @@ jobs:
           set -euo pipefail
 
 
-          FLI_RASTER=\
-            "data/outputs/fli_fars_${FWI_DATE}.tif"
+          FLI_RASTER="data/outputs/fli_fars_${FWI_DATE}.tif"
 
 
           if [ ! -f "${FLI_RASTER}" ]; then
@@ -623,12 +586,20 @@ jobs:
           set -euo pipefail
 
 
-          FLI_RASTER=\
-            "data/outputs/fli_fars_${FWI_DATE}.tif"
+          FLI_RASTER="data/outputs/fli_fars_${FWI_DATE}.tif"
+
+          REPORT_FILE="data/report/firis_report.xlsx"
 
 
-          REPORT_FILE=\
-            "data/report/firis_report.xlsx"
+          if [ ! -f "${FLI_RASTER}" ]; then
+
+            echo ""
+            echo "ERROR: FLI raster not found:"
+            echo "${FLI_RASTER}"
+
+            exit 1
+
+          fi
 
 
           echo ""
@@ -659,10 +630,10 @@ jobs:
 
 
       # ========================================================
-      # VERIFY WEB FILES
+      # VERIFY WEB OUTPUTS
       # ========================================================
 
-      - name: Verify web files
+      - name: Verify web outputs
 
         shell: bash
 
@@ -681,6 +652,8 @@ jobs:
 
             "data/web/fli_latest.png"
 
+            "data/report/firis_report.xlsx"
+
           )
 
 
@@ -695,7 +668,7 @@ jobs:
             if [ ! -f "${file}" ]; then
 
               echo ""
-              echo "ERROR: Missing web output:"
+              echo "ERROR: Missing web/report output:"
               echo "${file}"
 
               exit 1
@@ -708,7 +681,7 @@ jobs:
 
 
       # ========================================================
-      # VERIFY FORECAST DATE IN WEB METADATA
+      # VERIFY WEB FORECAST DATE
       # ========================================================
 
       - name: Verify web forecast date
@@ -731,14 +704,13 @@ jobs:
           ]
 
 
-          path = (
-              "data/web/"
-              "fli_latest.json"
+          metadata_path = (
+              "data/web/fli_latest.json"
           )
 
 
           with open(
-              path,
+              metadata_path,
               "r",
               encoding="utf-8"
           ) as file:
@@ -764,7 +736,6 @@ jobs:
           print("WEB FORECAST DATE VALIDATION")
           print("=" * 70)
 
-
           print(
               "Expected:",
               expected
@@ -780,12 +751,13 @@ jobs:
 
               raise SystemExit(
                   "ERROR: Web forecast date does not "
-                  "match selected FWI date."
+                  "match FWI forecast date."
               )
 
 
+          print("")
           print(
-              "✓ Forecast date is consistent."
+              "✓ Web forecast date is correct."
           )
 
           PY
@@ -913,9 +885,10 @@ jobs:
           print("FINAL GRID VALIDATION")
           print("=" * 70)
 
-
           print("")
-          print("REFERENCE = F_FWI")
+          print(
+              "REFERENCE = F_FWI"
+          )
 
           print(
               "CRS       :",
@@ -946,6 +919,10 @@ jobs:
 
                   failures.append(
                       f"{name}: FILE NOT FOUND"
+                  )
+
+                  print(
+                      f"✗ {name:<16} FILE NOT FOUND"
                   )
 
                   continue
@@ -1070,19 +1047,18 @@ jobs:
 
                   if problems:
 
-                      failures.append(
+                      print(
 
-                          f"{name}: "
+                          f"✗ {name:<16}"
+                          f"GRID MISMATCH: "
                           +
                           ", ".join(
                               problems
                           )
                       )
 
-                      print(
-
-                          f"✗ {name:<16}"
-                          f"GRID MISMATCH: "
+                      failures.append(
+                          f"{name}: "
                           +
                           ", ".join(
                               problems
@@ -1107,6 +1083,8 @@ jobs:
                   "GRID VALIDATION FAILED"
               )
 
+              print("")
+
               for failure in failures:
 
                   print(
@@ -1126,10 +1104,10 @@ jobs:
 
 
       # ========================================================
-      # SHOW FORECAST INFORMATION
+      # SHOW FINAL FORECAST
       # ========================================================
 
-      - name: Show forecast information
+      - name: Show final forecast information
 
         shell: bash
 
@@ -1149,58 +1127,74 @@ jobs:
           ]
 
 
-          path = (
+          fwi_path = (
               f"data/raw/fwi/"
               f"fwi_ecmwf_fars_{date}.json"
           )
 
 
+          web_path = (
+              "data/web/fli_latest.json"
+          )
+
+
           with open(
-              path,
+              fwi_path,
               "r",
               encoding="utf-8"
           ) as file:
 
-              metadata = json.load(
-                  file
-              )
+              fwi = json.load(file)
+
+
+          with open(
+              web_path,
+              "r",
+              encoding="utf-8"
+          ) as file:
+
+              web = json.load(file)
 
 
           print("")
           print("=" * 70)
-          print("FIRIS FORECAST")
+          print("FINAL FIRIS FORECAST")
           print("=" * 70)
 
+          print("")
           print(
-              "Forecast date:",
-              metadata.get(
+              "FWI target date:",
+              fwi.get(
                   "target_date"
               )
               or
-              metadata.get(
+              fwi.get(
                   "forecast_date"
               )
           )
 
           print(
-              "Downloaded UTC:",
-              metadata.get(
-                  "downloaded_at_utc"
+              "FLI forecast date:",
+              web.get(
+                  "forecast_date"
               )
               or
-              metadata.get(
-                  "generated_at_utc"
+              web.get(
+                  "target_date"
               )
           )
 
           print(
-              "Definition:",
-              metadata.get(
-                  "forecast_definition"
+              "Primary web layer:",
+              web.get(
+                  "primary_web_layer"
               )
           )
 
-          print("=" * 70)
+          print("")
+          print(
+              "✓ FWI → FLI → Web dates are synchronized."
+          )
 
           PY
 
@@ -1216,6 +1210,7 @@ jobs:
         run: |
 
           set -euo pipefail
+
 
           echo ""
           echo "============================================================"
@@ -1253,7 +1248,7 @@ jobs:
 
 
       # ========================================================
-      # COMMIT OUTPUTS
+      # COMMIT
       # ========================================================
 
       - name: Commit outputs
