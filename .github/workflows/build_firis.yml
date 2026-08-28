@@ -1,4 +1,4 @@
-```yaml
+
 name: Build FIRIS
 
 on:
@@ -1320,4 +1320,3 @@ jobs:
           echo ""
           echo "Forecast date:"
           echo "${FWI_DATE}"
-```
