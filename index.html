@@ -10,12 +10,14 @@
   content="width=device-width, initial-scale=1.0"
 >
 
-<title>FIRIS | سامانه خطر آتش‌سوزی فارس</title>
+<title>
+  FIRIS | سامانه خطر آتش‌سوزی فارس
+</title>
 
 <link
   rel="stylesheet"
   href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
->
+/>
 
 <style>
 
@@ -40,21 +42,22 @@ body {
   flex-direction: column;
 }
 
-/* ============================================================
-   HEADER
-   ============================================================ */
-
 .header {
   height: 82px;
   flex: 0 0 82px;
-  background: linear-gradient(135deg, #7f1010, #b71c1c);
+  background: linear-gradient(
+    135deg,
+    #7f1010,
+    #b71c1c
+  );
   color: white;
   padding: 12px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 2px 10px rgba(0,0,0,.18);
-  z-index: 1000;
+  box-shadow:
+    0 2px 10px rgba(0,0,0,.18);
+  z-index: 2000;
 }
 
 .title {
@@ -76,10 +79,6 @@ body {
   font-size: 12px;
 }
 
-/* ============================================================
-   MAP
-   ============================================================ */
-
 #map {
   flex: 1 1 auto;
   width: 100%;
@@ -92,26 +91,45 @@ body {
   background: #dfe5e8;
 }
 
-/* ============================================================
-   INFO
-   ============================================================ */
-
-.info-panel {
+.overlay-panel {
   position: absolute;
-  top: 16px;
-  left: 16px;
-  width: 255px;
+  z-index: 1500;
   background: rgba(255,255,255,.97);
   border-radius: 14px;
   box-shadow: 0 4px 20px rgba(0,0,0,.18);
-  padding: 15px;
-  z-index: 1000;
   direction: rtl;
+}
+
+.info-panel {
+  top: 16px;
+  left: 16px;
+  width: 255px;
+  padding: 15px;
+}
+
+.gauge-panel {
+  top: 16px;
+  right: 16px;
+  width: 230px;
+  padding: 15px;
+  text-align: center;
+}
+
+.filter-panel {
+  top: 16px;
+  right: 260px;
+  width: 245px;
+  padding: 13px;
+}
+
+.info-title,
+.filter-title,
+.gauge-title {
+  font-weight: 800;
 }
 
 .info-title {
   font-size: 16px;
-  font-weight: 800;
   margin-bottom: 8px;
 }
 
@@ -142,26 +160,8 @@ body {
   font-weight: 700;
 }
 
-/* ============================================================
-   GAUGE
-   ============================================================ */
-
-.gauge-panel {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 230px;
-  background: rgba(255,255,255,.97);
-  border-radius: 16px;
-  box-shadow: 0 4px 20px rgba(0,0,0,.20);
-  padding: 15px;
-  z-index: 1000;
-  text-align: center;
-}
-
 .gauge-title {
   font-size: 15px;
-  font-weight: 800;
   margin-bottom: 10px;
 }
 
@@ -173,7 +173,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-
   background:
     conic-gradient(
       #2e7d32 0deg 72deg,
@@ -182,7 +181,6 @@ body {
       #e53935 216deg 288deg,
       #880e4f 288deg 360deg
     );
-
   position: relative;
 }
 
@@ -216,63 +214,8 @@ body {
   color: #666;
 }
 
-/* ============================================================
-   LEGEND
-   ============================================================ */
-
-.legend {
-  position: absolute;
-  bottom: 20px;
-  left: 16px;
-  background: rgba(255,255,255,.96);
-  border-radius: 12px;
-  box-shadow: 0 3px 14px rgba(0,0,0,.18);
-  padding: 12px 14px;
-  z-index: 1000;
-  min-width: 175px;
-}
-
-.legend-title {
-  font-size: 14px;
-  font-weight: 800;
-  margin-bottom: 8px;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  margin: 5px 0;
-}
-
-.legend-color {
-  width: 18px;
-  height: 13px;
-  border-radius: 3px;
-  border: 1px solid rgba(0,0,0,.15);
-}
-
-/* ============================================================
-   FILTER PANEL
-   ============================================================ */
-
-.filter-panel {
-  position: absolute;
-  top: 16px;
-  right: 260px;
-  width: 245px;
-  background: rgba(255,255,255,.97);
-  border-radius: 14px;
-  box-shadow: 0 4px 20px rgba(0,0,0,.18);
-  padding: 13px;
-  z-index: 1000;
-  direction: rtl;
-}
-
 .filter-title {
   font-size: 14px;
-  font-weight: 800;
   margin-bottom: 8px;
 }
 
@@ -298,15 +241,45 @@ body {
   font-family: Tahoma, Arial, sans-serif;
 }
 
-/* ============================================================
-   MAP TOOLS
-   ============================================================ */
+.legend {
+  position: absolute;
+  bottom: 20px;
+  left: 16px;
+  z-index: 1500;
+  background: rgba(255,255,255,.96);
+  border-radius: 12px;
+  box-shadow: 0 3px 14px rgba(0,0,0,.18);
+  padding: 12px 14px;
+  min-width: 175px;
+  direction: rtl;
+}
+
+.legend-title {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin: 5px 0;
+}
+
+.legend-color {
+  width: 18px;
+  height: 13px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,.15);
+}
 
 .map-tools {
   position: absolute;
   bottom: 20px;
   right: 16px;
-  z-index: 1000;
+  z-index: 1500;
   display: flex;
   flex-direction: column;
   gap: 7px;
@@ -323,27 +296,18 @@ body {
   cursor: pointer;
 }
 
-/* ============================================================
-   NIGHT OVERLAY
-   فقط یک پرده نیمه شفاف
-   ============================================================ */
-
 #nightOverlay {
   position: absolute;
   inset: 0;
   background: rgba(15,20,35,.16);
   pointer-events: none;
-  z-index: 700;
+  z-index: 1200;
   display: none;
 }
 
 body.night #nightOverlay {
   display: block;
 }
-
-/* ============================================================
-   STATUS
-   ============================================================ */
 
 .status-bar {
   height: 42px;
@@ -354,9 +318,8 @@ body.night #nightOverlay {
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  color: #333;
   direction: rtl;
-  z-index: 1000;
+  z-index: 2000;
 }
 
 .status-ok {
@@ -368,10 +331,6 @@ body.night #nightOverlay {
   color: #b71c1c;
   font-weight: 700;
 }
-
-/* ============================================================
-   POPUP
-   ============================================================ */
 
 .fli-popup {
   direction: rtl;
@@ -388,7 +347,6 @@ body.night #nightOverlay {
 .fli-popup-value {
   font-size: 27px;
   font-weight: 900;
-  margin: 5px 0;
 }
 
 .fli-popup-risk {
@@ -397,17 +355,13 @@ body.night #nightOverlay {
   border-radius: 6px;
   color: white;
   font-weight: 700;
-  margin-bottom: 8px;
+  margin: 7px 0;
 }
 
 .fli-popup-coord {
   font-size: 11px;
   color: #666;
 }
-
-/* ============================================================
-   MOBILE
-   ============================================================ */
 
 @media (max-width: 900px) {
 
@@ -443,6 +397,12 @@ body.night #nightOverlay {
     padding: 10px;
   }
 
+  .filter-panel {
+    top: 10px;
+    right: 195px;
+    width: 180px;
+  }
+
   .gauge {
     width: 110px;
     height: 110px;
@@ -457,12 +417,6 @@ body.night #nightOverlay {
     font-size: 23px;
   }
 
-  .filter-panel {
-    top: 10px;
-    right: 195px;
-    width: 180px;
-  }
-
   .legend {
     bottom: 10px;
     left: 10px;
@@ -472,7 +426,6 @@ body.night #nightOverlay {
     bottom: 10px;
     right: 10px;
   }
-
 }
 
 </style>
@@ -510,9 +463,11 @@ body.night #nightOverlay {
   <div id="nightOverlay"></div>
 
 
-  <!-- INFO -->
+  <!-- ======================================================
+       INFO
+       ====================================================== -->
 
-  <div class="info-panel">
+  <div class="overlay-panel info-panel">
 
     <div class="info-title">
       اطلاعات شاخص
@@ -556,9 +511,11 @@ body.night #nightOverlay {
   </div>
 
 
-  <!-- GAUGE -->
+  <!-- ======================================================
+       GAUGE
+       ====================================================== -->
 
-  <div class="gauge-panel">
+  <div class="overlay-panel gauge-panel">
 
     <div class="gauge-title">
       وضعیت خطر منطقه انتخاب‌شده
@@ -596,12 +553,14 @@ body.night #nightOverlay {
   </div>
 
 
-  <!-- FILTER -->
+  <!-- ======================================================
+       FILTER
+       ====================================================== -->
 
-  <div class="filter-panel">
+  <div class="overlay-panel filter-panel">
 
     <div class="filter-title">
-      فیلتر و پهنه‌های محیط‌زیستی
+      فیلتر مناطق
     </div>
 
     <select id="areaFilter">
@@ -622,7 +581,9 @@ body.night #nightOverlay {
   </div>
 
 
-  <!-- LEGEND -->
+  <!-- ======================================================
+       LEGEND
+       ====================================================== -->
 
   <div class="legend">
 
@@ -673,22 +634,31 @@ body.night #nightOverlay {
   </div>
 
 
-  <!-- MAP TOOLS -->
+  <!-- ======================================================
+       TOOLS
+       ====================================================== -->
 
   <div class="map-tools">
 
     <button
-      id="dayNightButton"
+      id="fitFars"
+      class="map-tool"
+    >
+      فیت مرز فارس
+    </button>
+
+    <button
+      id="nightMode"
       class="map-tool"
     >
       حالت شب
     </button>
 
     <button
-      id="fitButton"
+      id="dayMode"
       class="map-tool"
     >
-      فیت استان فارس
+      حالت روز
     </button>
 
   </div>
@@ -706,37 +676,41 @@ body.night #nightOverlay {
 </div>
 
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+></script>
+
 
 <script>
 
 "use strict";
 
+
 /* ============================================================
    GLOBALS
    ============================================================ */
 
-let map;
-
-let osm;
+let map = null;
 
 let fliLayer = null;
 
-let fliCanvasLayer = null;
+let fliGrid = null;
 
-let boundaryLayer = null;
+let fliMetadata = null;
+
+let farsLayer = null;
 
 let protectedLayer = null;
 
 let huntingLayer = null;
 
-let protectedFeatures = [];
+let environmentalLayer = null;
 
-let fliMetadata = null;
+let selectedAreaLayer = null;
 
-let fliGrid = null;
+let selectedAreaKey = "all";
 
-let currentFilter = "all";
+let allAreaFeatures = [];
 
 
 /* ============================================================
@@ -751,7 +725,12 @@ map = L.map(
   }
 );
 
-osm = L.tileLayer(
+
+/* ============================================================
+   BASE MAP
+   ============================================================ */
+
+const osm = L.tileLayer(
   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
   {
     maxZoom: 18,
@@ -770,12 +749,15 @@ function setStatus(
   ok = true
 ) {
 
-  const el =
-    document.getElementById("status");
+  const element =
+    document.getElementById(
+      "status"
+    );
 
-  el.textContent = text;
+  element.textContent =
+    text;
 
-  el.className =
+  element.className =
     ok
       ? "status-bar status-ok"
       : "status-bar status-error";
@@ -786,13 +768,18 @@ function setStatus(
    NUMBER
    ============================================================ */
 
-function formatNumber(value) {
+function formatNumber(
+  value
+) {
 
   if (
     value === null ||
     value === undefined ||
-    !Number.isFinite(value)
+    !Number.isFinite(
+      Number(value)
+    )
   ) {
+
     return "—";
   }
 
@@ -810,16 +797,23 @@ function formatNumber(value) {
    RISK
    ============================================================ */
 
-function getRisk(value) {
+function getRisk(
+  value
+) {
 
-  if (!Number.isFinite(value)) {
+  if (
+    !Number.isFinite(
+      Number(value)
+    )
+  ) {
 
     return {
       label: "بدون داده",
       color: "#777"
     };
-
   }
+
+  value = Number(value);
 
   if (value < 20) {
 
@@ -827,7 +821,6 @@ function getRisk(value) {
       label: "کم",
       color: "#2e7d32"
     };
-
   }
 
   if (value < 40) {
@@ -836,7 +829,6 @@ function getRisk(value) {
       label: "متوسط",
       color: "#c7a900"
     };
-
   }
 
   if (value < 60) {
@@ -845,7 +837,6 @@ function getRisk(value) {
       label: "زیاد",
       color: "#fb8c00"
     };
-
   }
 
   if (value < 80) {
@@ -854,7 +845,6 @@ function getRisk(value) {
       label: "خیلی زیاد",
       color: "#e53935"
     };
-
   }
 
   return {
@@ -889,12 +879,21 @@ function updateGauge(
       "gaugeLocation"
     );
 
-  if (!Number.isFinite(value)) {
 
-    valueEl.textContent = "—";
+  if (
+    !Number.isFinite(
+      Number(value)
+    )
+  ) {
+
+    valueEl.textContent =
+      "—";
 
     labelEl.textContent =
       "بدون داده";
+
+    labelEl.style.color =
+      "#777";
 
     locationEl.textContent =
       "این نقطه داده معتبر ندارد";
@@ -902,8 +901,13 @@ function updateGauge(
     return;
   }
 
+
+  value =
+    Number(value);
+
   const risk =
     getRisk(value);
+
 
   valueEl.textContent =
     formatNumber(value);
@@ -930,22 +934,34 @@ function getGridValue(
 
   if (
     !fliGrid ||
-    !fliGrid.bounds
+    !fliGrid.bounds ||
+    !fliGrid.values
   ) {
+
     return null;
   }
 
+
   const south =
-    fliGrid.bounds[0][0];
+    Number(
+      fliGrid.bounds[0][0]
+    );
 
   const west =
-    fliGrid.bounds[0][1];
+    Number(
+      fliGrid.bounds[0][1]
+    );
 
   const north =
-    fliGrid.bounds[1][0];
+    Number(
+      fliGrid.bounds[1][0]
+    );
 
   const east =
-    fliGrid.bounds[1][1];
+    Number(
+      fliGrid.bounds[1][1]
+    );
+
 
   if (
     lat < south ||
@@ -953,34 +969,70 @@ function getGridValue(
     lon < west ||
     lon > east
   ) {
+
     return null;
   }
 
+
   const rows =
-    fliGrid.rows;
+    Number(
+      fliGrid.rows
+    );
 
   const cols =
-    fliGrid.cols;
+    Number(
+      fliGrid.cols
+    );
+
+
+  const rowStep =
+    Number(
+      fliGrid.row_step || 1
+    );
+
+  const colStep =
+    Number(
+      fliGrid.col_step || 1
+    );
+
+
+  const fullHeight =
+    rows *
+    rowStep;
+
+  const fullWidth =
+    cols *
+    colStep;
+
 
   let row =
     Math.floor(
-      ((north - lat) /
-        (north - south)) *
-      rows
+      (
+        (north - lat)
+        /
+        (north - south)
+      )
+      *
+      fullHeight
     );
 
   let col =
     Math.floor(
-      ((lon - west) /
-        (east - west)) *
-      cols
+      (
+        (lon - west)
+        /
+        (east - west)
+      )
+      *
+      fullWidth
     );
+
 
   row =
     Math.max(
       0,
       Math.min(
-        rows - 1,
+        fullHeight - 1,
         row
       )
     );
@@ -989,795 +1041,42 @@ function getGridValue(
     Math.max(
       0,
       Math.min(
-        cols - 1,
+        fullWidth - 1,
         col
       )
     );
 
+
+  const sampleRow =
+    Math.floor(
+      row / rowStep
+    );
+
+  const sampleCol =
+    Math.floor(
+      col / colStep
+    );
+
+
   const value =
-    fliGrid.values?.[row]?.[col];
+    fliGrid.values?.[
+      sampleRow
+    ]?.[
+      sampleCol
+    ];
+
 
   if (
     value === undefined ||
     value === null ||
-    value < 0
+    Number(value) < 0
   ) {
+
     return null;
   }
+
 
   return Number(value);
-}
-
-
-/* ============================================================
-   LOAD GEOJSON
-   ============================================================ */
-
-async function loadGeoJSON(
-  path
-) {
-
-  const response =
-    await fetch(
-      path + "?" + Date.now(),
-      {
-        cache: "no-store"
-      }
-    );
-
-  if (!response.ok) {
-
-    throw new Error(
-      `${path} HTTP ${response.status}`
-    );
-
-  }
-
-  return response.json();
-}
-
-
-/* ============================================================
-   PROPERTY NAME
-   ============================================================ */
-
-function getFeatureName(
-  feature,
-  fallback
-) {
-
-  const p =
-    feature.properties || {};
-
-  const keys = [
-    "name",
-    "NAME",
-    "Name",
-    "نام",
-    "نام منطقه",
-    "NAME_1",
-    "NAME_2",
-    "title",
-    "TITLE",
-    "id"
-  ];
-
-  for (
-    const key of keys
-  ) {
-
-    if (
-      p[key] !== undefined &&
-      p[key] !== null &&
-      String(p[key]).trim() !== ""
-    ) {
-
-      return String(
-        p[key]
-      );
-
-    }
-
-  }
-
-  return fallback;
-}
-
-
-/* ============================================================
-   LOAD BOUNDARY
-   ============================================================ */
-
-async function loadBoundary() {
-
-  const geojson =
-    await loadGeoJSON(
-      "fars.geojson"
-    );
-
-  boundaryLayer =
-    L.geoJSON(
-      geojson,
-      {
-        style: {
-          color: "#111",
-          weight: 2.5,
-          opacity: .95,
-          fill: false
-        },
-        interactive: false
-      }
-    ).addTo(map);
-
-  return boundaryLayer;
-}
-
-
-/* ============================================================
-   PROTECTED AREAS
-   ============================================================ */
-
-async function loadProtectedAreas() {
-
-  try {
-
-    const geojson =
-      await loadGeoJSON(
-        "protected_areas.geojson"
-      );
-
-    protectedFeatures =
-      geojson.features || [];
-
-    protectedLayer =
-      L.geoJSON(
-        geojson,
-        {
-          style: {
-            color: "#1565c0",
-            weight: 1.7,
-            opacity: .9,
-            fillColor: "#42a5f5",
-            fillOpacity: .10
-          },
-
-          onEachFeature:
-            function(
-              feature,
-              layer
-            ) {
-
-              const name =
-                getFeatureName(
-                  feature,
-                  "منطقه حفاظت‌شده"
-                );
-
-              layer.bindPopup(
-                `<div dir="rtl">
-                  <strong>${name}</strong>
-                  <br>
-                  منطقه چهارگانه محیط‌زیست
-                </div>`
-              );
-
-            }
-        }
-      );
-
-    protectedLayer.addTo(map);
-
-    populateAreaFilter(
-      protectedFeatures
-    );
-
-    return true;
-
-  } catch (error) {
-
-    console.warn(
-      "Protected areas:",
-      error
-    );
-
-    return false;
-  }
-}
-
-
-/* ============================================================
-   HUNTING BANNED
-   ============================================================ */
-
-async function loadHuntingBanned() {
-
-  try {
-
-    const geojson =
-      await loadGeoJSON(
-        "hunting_banned.geojson"
-      );
-
-    huntingLayer =
-      L.geoJSON(
-        geojson,
-        {
-          style: {
-            color: "#6a1b9a",
-            weight: 1.7,
-            opacity: .9,
-            dashArray: "6 4",
-            fillColor: "#ab47bc",
-            fillOpacity: .08
-          },
-
-          onEachFeature:
-            function(
-              feature,
-              layer
-            ) {
-
-              const name =
-                getFeatureName(
-                  feature,
-                  "منطقه شکار ممنوع"
-                );
-
-              layer.bindPopup(
-                `<div dir="rtl">
-                  <strong>${name}</strong>
-                  <br>
-                  منطقه شکار ممنوع
-                </div>`
-              );
-
-            }
-        }
-      ).addTo(map);
-
-    return true;
-
-  } catch (error) {
-
-    console.warn(
-      "Hunting banned:",
-      error
-    );
-
-    return false;
-  }
-}
-
-
-/* ============================================================
-   AREA FILTER
-   ============================================================ */
-
-function populateAreaFilter(
-  features
-) {
-
-  const select =
-    document.getElementById(
-      "areaFilter"
-    );
-
-  const names =
-    [];
-
-  features.forEach(
-    function(
-      feature,
-      index
-    ) {
-
-      const name =
-        getFeatureName(
-          feature,
-          `منطقه ${index + 1}`
-        );
-
-      if (
-        !names.includes(name)
-      ) {
-
-        names.push(name);
-
-        const option =
-          document.createElement(
-            "option"
-          );
-
-        option.value =
-          String(index);
-
-        option.textContent =
-          name;
-
-        select.appendChild(
-          option
-        );
-
-      }
-
-    }
-  );
-}
-
-
-/* ============================================================
-   POINT IN POLYGON
-   ============================================================ */
-
-function pointInRing(
-  point,
-  ring
-) {
-
-  const x =
-    point[0];
-
-  const y =
-    point[1];
-
-  let inside = false;
-
-  for (
-    let i = 0,
-        j = ring.length - 1;
-    i < ring.length;
-    j = i++
-  ) {
-
-    const xi =
-      ring[i][0];
-
-    const yi =
-      ring[i][1];
-
-    const xj =
-      ring[j][0];
-
-    const yj =
-      ring[j][1];
-
-    const intersect =
-      (
-        yi > y
-      ) !== (
-        yj > y
-      ) &&
-      x <
-      (
-        (xj - xi) *
-        (y - yi) /
-        (yj - yi) +
-        xi
-      );
-
-    if (intersect) {
-      inside = !inside;
-    }
-
-  }
-
-  return inside;
-}
-
-
-function pointInPolygon(
-  lon,
-  lat,
-  geometry
-) {
-
-  if (!geometry) {
-    return false;
-  }
-
-  if (
-    geometry.type ===
-    "Polygon"
-  ) {
-
-    const rings =
-      geometry.coordinates;
-
-    if (
-      !pointInRing(
-        [lon, lat],
-        rings[0]
-      )
-    ) {
-      return false;
-    }
-
-    for (
-      let i = 1;
-      i < rings.length;
-      i++
-    ) {
-
-      if (
-        pointInRing(
-          [lon, lat],
-          rings[i]
-        )
-      ) {
-        return false;
-      }
-
-    }
-
-    return true;
-  }
-
-
-  if (
-    geometry.type ===
-    "MultiPolygon"
-  ) {
-
-    for (
-      const polygon
-      of geometry.coordinates
-    ) {
-
-      if (
-        pointInPolygon(
-          lon,
-          lat,
-          {
-            type: "Polygon",
-            coordinates: polygon
-          }
-        )
-      ) {
-        return true;
-      }
-
-    }
-
-  }
-
-  return false;
-}
-
-
-/* ============================================================
-   SELECTED FEATURE
-   ============================================================ */
-
-function getSelectedGeometry() {
-
-  if (
-    currentFilter ===
-    "all"
-  ) {
-    return null;
-  }
-
-  const index =
-    Number(
-      currentFilter
-    );
-
-  if (
-    !protectedFeatures[index]
-  ) {
-    return null;
-  }
-
-  return protectedFeatures[
-    index
-  ].geometry;
-}
-
-
-/* ============================================================
-   FILTER FLI GRID
-   ============================================================ */
-
-function updateFilteredStatistics() {
-
-  if (
-    !fliGrid ||
-    currentFilter === "all"
-  ) {
-
-    if (fliMetadata) {
-
-      document.getElementById(
-        "minValue"
-      ).textContent =
-        formatNumber(
-          fliMetadata.statistics?.min
-        );
-
-      document.getElementById(
-        "maxValue"
-      ).textContent =
-        formatNumber(
-          fliMetadata.statistics?.max
-        );
-
-      document.getElementById(
-        "meanValue"
-      ).textContent =
-        formatNumber(
-          fliMetadata.statistics?.mean
-        );
-
-    }
-
-    return;
-  }
-
-  const geometry =
-    getSelectedGeometry();
-
-  if (!geometry) {
-    return;
-  }
-
-  const south =
-    fliGrid.bounds[0][0];
-
-  const west =
-    fliGrid.bounds[0][1];
-
-  const north =
-    fliGrid.bounds[1][0];
-
-  const east =
-    fliGrid.bounds[1][1];
-
-  const rows =
-    fliGrid.rows;
-
-  const cols =
-    fliGrid.cols;
-
-  const values =
-    [];
-
-  for (
-    let r = 0;
-    r < rows;
-    r++
-  ) {
-
-    const lat =
-      north -
-      (
-        (r + .5) /
-        rows
-      ) *
-      (
-        north - south
-      );
-
-    for (
-      let c = 0;
-      c < cols;
-      c++
-    ) {
-
-      const lon =
-        west +
-        (
-          (c + .5) /
-          cols
-        ) *
-        (
-          east - west
-        );
-
-      if (
-        pointInPolygon(
-          lon,
-          lat,
-          geometry
-        )
-      ) {
-
-        const value =
-          fliGrid.values?.[r]?.[c];
-
-        if (
-          Number.isFinite(
-            value
-          ) &&
-          value >= 0 &&
-          value <= 100
-        ) {
-
-          values.push(
-            Number(value)
-          );
-
-        }
-
-      }
-
-    }
-
-  }
-
-  if (
-    values.length === 0
-  ) {
-
-    document.getElementById(
-      "minValue"
-    ).textContent = "—";
-
-    document.getElementById(
-      "maxValue"
-    ).textContent = "—";
-
-    document.getElementById(
-      "meanValue"
-    ).textContent = "—";
-
-    return;
-  }
-
-  const min =
-    Math.min(...values);
-
-  const max =
-    Math.max(...values);
-
-  const mean =
-    values.reduce(
-      (a,b) => a + b,
-      0
-    ) /
-    values.length;
-
-  document.getElementById(
-    "minValue"
-  ).textContent =
-    formatNumber(min);
-
-  document.getElementById(
-    "maxValue"
-  ).textContent =
-    formatNumber(max);
-
-  document.getElementById(
-    "meanValue"
-  ).textContent =
-    formatNumber(mean);
-}
-
-
-/* ============================================================
-   FLI IMAGE
-   ============================================================ */
-
-async function loadFLI() {
-
-  const metadataResponse =
-    await fetch(
-      "data/web/fli_latest.json?" +
-      Date.now(),
-      {
-        cache: "no-store"
-      }
-    );
-
-  if (
-    !metadataResponse.ok
-  ) {
-
-    throw new Error(
-      "FLI metadata HTTP " +
-      metadataResponse.status
-    );
-
-  }
-
-  fliMetadata =
-    await metadataResponse.json();
-
-
-  document.getElementById(
-    "minValue"
-  ).textContent =
-    formatNumber(
-      fliMetadata.statistics?.min
-    );
-
-  document.getElementById(
-    "maxValue"
-  ).textContent =
-    formatNumber(
-      fliMetadata.statistics?.max
-    );
-
-  document.getElementById(
-    "meanValue"
-  ).textContent =
-    formatNumber(
-      fliMetadata.statistics?.mean
-    );
-
-
-  document.getElementById(
-    "dateValue"
-  ).textContent =
-    formatDate(
-      fliMetadata.generated_at_utc
-    );
-
-
-  const gridResponse =
-    await fetch(
-      "data/web/fli_latest_grid.json?" +
-      Date.now(),
-      {
-        cache: "no-store"
-      }
-    );
-
-  if (
-    gridResponse.ok
-  ) {
-
-    fliGrid =
-      await gridResponse.json();
-
-  }
-
-
-  const imageBounds =
-    L.latLngBounds(
-      fliMetadata.bounds[0],
-      fliMetadata.bounds[1]
-    );
-
-
-  fliLayer =
-    L.imageOverlay(
-      "data/web/fli_latest.png?" +
-      Date.now(),
-      imageBounds,
-      {
-        opacity: .72,
-        interactive: false
-      }
-    ).addTo(map);
-
-  return imageBounds;
-}
-
-
-/* ============================================================
-   DATE
-   ============================================================ */
-
-function formatDate(
-  value
-) {
-
-  if (!value) {
-    return "—";
-  }
-
-  try {
-
-    const d =
-      new Date(value);
-
-    return d.toLocaleDateString(
-      "fa-IR"
-    );
-
-  } catch {
-    return "—";
-  }
 }
 
 
@@ -1801,23 +1100,30 @@ map.on(
         lon
       );
 
+
     updateGauge(
       value,
       lat,
       lon
     );
 
+
     if (
-      !Number.isFinite(value)
+      !Number.isFinite(
+        Number(value)
+      )
     ) {
+
       return;
     }
+
 
     const risk =
       getRisk(value);
 
-    const popup =
-      `
+
+    const popup = `
+
       <div class="fli-popup">
 
         <div class="fli-popup-title">
@@ -1849,7 +1155,9 @@ map.on(
         </div>
 
       </div>
-      `;
+
+    `;
+
 
     L.popup({
       maxWidth: 260
@@ -1860,137 +1168,657 @@ map.on(
     .setContent(
       popup
     )
-    .openOn(map);
-
+    .openOn(
+      map
+    );
   }
 );
 
 
 /* ============================================================
-   FILTER
+   LOAD FARS
    ============================================================ */
 
-document.getElementById(
-  "areaFilter"
-).addEventListener(
-  "change",
-  function() {
+async function loadFars() {
 
-    currentFilter =
-      this.value;
-
-    if (
-      currentFilter ===
-      "all"
-    ) {
-
-      updateFilteredStatistics();
-
-      if (
-        boundaryLayer &&
-        boundaryLayer.getBounds().isValid()
-      ) {
-
-        map.fitBounds(
-          boundaryLayer.getBounds(),
-          {
-            padding: [30,30],
-            maxZoom: 9
-          }
-        );
-
+  const response =
+    await fetch(
+      "fars.geojson",
+      {
+        cache: "no-store"
       }
-
-      setStatus(
-        "نمایش شاخص FLI برای کل استان فارس",
-        true
-      );
-
-      return;
-    }
-
-    const geometry =
-      getSelectedGeometry();
-
-    if (!geometry) {
-      return;
-    }
-
-    updateFilteredStatistics();
-
-    const feature =
-      protectedFeatures[
-        Number(currentFilter)
-      ];
-
-    const temp =
-      L.geoJSON(feature);
-
-    if (
-      temp.getBounds().isValid()
-    ) {
-
-      map.fitBounds(
-        temp.getBounds(),
-        {
-          padding: [40,40],
-          maxZoom: 12
-        }
-      );
-
-    }
-
-    setStatus(
-      "FLI بر اساس منطقه انتخاب‌شده فیلتر شد.",
-      true
     );
 
+  if (!response.ok) {
+
+    throw new Error(
+      `Fars boundary HTTP ${response.status}`
+    );
   }
-);
+
+  const geojson =
+    await response.json();
+
+
+  farsLayer =
+    L.geoJSON(
+      geojson,
+      {
+        style: {
+          color: "#111",
+          weight: 2.5,
+          opacity: .95,
+          fill: false
+        },
+        interactive: false
+      }
+    ).addTo(
+      map
+    );
+
+
+  allAreaFeatures =
+    geojson.features || [];
+
+
+  buildAreaFilter(
+    allAreaFeatures
+  );
+
+  return farsLayer;
+}
+
+
+/* ============================================================
+   AREA FILTER
+   ============================================================ */
+
+function buildAreaFilter(
+  features
+) {
+
+  const select =
+    document.getElementById(
+      "areaFilter"
+    );
+
+
+  for (
+    const feature of features
+  ) {
+
+    const properties =
+      feature.properties || {};
+
+
+    const name =
+      properties.shapeName ||
+      properties.name ||
+      properties.NAME_1 ||
+      properties.NAME ||
+      "منطقه";
+
+
+    const option =
+      document.createElement(
+        "option"
+      );
+
+
+    option.value =
+      `area_${select.options.length}`;
+
+    option.textContent =
+      name;
+
+    option.dataset.featureIndex =
+      String(
+        features.indexOf(
+          feature
+        )
+      );
+
+
+    select.appendChild(
+      option
+    );
+  }
+}
+
+
+/* ============================================================
+   FILTER AREA
+   ============================================================ */
+
+function applyAreaFilter(
+  key
+) {
+
+  selectedAreaKey =
+    key;
+
+
+  if (
+    selectedAreaLayer
+  ) {
+
+    map.removeLayer(
+      selectedAreaLayer
+    );
+
+    selectedAreaLayer =
+      null;
+  }
+
+
+  if (
+    key === "all"
+  ) {
+
+    if (
+      farsLayer
+    ) {
+
+      farsLayer.setStyle({
+        color: "#111",
+        weight: 2.5,
+        opacity: .95,
+        fill: false
+      });
+    }
+
+    return;
+  }
+
+
+  const select =
+    document.getElementById(
+      "areaFilter"
+    );
+
+
+  const option =
+    select.options[
+      select.selectedIndex
+    ];
+
+
+  const index =
+    Number(
+      option.dataset.featureIndex
+    );
+
+
+  const feature =
+    allAreaFeatures[
+      index
+    ];
+
+
+  if (!feature) {
+    return;
+  }
+
+
+  selectedAreaLayer =
+    L.geoJSON(
+      feature,
+      {
+        style: {
+          color: "#0057b7",
+          weight: 3,
+          opacity: 1,
+          fillColor: "#4da3ff",
+          fillOpacity: .08
+        }
+      }
+    ).addTo(
+      map
+    );
+
+
+  map.fitBounds(
+    selectedAreaLayer.getBounds(),
+    {
+      padding: [30, 30],
+      maxZoom: 10
+    }
+  );
+
+
+  /*
+   * The FLI GeoJSON itself is not recalculated here.
+   *
+   * The selected boundary acts as a spatial filter by
+   * clipping/hiding polygon features outside the selected
+   * region.
+   */
+
+  filterFLILayer(
+    feature
+  );
+}
+
+
+/* ============================================================
+   FILTER FLI
+   ============================================================ */
+
+function filterFLILayer(
+  selectedFeature
+) {
+
+  if (
+    !fliLayer
+  ) {
+    return;
+  }
+
+
+  const selectedBounds =
+    L.geoJSON(
+      selectedFeature
+    ).getBounds();
+
+
+  fliLayer.eachLayer(
+    function(layer) {
+
+      if (
+        !layer.feature ||
+        !layer.feature.geometry
+      ) {
+
+        return;
+      }
+
+
+      const bounds =
+        L.geoJSON(
+          layer.feature
+        ).getBounds();
+
+
+      const overlaps =
+        selectedBounds.intersects(
+          bounds
+        );
+
+
+      if (overlaps) {
+
+        layer.setStyle({
+          fillOpacity: .72,
+          opacity: 1
+        });
+
+      } else {
+
+        layer.setStyle({
+          fillOpacity: 0,
+          opacity: 0
+        });
+      }
+    }
+  );
+}
 
 
 /* ============================================================
    RESET FILTER
    ============================================================ */
 
-document.getElementById(
-  "resetFilter"
-).addEventListener(
-  "click",
-  function() {
+function resetAreaFilter() {
 
-    currentFilter =
-      "all";
-
+  const select =
     document.getElementById(
       "areaFilter"
-    ).value =
-      "all";
-
-    updateFilteredStatistics();
-
-    if (
-      boundaryLayer &&
-      boundaryLayer.getBounds().isValid()
-    ) {
-
-      map.fitBounds(
-        boundaryLayer.getBounds(),
-        {
-          padding: [30,30],
-          maxZoom: 9
-        }
-      );
-
-    }
-
-    setStatus(
-      "نمایش کل استان فارس",
-      true
     );
 
+
+  select.value =
+    "all";
+
+
+  applyAreaFilter(
+    "all"
+  );
+
+
+  if (
+    farsLayer &&
+    farsLayer.getBounds().isValid()
+  ) {
+
+    map.fitBounds(
+      farsLayer.getBounds(),
+      {
+        padding: [40, 40],
+        maxZoom: 8.5
+      }
+    );
   }
-);
+}
+
+
+/* ============================================================
+   LOAD PROTECTED AREAS
+   ============================================================ */
+
+async function loadProtectedAreas() {
+
+  const response =
+    await fetch(
+      "protected_areas.geojson",
+      {
+        cache: "no-store"
+      }
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Protected areas HTTP ${response.status}`
+    );
+  }
+
+  const data =
+    await response.json();
+
+
+  protectedLayer =
+    L.geoJSON(
+      data,
+      {
+        style: {
+          color: "#1565c0",
+          weight: 1.5,
+          opacity: .9,
+          fillColor: "#42a5f5",
+          fillOpacity: .08
+        },
+        onEachFeature: function(
+          feature,
+          layer
+        ) {
+
+          const p =
+            feature.properties || {};
+
+          const name =
+            p.name ||
+            p.NAME ||
+            p.shapeName ||
+            "منطقه حفاظت‌شده";
+
+
+          layer.bindPopup(
+            `<div dir="rtl">
+              <strong>${name}</strong>
+            </div>`
+          );
+        }
+      }
+    );
+
+  return protectedLayer;
+}
+
+
+/* ============================================================
+   LOAD HUNTING BANNED
+   ============================================================ */
+
+async function loadHunting() {
+
+  const response =
+    await fetch(
+      "hunting_banned.geojson",
+      {
+        cache: "no-store"
+      }
+    );
+
+  if (!response.ok) {
+    throw new Error(
+      `Hunting areas HTTP ${response.status}`
+    );
+  }
+
+  const data =
+    await response.json();
+
+
+  huntingLayer =
+    L.geoJSON(
+      data,
+      {
+        style: {
+          color: "#7b1fa2",
+          weight: 1.5,
+          opacity: .9,
+          fillColor: "#ab47bc",
+          fillOpacity: .10
+        },
+        onEachFeature: function(
+          feature,
+          layer
+        ) {
+
+          const p =
+            feature.properties || {};
+
+          const name =
+            p.name ||
+            p.NAME ||
+            p.shapeName ||
+            "منطقه شکار ممنوع";
+
+
+          layer.bindPopup(
+            `<div dir="rtl">
+              <strong>${name}</strong>
+            </div>`
+          );
+        }
+      }
+    );
+
+  return huntingLayer;
+}
+
+
+/* ============================================================
+   LOAD FLI GEOJSON
+   ============================================================ */
+
+async function loadFLIPolygons() {
+
+  const response =
+    await fetch(
+      "data/web/fli_polygons.geojson",
+      {
+        cache: "no-store"
+      }
+    );
+
+
+  if (!response.ok) {
+
+    throw new Error(
+      `FLI polygon HTTP ${response.status}`
+    );
+  }
+
+
+  const data =
+    await response.json();
+
+
+  fliLayer =
+    L.geoJSON(
+      data,
+      {
+
+        style: function(
+          feature
+        ) {
+
+          const properties =
+            feature.properties || {};
+
+
+          return {
+
+            color:
+              properties.color,
+
+            weight:
+              .25,
+
+            opacity:
+              .9,
+
+            fillColor:
+              properties.color,
+
+            fillOpacity:
+              .72
+          };
+        },
+
+        interactive: false
+      }
+    );
+
+
+  fliLayer.addTo(
+    map
+  );
+
+
+  return fliLayer;
+}
+
+
+/* ============================================================
+   LOAD FLI GRID + METADATA
+   ============================================================ */
+
+async function loadFLIData() {
+
+  const metadataResponse =
+    await fetch(
+      "data/web/fli_latest.json",
+      {
+        cache: "no-store"
+      }
+    );
+
+
+  if (!metadataResponse.ok) {
+
+    throw new Error(
+      `FLI metadata HTTP ${metadataResponse.status}`
+    );
+  }
+
+
+  fliMetadata =
+    await metadataResponse.json();
+
+
+  document.getElementById(
+    "minValue"
+  ).textContent =
+    formatNumber(
+      fliMetadata.statistics?.min
+    );
+
+
+  document.getElementById(
+    "maxValue"
+  ).textContent =
+    formatNumber(
+      fliMetadata.statistics?.max
+    );
+
+
+  document.getElementById(
+    "meanValue"
+  ).textContent =
+    formatNumber(
+      fliMetadata.statistics?.mean
+    );
+
+
+  const generated =
+    fliMetadata.generated_at_utc;
+
+
+  document.getElementById(
+    "dateValue"
+  ).textContent =
+    generated
+      ? new Date(
+          generated
+        ).toLocaleDateString(
+          "fa-IR"
+        )
+      : "—";
+
+
+  const gridResponse =
+    await fetch(
+      "data/web/fli_latest_grid.json",
+      {
+        cache: "no-store"
+      }
+    );
+
+
+  if (
+    gridResponse.ok
+  ) {
+
+    fliGrid =
+      await gridResponse.json();
+  }
+}
+
+
+/* ============================================================
+   FIT FARS
+   ============================================================ */
+
+function fitFars() {
+
+  if (
+    farsLayer &&
+    farsLayer.getBounds().isValid()
+  ) {
+
+    map.fitBounds(
+      farsLayer.getBounds(),
+      {
+        padding: [40, 40],
+        maxZoom: 8.5
+      }
+    );
+
+    return;
+  }
+
+
+  if (
+    fliMetadata &&
+    fliMetadata.bounds
+  ) {
+
+    map.fitBounds(
+      fliMetadata.bounds
+    );
+  }
+}
 
 
 /* ============================================================
@@ -1998,25 +1826,27 @@ document.getElementById(
    ============================================================ */
 
 document.getElementById(
-  "dayNightButton"
+  "nightMode"
 ).addEventListener(
   "click",
   function() {
 
-    document.body.classList.toggle(
+    document.body.classList.add(
       "night"
     );
+  }
+);
 
-    const night =
-      document.body.classList.contains(
-        "night"
-      );
 
-    this.textContent =
-      night
-        ? "حالت روز"
-        : "حالت شب";
+document.getElementById(
+  "dayMode"
+).addEventListener(
+  "click",
+  function() {
 
+    document.body.classList.remove(
+      "night"
+    );
   }
 );
 
@@ -2026,91 +1856,108 @@ document.getElementById(
    ============================================================ */
 
 document.getElementById(
-  "fitButton"
+  "fitFars"
 ).addEventListener(
   "click",
-  function() {
-
-    if (
-      boundaryLayer &&
-      boundaryLayer.getBounds().isValid()
-    ) {
-
-      map.fitBounds(
-        boundaryLayer.getBounds(),
-        {
-          paddingTopLeft: [30,30],
-          paddingBottomRight: [30,30],
-          maxZoom: 9
-        }
-      );
-
-    }
-
-  }
+  fitFars
 );
 
 
 /* ============================================================
-   LAYER CONTROL
+   FILTER EVENTS
    ============================================================ */
 
-function createLayerControl() {
+document.getElementById(
+  "areaFilter"
+).addEventListener(
+  "change",
+  function(event) {
+
+    applyAreaFilter(
+      event.target.value
+    );
+  }
+);
+
+
+document.getElementById(
+  "resetFilter"
+).addEventListener(
+  "click",
+  resetAreaFilter
+);
+
+
+/* ============================================================
+   LAYERS
+   ============================================================ */
+
+async function setupLayerControl() {
 
   const baseLayers = {
 
     "نقشه خیابانی":
       osm
-
   };
+
 
   const overlays = {};
 
-  if (fliLayer) {
+
+  if (
+    fliLayer
+  ) {
 
     overlays[
       "شاخص خطر FLI"
     ] =
       fliLayer;
-
   }
 
-  if (boundaryLayer) {
+
+  if (
+    farsLayer
+  ) {
 
     overlays[
       "مرز استان فارس"
     ] =
-      boundaryLayer;
-
+      farsLayer;
   }
 
-  if (protectedLayer) {
+
+  if (
+    protectedLayer
+  ) {
 
     overlays[
-      "مناطق چهارگانه محیط‌زیست"
+      "مناطق چهارگانه محیط زیست"
     ] =
       protectedLayer;
-
   }
 
-  if (huntingLayer) {
+
+  if (
+    huntingLayer
+  ) {
 
     overlays[
       "مناطق شکار ممنوع"
     ] =
       huntingLayer;
-
   }
+
 
   L.control.layers(
     baseLayers,
     overlays,
     {
-      collapsed: true,
-      position: "topleft"
+      collapsed: false,
+      position: "topright"
     }
-  ).addTo(map);
-
+  ).addTo(
+    map
+  );
 }
 
 
@@ -2118,65 +1965,58 @@ function createLayerControl() {
    START
    ============================================================ */
 
-async function start() {
+async function startFIRIS() {
 
   try {
 
     setStatus(
-      "در حال بارگذاری FIRIS..."
+      "در حال بارگذاری نقشه FIRIS..."
     );
 
-    const imageBounds =
-      await loadFLI();
 
-    await loadBoundary();
+    await loadFLIData();
 
-    await loadProtectedAreas();
+    await loadFars();
 
-    await loadHuntingBanned();
+    await loadFLIPolygons();
 
 
-    /*
-     * بسیار مهم:
-     * Fit فقط بعد از بارگذاری مرز فارس انجام می‌شود.
-     */
+    try {
 
-    if (
-      boundaryLayer &&
-      boundaryLayer.getBounds().isValid()
-    ) {
+      await loadProtectedAreas();
 
-      map.fitBounds(
-        boundaryLayer.getBounds(),
-        {
-          paddingTopLeft: [30,30],
-          paddingBottomRight: [30,30],
-          maxZoom: 9
-        }
+    } catch (error) {
+
+      console.warn(
+        "Protected areas unavailable:",
+        error
       );
-
-    } else {
-
-      map.fitBounds(
-        imageBounds,
-        {
-          padding: [30,30]
-        }
-      );
-
     }
 
 
-    /*
-     * کنترل لایه‌ها بعد از ساخته‌شدن واقعی
-     * تمام لایه‌ها ایجاد می‌شود.
-     */
+    try {
 
-    createLayerControl();
+      await loadHunting();
+
+    } catch (error) {
+
+      console.warn(
+        "Hunting areas unavailable:",
+        error
+      );
+    }
+
+
+    await setupLayerControl();
+
+
+    fitFars();
 
 
     setStatus(
-      "FIRIS با موفقیت بارگذاری شد.",
+      `FIRIS با موفقیت بارگذاری شد | میانگین: ${formatNumber(
+        fliMetadata.statistics?.mean
+      )}`,
       true
     );
 
@@ -2184,28 +2024,23 @@ async function start() {
   } catch (error) {
 
     console.error(
+      "FIRIS startup error:",
       error
     );
+
 
     setStatus(
       "خطا در بارگذاری FIRIS: " +
       error.message,
       false
     );
-
   }
-
 }
 
 
-/* ============================================================
-   RUN
-   ============================================================ */
-
-start();
+startFIRIS();
 
 </script>
 
 </body>
-
 </html>
