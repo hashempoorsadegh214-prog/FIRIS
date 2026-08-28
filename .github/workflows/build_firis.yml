@@ -1,4 +1,3 @@
-
 name: Build FIRIS
 
 on:
@@ -41,7 +40,6 @@ jobs:
 
     runs-on: ubuntu-latest
 
-
     steps:
 
       # ========================================================
@@ -49,9 +47,7 @@ jobs:
       # ========================================================
 
       - name: Checkout repository
-
         uses: actions/checkout@v4
-
         with:
           fetch-depth: 0
 
@@ -61,9 +57,7 @@ jobs:
       # ========================================================
 
       - name: Setup Python
-
         uses: actions/setup-python@v5
-
         with:
           python-version: "3.11"
 
@@ -73,41 +67,23 @@ jobs:
       # ========================================================
 
       - name: Install dependencies
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           python -m pip install --upgrade pip
-
           pip install \
             numpy \
             pandas \
             openpyxl \
             rasterio \
-            shapely \
-            pyproj \
-            pillow
-
-
-      # ========================================================
-      # RUN DATE
-      # ========================================================
-
-      - name: Set run date
-
+            shap      - name: Define input files
         shell: bash
-
         run: |
-
           set -euo pipefail
-
+          FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
+          FUEL_
           RUN_DATE="$(date -u +%Y-%m-%d)"
-
           echo "RUN_DATE=${RUN_DATE}" >> "${GITHUB_ENV}"
-
           echo ""
           echo "============================================================"
           echo "FIRIS BUILD"
@@ -120,13 +96,9 @@ jobs:
       # ========================================================
 
       - name: Define input files
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
           FUEL_RASTER="data/raw/fuel/fars_fuel.tif"
           DEM_RASTER="data/raw/topography/dem_fars.tif"
@@ -141,7 +113,6 @@ jobs:
           echo "============================================================"
           echo "INPUT FILES"
           echo "============================================================"
-
           echo "FWI_RASTER  = ${FWI_RASTER}"
           echo "FUEL_RASTER = ${FUEL_RASTER}"
           echo "DEM_RASTER  = ${DEM_RASTER}"
@@ -156,50 +127,32 @@ jobs:
       # ========================================================
 
       - name: Check input files
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           echo ""
           echo "============================================================"
           echo "CHECKING INPUT FILES"
           echo "============================================================"
 
           required_files=(
-
             "${FWI_RASTER}"
-
             "${FUEL_RASTER}"
-
             "${DEM_RASTER}"
-
             "${FUEL_EXCEL}"
-
             "fars.geojson"
-
             "protected_areas.geojson"
-
             "hunting_banned.geojson"
-
           )
 
           for file in "${required_files[@]}"; do
-
             if [ ! -f "${file}" ]; then
-
               echo ""
               echo "ERROR: Required file not found:"
               echo "${file}"
-
               exit 1
-
             fi
-
             echo "✓ ${file}"
-
           done
 
           echo ""
@@ -211,29 +164,17 @@ jobs:
       # ========================================================
 
       - name: Inspect source rasters
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           python - <<'PY'
-
           import os
           import rasterio
 
           files = {
-
-              "FWI":
-                  os.environ["FWI_RASTER"],
-
-              "Fuel":
-                  os.environ["FUEL_RASTER"],
-
-              "DEM":
-                  os.environ["DEM_RASTER"]
-
+              "FWI": os.environ["FWI_RASTER"],
+              "Fuel": os.environ["FUEL_RASTER"],
+              "DEM": os.environ["DEM_RASTER"]
           }
 
           print("")
@@ -242,41 +183,20 @@ jobs:
           print("=" * 70)
 
           for name, path in files.items():
-
               print("")
               print(name)
               print("-" * 70)
-
               with rasterio.open(path) as src:
-
                   print("Path       :", path)
                   print("CRS        :", src.crs)
-                  print(
-                      "Size       :",
-                      src.width,
-                      "x",
-                      src.height
-                  )
-                  print(
-                      "Resolution :",
-                      src.res
-                  )
-                  print(
-                      "Bounds     :",
-                      src.bounds
-                  )
-                  print(
-                      "Transform  :",
-                      src.transform
-                  )
-                  print(
-                      "NoData     :",
-                      src.nodata
-                  )
+                  print("Size       :", src.width, "x", src.height)
+                  print("Resolution :", src.res)
+                  print("Bounds     :", src.bounds)
+                  print("Transform  :", src.transform)
+                  print("NoData     :", src.nodata)
 
           print("")
           print("=" * 70)
-
           PY
 
 
@@ -285,37 +205,23 @@ jobs:
       # ========================================================
 
       - name: Prepare output directories
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           mkdir -p data/outputs
           mkdir -p data/web
           mkdir -p data/report
-
           echo "Output directories ready."
 
 
       # ========================================================
       # CONTROL POINT DIAGNOSTIC
-      #
-      # IMPORTANT:
-      # This step does NOT modify the FLI.
-      # It only compares boundary coordinates with
-      # the current FWI grid.
       # ========================================================
 
       - name: Generate boundary control points
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           echo ""
           echo "============================================================"
           echo "BOUNDARY CONTROL POINT DIAGNOSTIC"
@@ -324,25 +230,17 @@ jobs:
           python scripts/check_control_points.py \
             --raster "${FWI_RASTER}" \
             --boundary "fars.geojson" \
-            --output \
-              "data/outputs/control_points_${RUN_DATE}.json"
+            --output "data/outputs/control_points_${RUN_DATE}.json"
 
 
       # ========================================================
       # RUN FIRIS
-      #
-      # IMPORTANT:
-      # The existing FLI calculation is unchanged.
       # ========================================================
 
       - name: Run FIRIS
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           echo ""
           echo "============================================================"
           echo "RUNNING FIRIS"
@@ -363,23 +261,16 @@ jobs:
       # ========================================================
 
       - name: Build web map
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           FLI_RASTER="data/outputs/fli_fars_${RUN_DATE}.tif"
 
           if [ ! -f "${FLI_RASTER}" ]; then
-
             echo ""
             echo "ERROR: FLI raster not found:"
             echo "${FLI_RASTER}"
-
             exit 1
-
           fi
 
           echo ""
@@ -398,25 +289,17 @@ jobs:
       # ========================================================
 
       - name: Build Excel report
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           FLI_RASTER="data/outputs/fli_fars_${RUN_DATE}.tif"
-
           REPORT_FILE="data/report/firis_report.xlsx"
 
           if [ ! -f "${FLI_RASTER}" ]; then
-
             echo ""
             echo "ERROR: FLI raster not found for report:"
             echo "${FLI_RASTER}"
-
             exit 1
-
           fi
 
           echo ""
@@ -430,13 +313,10 @@ jobs:
             --run-date "${RUN_DATE}"
 
           if [ ! -f "${REPORT_FILE}" ]; then
-
             echo ""
             echo "ERROR: Excel report was not created:"
             echo "${REPORT_FILE}"
-
             exit 1
-
           fi
 
           echo ""
@@ -449,60 +329,37 @@ jobs:
       # ========================================================
 
       - name: Verify outputs
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           echo ""
           echo "============================================================"
           echo "VERIFYING OUTPUTS"
           echo "============================================================"
 
           required_outputs=(
-
             "data/outputs/f_fwi_fars_${RUN_DATE}.tif"
-
             "data/outputs/f_fuel_fars_${RUN_DATE}.tif"
-
             "data/outputs/slope_fars_${RUN_DATE}.tif"
-
             "data/outputs/f_topo_fars_${RUN_DATE}.tif"
-
             "data/outputs/fli_fars_${RUN_DATE}.tif"
-
             "data/outputs/fuel_coverage_fars_${RUN_DATE}.tif"
-
             "data/outputs/firis_report_${RUN_DATE}.json"
-
             "data/outputs/control_points_${RUN_DATE}.json"
-
             "data/web/fli_latest.png"
-
             "data/web/fli_latest.json"
-
             "data/web/fli_latest_grid.json"
-
             "data/report/firis_report.xlsx"
-
           )
 
           for file in "${required_outputs[@]}"; do
-
             if [ ! -f "${file}" ]; then
-
               echo ""
               echo "ERROR: Missing output:"
               echo "${file}"
-
               exit 1
-
             fi
-
             echo "✓ ${file}"
-
           done
 
           echo ""
@@ -511,192 +368,88 @@ jobs:
 
       # ========================================================
       # FINAL GRID VALIDATION
-      #
-      # Every FIRIS output must have exactly the same
-      # spatial grid as FWI.
       # ========================================================
 
       - name: Validate final FIRIS grids
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           export FIRIS_DATE="${RUN_DATE}"
-
           python - <<'PY'
-
           import os
           from pathlib import Path
-
           import rasterio
 
           date = os.environ["FIRIS_DATE"]
-
           output_dir = Path("data/outputs")
 
           files = {
-
-              "F_FWI":
-                  output_dir /
-                  f"f_fwi_fars_{date}.tif",
-
-              "F_Fuel":
-                  output_dir /
-                  f"f_fuel_fars_{date}.tif",
-
-              "Slope":
-                  output_dir /
-                  f"slope_fars_{date}.tif",
-
-              "F_Topo":
-                  output_dir /
-                  f"f_topo_fars_{date}.tif",
-
-              "FLI":
-                  output_dir /
-                  f"fli_fars_{date}.tif",
-
-              "FuelCoverage":
-                  output_dir /
-                  f"fuel_coverage_fars_{date}.tif",
-
+              "F_FWI": output_dir / f"f_fwi_fars_{date}.tif",
+              "F_Fuel": output_dir / f"f_fuel_fars_{date}.tif",
+              "Slope": output_dir / f"slope_fars_{date}.tif",
+              "F_Topo": output_dir / f"f_topo_fars_{date}.tif",
+              "FLI": output_dir / f"fli_fars_{date}.tif",
+              "FuelCoverage": output_dir / f"fuel_coverage_fars_{date}.tif",
           }
 
           reference_path = files["F_FWI"]
 
           with rasterio.open(reference_path) as ref:
-
               reference = {
-
-                  "crs":
-                      ref.crs,
-
-                  "width":
-                      ref.width,
-
-                  "height":
-                      ref.height,
-
-                  "transform":
-                      ref.transform,
-
-                  "bounds":
-                      ref.bounds,
-
-                  "res":
-                      ref.res
-
+                  "crs": ref.crs,
+                  "width": ref.width,
+                  "height": ref.height,
+                  "transform": ref.transform,
+                  "bounds": ref.bounds,
+                  "res": ref.res
               }
 
               print("")
               print("=" * 70)
               print("FINAL GRID VALIDATION")
               print("=" * 70)
-
               print("")
               print("REFERENCE = F_FWI")
-
-              print(
-                  "CRS       :",
-                  reference["crs"]
-              )
-
-              print(
-                  "SIZE      :",
-                  reference["width"],
-                  "x",
-                  reference["height"]
-              )
-
-              print(
-                  "RES       :",
-                  reference["res"]
-              )
-
-              print(
-                  "BOUNDS    :",
-                  reference["bounds"]
-              )
+              print("CRS       :", reference["crs"])
+              print("SIZE      :", reference["width"], "x", reference["height"])
+              print("RES       :", reference["res"])
+              print("BOUNDS    :", reference["bounds"])
 
           failures = []
 
           for name, path in files.items():
-
               if not path.exists():
-
-                  failures.append(
-                      f"{name}: FILE NOT FOUND"
-                  )
-
+                  failures.append(f"{name}: FILE NOT FOUND")
                   continue
 
               with rasterio.open(path) as src:
-
                   problems = []
-
                   if src.crs != reference["crs"]:
                       problems.append("CRS")
-
                   if src.width != reference["width"]:
                       problems.append("WIDTH")
-
                   if src.height != reference["height"]:
                       problems.append("HEIGHT")
-
-                  if not src.transform.almost_equals(
-                      reference["transform"],
-                      precision=7
-                  ):
+                  if not src.transform.almost_equals(reference["transform"], precision=7):
                       problems.append("TRANSFORM")
-
                   if src.bounds != reference["bounds"]:
                       problems.append("BOUNDS")
 
                   if problems:
-
-                      failures.append(
-                          f"{name}: "
-                          + ", ".join(problems)
-                      )
-
-                      print(
-                          f"✗ {name:<16} "
-                          f"GRID MISMATCH: "
-                          f"{', '.join(problems)}"
-                      )
-
+                      failures.append(f"{name}: " + ", ".join(problems))
+                      print(f"✗ {name:<16} GRID MISMATCH: {', '.join(problems)}")
                   else:
-
-                      print(
-                          f"✓ {name:<16} GRID MATCH"
-                      )
+                      print(f"✓ {name:<16} GRID MATCH")
 
           print("")
-
           if failures:
-
-              print(
-                  "GRID VALIDATION FAILED"
-              )
-
+              print("GRID VALIDATION FAILED")
               for failure in failures:
-
-                  print(
-                      " -",
-                      failure
-                  )
-
+                  print(" -", failure)
               raise SystemExit(1)
 
-          print(
-              "✓ ALL FIRIS OUTPUTS MATCH THE FWI REFERENCE GRID"
-          )
-
+          print("✓ ALL FIRIS OUTPUTS MATCH THE FWI REFERENCE GRID")
           print("=" * 70)
-
           PY
 
 
@@ -705,20 +458,14 @@ jobs:
       # ========================================================
 
       - name: Show control point report
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           REPORT="data/outputs/control_points_${RUN_DATE}.json"
-
           echo ""
           echo "============================================================"
           echo "CONTROL POINT REPORT"
           echo "============================================================"
-
           cat "${REPORT}"
 
 
@@ -727,51 +474,23 @@ jobs:
       # ========================================================
 
       - name: Show web map metadata
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           echo ""
           echo "============================================================"
           echo "WEB MAP METADATA"
           echo "============================================================"
-
           python - <<'PY'
-
           import json
-
-          with open(
-              "data/web/fli_latest.json",
-              "r",
-              encoding="utf-8"
-          ) as file:
-
+          with open("data/web/fli_latest.json", "r", encoding="utf-8") as file:
               data = json.load(file)
 
           print("")
-          print(
-              "CRS:",
-              data.get("crs")
-          )
-
-          print(
-              "Bounds:",
-              data.get("bounds")
-          )
-
-          print(
-              "Statistics:",
-              data.get("statistics")
-          )
-
-          print(
-              "Boundary:",
-              data.get("boundary")
-          )
-
+          print("CRS:", data.get("crs"))
+          print("Bounds:", data.get("bounds"))
+          print("Statistics:", data.get("statistics"))
+          print("Boundary:", data.get("boundary"))
           PY
 
 
@@ -780,102 +499,46 @@ jobs:
       # ========================================================
 
       - name: List outputs
-
         shell: bash
-
         run: |
-
           set -euo pipefail
-
           echo ""
           echo "============================================================"
           echo "OUTPUT FILES"
           echo "============================================================"
-
-          find data/outputs \
-            -maxdepth 1 \
-            -type f \
-            -print \
-            | sort
-
+          find data/outputs -maxdepth 1 -type f -print | sort
           echo ""
           echo "WEB FILES"
-
-          find data/web \
-            -maxdepth 1 \
-            -type f \
-            -print \
-            | sort
-
+          find data/web -maxdepth 1 -type f -print | sort
           echo ""
           echo "REPORT FILES"
-
-          find data/report \
-            -maxdepth 1 \
-            -type f \
-            -print \
-            | sort
+          find data/report -maxdepth 1 -type f -print | sort
 
 
       # ========================================================
-      # COMMIT
+      # COMMIT & PUSH
       # ========================================================
 
-      - name: Commit outputs
-
+      - name: Commit and Push outputs
         shell: bash
-
         run: |
-
           set -euo pipefail
 
-          git config \
-            user.name \
-            "github-actions[bot]"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git config \
-            user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add \
-            data/outputs \
-            data/web \
-            data/report
+          git add data/outputs data/web data/report
 
           if git diff --cached --quiet; then
-
             echo ""
             echo "No output changes to commit."
-
           else
-
-            git commit \
-              -m "chore(firis): update FLI web map report and diagnostics [skip ci]"
-
+            git commit -m "chore(firis): update FLI web map report and diagnostics [skip ci]"
             echo ""
-            echo "Commit created."
-
+            echo "Commit created. Pulling latest remote changes..."
+            git pull origin main --rebase
+            echo "Pushing outputs..."
+            git push origin HEAD:main
+            echo ""
+            echo "✓ FIRIS outputs pushed successfully."
           fi
-
-
-      # ========================================================
-      # PUSH
-      # ========================================================
-
-      - name: Push outputs
-
-        shell: bash
-
-        run: |
-
-          set -euo pipefail
-
-          echo ""
-          echo "============================================================"
-          echo "PUSHING OUTPUTS"
-          echo "============================================================"
-
-          git push origin HEAD:main
-
-          echo ""
-          echo "✓ FIRIS outputs pushed successfully."
