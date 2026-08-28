@@ -1,4 +1,4 @@
-```python
+
 #!/usr/bin/env python3
 """
 FIRIS - Fars Integrated Fire Information System
@@ -1590,4 +1590,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-```
