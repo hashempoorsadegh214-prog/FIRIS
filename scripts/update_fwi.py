@@ -1,24 +1,16 @@
-
 #!/usr/bin/env python3
 
 """
 FIRIS - ECMWF FWI Downloader
 ============================
 
-Downloads ECMWF Fire Weather Index (FWI) from
-Copernicus GWIS WMS.
+Downloads ECMWF Fire Weather Index (FWI)
+from Copernicus GWIS WMS.
 
-IMPORTANT
----------
-The spatial BBOX is calculated directly from:
+The requested spatial extent is calculated directly
+from fars.geojson.
 
-    fars.geojson
-
-A small margin is added around the actual province
-extent so the complete Fars Province is covered.
-
-This script does NOT calculate FLI.
-It only downloads the FWI raster used by FIRIS.
+No FLI calculation is performed here.
 """
 
 from __future__ import annotations
@@ -36,7 +28,7 @@ import requests
 
 
 # ============================================================
-# COPERNICUS GWIS
+# GWIS WMS
 # ============================================================
 
 WMS_URL = (
@@ -59,15 +51,7 @@ REQUEST_TIMEOUT_SECONDS = 180
 # BOUNDARY MARGIN
 # ============================================================
 
-# Margin in geographic degrees.
-#
-# The current Fars boundary extends farther east than
-# the old fixed BBOX. A 0.10 degree margin provides
-# safe coverage around the complete province.
-#
-# This does not alter FLI calculations.
-# ============================================================
-
+# Extra margin around the exact Fars boundary.
 BOUNDARY_MARGIN_DEG = 0.10
 
 
@@ -98,17 +82,13 @@ def parse_args() -> argparse.Namespace:
         "--boundary",
         type=Path,
         default=Path("fars.geojson"),
-        help=(
-            "Fars Province GeoJSON boundary."
-        ),
+        help="Fars Province GeoJSON boundary."
     )
 
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help=(
-            "Download again even if output already exists."
-        ),
+        help="Overwrite existing FWI for the target date."
     )
 
     return parser.parse_args()
@@ -135,22 +115,21 @@ def get_target_date(
 
             raise SystemExit(
                 f"Invalid date: {value}. "
-                "Expected format YYYY-MM-DD."
+                "Expected YYYY-MM-DD."
             ) from error
 
     tomorrow = (
         datetime.now(
             timezone.utc
         ).date()
-        +
-        timedelta(days=1)
+        + timedelta(days=1)
     )
 
     return tomorrow.isoformat()
 
 
 # ============================================================
-# LOAD BOUNDARY
+# LOAD FARS GEOJSON
 # ============================================================
 
 def load_boundary(
@@ -170,14 +149,11 @@ def load_boundary(
 
         geojson = json.load(file)
 
-    if (
-        geojson.get("type")
-        != "FeatureCollection"
-    ):
+    if geojson.get("type") != "FeatureCollection":
 
         raise ValueError(
-            "Boundary GeoJSON must be a "
-            "FeatureCollection."
+            "fars.geojson must be a "
+            "GeoJSON FeatureCollection."
         )
 
     features = geojson.get(
@@ -188,14 +164,14 @@ def load_boundary(
     if not features:
 
         raise ValueError(
-            "Boundary contains no features."
+            "fars.geojson contains no features."
         )
 
     return geojson
 
 
 # ============================================================
-# EXTRACT COORDINATES
+# EXTRACT ALL COORDINATES
 # ============================================================
 
 def extract_coordinates(
@@ -203,17 +179,15 @@ def extract_coordinates(
     output: list[tuple[float, float]]
 ) -> None:
 
+    # A coordinate pair.
     if (
         isinstance(value, list)
-        and
-        len(value) >= 2
-        and
-        isinstance(
+        and len(value) >= 2
+        and isinstance(
             value[0],
             (int, float)
         )
-        and
-        isinstance(
+        and isinstance(
             value[1],
             (int, float)
         )
@@ -228,10 +202,8 @@ def extract_coordinates(
 
         return
 
-    if isinstance(
-        value,
-        list
-    ):
+    # Nested coordinate arrays.
+    if isinstance(value, list):
 
         for item in value:
 
@@ -242,10 +214,10 @@ def extract_coordinates(
 
 
 # ============================================================
-# CALCULATE REAL BBOX
+# CALCULATE BBOX FROM FARS
 # ============================================================
 
-def calculate_boundary_bbox(
+def calculate_fars_bbox(
     geojson: dict[str, Any],
     margin_deg: float
 ) -> tuple[
@@ -255,7 +227,9 @@ def calculate_boundary_bbox(
     float
 ]:
 
-    coordinates = []
+    coordinates: list[
+        tuple[float, float]
+    ] = []
 
     for feature in geojson.get(
         "features",
@@ -269,14 +243,12 @@ def calculate_boundary_bbox(
         if not geometry:
             continue
 
-        geometry_coordinates = (
-            geometry.get(
-                "coordinates"
-            )
+        coords = geometry.get(
+            "coordinates"
         )
 
         extract_coordinates(
-            geometry_coordinates,
+            coords,
             coordinates
         )
 
@@ -284,39 +256,29 @@ def calculate_boundary_bbox(
 
         raise ValueError(
             "No coordinates found in "
-            "Fars boundary."
+            "fars.geojson."
         )
 
     longitudes = [
-        p[0]
-        for p in coordinates
+        point[0]
+        for point in coordinates
     ]
 
     latitudes = [
-        p[1]
-        for p in coordinates
+        point[1]
+        for point in coordinates
     ]
 
-    west = min(
-        longitudes
-    )
+    west = min(longitudes)
+    east = max(longitudes)
 
-    east = max(
-        longitudes
-    )
+    south = min(latitudes)
+    north = max(latitudes)
 
-    south = min(
-        latitudes
-    )
-
-    north = max(
-        latitudes
-    )
-
-    # Add margin around actual boundary.
+    # Add safety margin.
     west -= margin_deg
-    south -= margin_deg
     east += margin_deg
+    south -= margin_deg
     north += margin_deg
 
     return (
@@ -369,7 +331,7 @@ def response_is_error_payload(
         .lower()
     )
 
-    error_content_types = (
+    error_types = (
         "text/xml",
         "application/xml",
         "text/html",
@@ -379,12 +341,12 @@ def response_is_error_payload(
 
     if any(
         item in content_type
-        for item in error_content_types
+        for item in error_types
     ):
 
         return True
 
-    error_prefixes = (
+    prefixes = (
         b"<?xml",
         b"<serviceexception",
         b"<serviceexceptionreport",
@@ -395,7 +357,7 @@ def response_is_error_payload(
     )
 
     return sample.startswith(
-        error_prefixes
+        prefixes
     )
 
 
@@ -403,13 +365,13 @@ def response_is_error_payload(
 # SAVE ERROR RESPONSE
 # ============================================================
 
-def write_error_response(
+def save_error_response(
     output_dir: Path,
     target_date: str,
     response: requests.Response
 ) -> Path:
 
-    error_path = (
+    path = (
         output_dir
         /
         f"fwi_download_error_{target_date}.txt"
@@ -419,21 +381,17 @@ def write_error_response(
         f"HTTP status: {response.status_code}\n"
         f"Content-Type: "
         f"{response.headers.get('Content-Type', '')}\n"
-        f"Request URL: {response.url}\n"
+        f"URL: {response.url}\n"
         "\n"
         "Response body:\n"
         "------------------------------------------------------------\n"
-    ).encode(
-        "utf-8"
+    ).encode("utf-8")
+
+    path.write_bytes(
+        header + response.content
     )
 
-    error_path.write_bytes(
-        header
-        +
-        response.content
-    )
-
-    return error_path
+    return path
 
 
 # ============================================================
@@ -448,135 +406,121 @@ def validate_geotiff(
 
         with rasterio.open(
             tif_path
-        ) as dataset:
+        ) as src:
 
-            if dataset.driver != "GTiff":
+            if src.driver != "GTiff":
 
                 raise RuntimeError(
-                    "Downloaded file is not GTiff."
+                    f"Expected GTiff, got "
+                    f"{src.driver}"
                 )
 
-            if dataset.count < 1:
+            if src.count < 1:
 
                 raise RuntimeError(
-                    "GeoTIFF contains no raster bands."
+                    "GeoTIFF has no raster bands."
                 )
 
             if (
-                dataset.width < 1
+                src.width <= 0
                 or
-                dataset.height < 1
+                src.height <= 0
             ):
 
                 raise RuntimeError(
-                    "GeoTIFF dimensions are invalid."
+                    "Invalid raster dimensions."
                 )
 
-            first_band = dataset.read(
+            data = src.read(
                 1,
                 masked=True
             )
 
-            valid_pixel_count = int(
-                first_band.count()
+            valid_count = int(
+                data.count()
             )
 
-            if valid_pixel_count == 0:
+            if valid_count == 0:
 
                 raise RuntimeError(
-                    "GeoTIFF contains no "
-                    "valid FWI pixels."
+                    "FWI GeoTIFF contains no "
+                    "valid pixels."
                 )
 
             return {
 
                 "driver":
-                    dataset.driver,
+                    src.driver,
 
                 "crs":
-                    (
-                        str(dataset.crs)
-                        if dataset.crs
-                        else None
-                    ),
+                    str(src.crs)
+                    if src.crs
+                    else None,
 
                 "width":
-                    dataset.width,
+                    int(src.width),
 
                 "height":
-                    dataset.height,
+                    int(src.height),
 
-                "band_count":
-                    dataset.count,
+                "resolution": {
 
-                "dtype":
-                    dataset.dtypes[0],
+                    "x":
+                        float(src.res[0]),
 
-                "nodata":
-                    dataset.nodata,
+                    "y":
+                        float(
+                            abs(src.res[1])
+                        )
+                },
 
                 "bounds": {
 
                     "left":
                         float(
-                            dataset.bounds.left
+                            src.bounds.left
                         ),
 
                     "bottom":
                         float(
-                            dataset.bounds.bottom
+                            src.bounds.bottom
                         ),
 
                     "right":
                         float(
-                            dataset.bounds.right
+                            src.bounds.right
                         ),
 
                     "top":
                         float(
-                            dataset.bounds.top
+                            src.bounds.top
                         )
                 },
 
-                "resolution": {
+                "nodata":
+                    src.nodata,
 
-                    "x":
-                        float(
-                            dataset.res[0]
-                        ),
-
-                    "y":
-                        float(
-                            abs(
-                                dataset.res[1]
-                            )
-                        )
-                },
+                "dtype":
+                    src.dtypes[0],
 
                 "valid_pixel_count":
-                    valid_pixel_count,
+                    valid_count,
 
-                "fwi_min":
-                    float(
-                        first_band.min()
-                    ),
+                "min":
+                    float(data.min()),
 
-                "fwi_max":
-                    float(
-                        first_band.max()
-                    ),
+                "max":
+                    float(data.max()),
 
-                "fwi_mean":
-                    float(
-                        first_band.mean()
-                    )
+                "mean":
+                    float(data.mean())
             }
 
     except Exception as error:
 
         raise RuntimeError(
-            "Downloaded file cannot be validated "
-            f"as a readable GeoTIFF: {error}"
+            "Downloaded file could not be "
+            f"validated as GeoTIFF: {error}"
         ) from error
 
 
@@ -619,12 +563,9 @@ def main() -> None:
 
     output_dir = (
         project_root
-        /
-        "data"
-        /
-        "raw"
-        /
-        "fwi"
+        / "data"
+        / "raw"
+        / "fwi"
     )
 
     output_dir.mkdir(
@@ -646,7 +587,7 @@ def main() -> None:
 
 
     # ========================================================
-    # LOAD REAL FARS BOUNDARY
+    # READ FARS BOUNDARY
     # ========================================================
 
     geojson = load_boundary(
@@ -658,12 +599,12 @@ def main() -> None:
         south,
         east,
         north
-    ) = calculate_boundary_bbox(
+    ) = calculate_fars_bbox(
         geojson,
         BOUNDARY_MARGIN_DEG
     )
 
-    fars_bbox = format_bbox(
+    bbox = format_bbox(
         west,
         south,
         east,
@@ -672,7 +613,50 @@ def main() -> None:
 
 
     # ========================================================
-    # EXISTING FILE CHECK
+    # PRINT REQUEST EXTENT
+    # ========================================================
+
+    print("")
+    print("=" * 70)
+    print("FIRIS - ECMWF FWI DOWNLOAD")
+    print("=" * 70)
+
+    print("")
+    print(
+        f"Target date : {target_date}"
+    )
+
+    print(
+        f"Boundary    : {args.boundary}"
+    )
+
+    print(
+        f"Margin      : "
+        f"{BOUNDARY_MARGIN_DEG} degree"
+    )
+
+    print("")
+    print("REQUEST BBOX")
+    print(
+        f"West  : {west:.8f}"
+    )
+    print(
+        f"South : {south:.8f}"
+    )
+    print(
+        f"East  : {east:.8f}"
+    )
+    print(
+        f"North : {north:.8f}"
+    )
+
+    print(
+        f"BBOX string: {bbox}"
+    )
+
+
+    # ========================================================
+    # EXISTING OUTPUT
     # ========================================================
 
     if (
@@ -681,20 +665,24 @@ def main() -> None:
         not args.overwrite
     ):
 
+        print("")
         print(
-            f"FWI file already exists: "
-            f"{output_tif}"
+            "FWI file already exists:"
         )
 
         print(
-            "Use --overwrite to download again."
+            output_tif
+        )
+
+        print(
+            "Use --overwrite to replace it."
         )
 
         return
 
 
     # ========================================================
-    # WMS PARAMETERS
+    # WMS REQUEST
     # ========================================================
 
     params = {
@@ -718,7 +706,7 @@ def main() -> None:
             SRS,
 
         "BBOX":
-            fars_bbox,
+            bbox,
 
         "WIDTH":
             str(WIDTH),
@@ -737,45 +725,14 @@ def main() -> None:
     }
 
 
-    # ========================================================
-    # LOG
-    # ========================================================
-
     print("")
-    print("=" * 70)
-    print("FIRIS - ECMWF FWI DOWNLOADER")
-    print("=" * 70)
-
     print(
-        f"Target date : {target_date}"
+        "Downloading FWI..."
     )
-
-    print(
-        f"Layer       : {LAYER_NAME}"
-    )
-
-    print(
-        f"Boundary    : {args.boundary}"
-    )
-
-    print(
-        f"Margin      : "
-        f"{BOUNDARY_MARGIN_DEG} degree"
-    )
-
-    print(
-        f"BBOX        : {fars_bbox}"
-    )
-
-    print(
-        f"Output TIFF : {output_tif}"
-    )
-
-    print("")
 
 
     # ========================================================
-    # DOWNLOAD
+    # REQUEST
     # ========================================================
 
     try:
@@ -788,8 +745,7 @@ def main() -> None:
                 "User-Agent":
                     (
                         "FIRIS/1.0 "
-                        "(GitHub Actions; "
-                        "Fars Fire Risk System)"
+                        "(GitHub Actions)"
                     )
             }
         )
@@ -809,7 +765,7 @@ def main() -> None:
     )
 
     print(
-        "Content-Type    : "
+        f"Content-Type    : "
         f"{response.headers.get('Content-Type', '')}"
     )
 
@@ -818,6 +774,10 @@ def main() -> None:
         f"{len(response.content)}"
     )
 
+
+    # ========================================================
+    # EMPTY RESPONSE
+    # ========================================================
 
     if not response.content:
 
@@ -828,7 +788,7 @@ def main() -> None:
 
 
     # ========================================================
-    # WMS ERROR DOCUMENT
+    # WMS ERROR
     # ========================================================
 
     if response_is_error_payload(
@@ -836,7 +796,7 @@ def main() -> None:
     ):
 
         error_path = (
-            write_error_response(
+            save_error_response(
                 output_dir,
                 target_date,
                 response
@@ -844,8 +804,8 @@ def main() -> None:
         )
 
         raise SystemExit(
-            "FWI download failed: WMS returned "
-            "an error document instead of GeoTIFF.\n"
+            "FWI download failed: "
+            "WMS returned an error document.\n"
             f"Saved to: {error_path}"
         )
 
@@ -867,19 +827,19 @@ def main() -> None:
             ),
             dir=output_dir,
             delete=False
-        ) as temporary_file:
+        ) as temp:
 
-            temporary_file.write(
+            temp.write(
                 response.content
             )
 
             temporary_path = Path(
-                temporary_file.name
+                temp.name
             )
 
 
         # ----------------------------------------------------
-        # Validate before replacing existing output.
+        # VALIDATE BEFORE REPLACING FINAL FILE
         # ----------------------------------------------------
 
         raster_info = validate_geotiff(
@@ -888,7 +848,7 @@ def main() -> None:
 
 
         # ----------------------------------------------------
-        # Make the new file authoritative.
+        # ATOMIC REPLACEMENT
         # ----------------------------------------------------
 
         os.replace(
@@ -901,7 +861,7 @@ def main() -> None:
 
     except RuntimeError as error:
 
-        invalid_file = (
+        invalid_path = (
             output_dir
             /
             f"fwi_invalid_response_"
@@ -916,14 +876,14 @@ def main() -> None:
 
             os.replace(
                 temporary_path,
-                invalid_file
+                invalid_path
             )
 
             temporary_path = None
 
         raise SystemExit(
             f"FWI validation failed: {error}\n"
-            f"Invalid file saved to: {invalid_file}"
+            f"Invalid file saved to: {invalid_path}"
         ) from error
 
 
@@ -973,32 +933,24 @@ def main() -> None:
         "boundary_margin_degree":
             BOUNDARY_MARGIN_DEG,
 
-        "boundary_bbox_with_margin": {
+        "boundary_bbox":
 
-            "west":
-                west,
+            {
+                "west":
+                    west,
 
-            "south":
-                south,
+                "south":
+                    south,
 
-            "east":
-                east,
+                "east":
+                    east,
 
-            "north":
-                north
-        },
+                "north":
+                    north
+            },
 
-        "wms_version":
-            WMS_VERSION,
-
-        "srs":
-            SRS,
-
-        "width":
-            WIDTH,
-
-        "height":
-            HEIGHT,
+        "request_bbox":
+            bbox,
 
         "request_parameters":
             params,
@@ -1033,24 +985,15 @@ def main() -> None:
 
 
     # ========================================================
-    # FINAL REPORT
+    # FINAL OUTPUT
     # ========================================================
 
     print("")
     print("=" * 70)
-    print("FWI DOWNLOAD COMPLETED")
+    print("FWI DOWNLOAD COMPLETED SUCCESSFULLY")
     print("=" * 70)
 
-    print(
-        f"GeoTIFF : {output_tif}"
-    )
-
-    print(
-        f"Metadata: {output_json}"
-    )
-
     print("")
-
     print("REQUEST BBOX")
 
     print(
@@ -1070,50 +1013,47 @@ def main() -> None:
     )
 
     print("")
-
     print("OUTPUT RASTER")
 
     print(
-        f"CRS   : {raster_info['crs']}"
+        f"CRS        : "
+        f"{raster_info['crs']}"
     )
 
     print(
-        f"Size  : "
+        f"Size       : "
         f"{raster_info['width']} x "
         f"{raster_info['height']}"
     )
 
     print(
-        "Bounds:"
+        f"Resolution : "
+        f"{raster_info['resolution']['x']}, "
+        f"{raster_info['resolution']['y']}"
     )
 
     print(
-        f"  West  = "
-        f"{raster_info['bounds']['left']:.8f}"
-    )
-
-    print(
-        f"  South = "
-        f"{raster_info['bounds']['bottom']:.8f}"
-    )
-
-    print(
-        f"  East  = "
-        f"{raster_info['bounds']['right']:.8f}"
-    )
-
-    print(
-        f"  North = "
-        f"{raster_info['bounds']['top']:.8f}"
+        "Bounds     : "
+        f"W={raster_info['bounds']['left']:.8f}, "
+        f"S={raster_info['bounds']['bottom']:.8f}, "
+        f"E={raster_info['bounds']['right']:.8f}, "
+        f"N={raster_info['bounds']['top']:.8f}"
     )
 
     print("")
+    print(
+        f"FWI min    : "
+        f"{raster_info['min']:.3f}"
+    )
 
     print(
-        "FWI statistics: "
-        f"min={raster_info['fwi_min']:.3f}, "
-        f"max={raster_info['fwi_max']:.3f}, "
-        f"mean={raster_info['fwi_mean']:.3f}"
+        f"FWI max    : "
+        f"{raster_info['max']:.3f}"
+    )
+
+    print(
+        f"FWI mean   : "
+        f"{raster_info['mean']:.3f}"
     )
 
     print(
@@ -1121,9 +1061,21 @@ def main() -> None:
         f"{raster_info['valid_pixel_count']}"
     )
 
+    print("")
     print(
-        "============================================================"
+        f"GeoTIFF : {output_tif}"
     )
+
+    print(
+        f"Metadata: {output_json}"
+    )
+
+    print("")
+    print(
+        "IMPORTANT: FLI calculation was not modified."
+    )
+
+    print("=" * 70)
 
 
 if __name__ == "__main__":
