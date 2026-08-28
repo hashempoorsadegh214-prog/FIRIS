@@ -1,7 +1,7 @@
 {
   "title": "FIRIS - Fars Fire Risk Index",
   "source_file": "fli_fars_2026-08-28.tif",
-  "generated_at_utc": "2026-08-28T09:10:47.843500+00:00",
+  "generated_at_utc": "2026-08-28T12:20:40.469445+00:00",
   "crs": "EPSG:4326",
   "image": "fli_latest.png",
   "grid": "fli_latest_grid.json",
@@ -78,9 +78,9 @@
   "boundary": {
     "file": "fars.geojson",
     "mask_applied": true,
-    "original_valid_pixels": 890191,
+    "original_valid_pixels": 890704,
     "valid_pixels_inside_fars": 890191,
-    "valid_pixels_removed_outside_fars": 0
+    "valid_pixels_removed_outside_fars": 513
   },
   "spatial_policy": {
     "reference_grid": "FLI source raster",
