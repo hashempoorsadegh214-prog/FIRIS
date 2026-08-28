@@ -1,0 +1,93 @@
+{
+  "project": "FIRIS - Fars Integrated Fire Information System",
+  "generated_at_utc": "2026-08-28T06:16:18.343046+00:00",
+  "run_date": "2026-08-28",
+  "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
+  "weights": {
+    "F_FWI": 0.45,
+    "F_Fuel": 0.35,
+    "F_Topo": 0.2
+  },
+  "target_grid": {
+    "reference": "FWI",
+    "crs": "EPSG:4326",
+    "width": 2000,
+    "height": 2000,
+    "cell_size_x": 0.0025000000000000014,
+    "cell_size_y": 0.0025000000000000014
+  },
+  "alignment": {
+    "FWI": "reference grid",
+    "Fuel": "nearest-neighbour to FWI",
+    "DEM": "native slope calculation then bilinear to FWI"
+  },
+  "normalization": {
+    "F_FWI": "clip(FWI / 100, 0, 1)",
+    "F_Fuel": "Fuelbeds_metric weighted score",
+    "F_Topo": "clip(slope_degrees / 45, 0, 1)"
+  },
+  "statistics": {
+    "FWI": {
+      "count": 4000000,
+      "min": 0.0,
+      "max": 95.09449,
+      "mean": 42.923744,
+      "std": 33.648422
+    },
+    "F_FWI": {
+      "count": 4000000,
+      "min": 0.0,
+      "max": 0.950945,
+      "mean": 0.429237,
+      "std": 0.336484
+    },
+    "F_Fuel": {
+      "count": 708957,
+      "min": 0.0,
+      "max": 0.216056,
+      "mean": 0.071302,
+      "std": 0.035874
+    },
+    "Slope_degrees": {
+      "count": 3252391,
+      "min": 0.0,
+      "max": 70.699921,
+      "mean": 4.82354,
+      "std": 7.618256
+    },
+    "F_Topo": {
+      "count": 3252391,
+      "min": 0.0,
+      "max": 1.0,
+      "mean": 0.107129,
+      "std": 0.168948
+    },
+    "FLI": {
+      "count": 708957,
+      "min": 0.286626,
+      "max": 66.166588,
+      "mean": 38.20208,
+      "std": 6.507793
+    },
+    "total_pixels": 4000000,
+    "common_valid_pixels": 708957,
+    "common_valid_percent": 17.7239
+  },
+  "fuel": {
+    "unmapped_code_count": 0,
+    "unmapped_codes": []
+  },
+  "inputs": {
+    "FWI": "data/raw/fwi/fwi_ecmwf_fars_2026-08-28.tif",
+    "Fuel": "data/raw/fuel/fars_fuel.tif",
+    "DEM": "data/raw/topography/dem_fars.tif",
+    "FuelExcel": "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
+  },
+  "outputs": {
+    "F_FWI": "data/outputs/f_fwi_fars_2026-08-28.tif",
+    "F_Fuel": "data/outputs/f_fuel_fars_2026-08-28.tif",
+    "Slope": "data/outputs/slope_fars_2026-08-28.tif",
+    "F_Topo": "data/outputs/f_topo_fars_2026-08-28.tif",
+    "FLI": "data/outputs/fli_fars_2026-08-28.tif"
+  }
+}
