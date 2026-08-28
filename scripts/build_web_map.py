@@ -6,26 +6,18 @@ FIRIS - Web Map Builder
 
 Purpose
 -------
-Convert the final FLI GeoTIFF into web-ready files.
+Convert the existing FLI GeoTIFF into web-ready files.
 
 IMPORTANT
 ---------
-This script DOES NOT recalculate or modify the FLI index.
+This script does NOT recalculate or modify FLI.
 
-The existing FLI raster is used as the authoritative data source.
-
-The Fars Province boundary is applied AGAIN at the web stage
-so that pixels outside fars.geojson are always transparent.
-
-The original raster grid is preserved:
-- CRS
-- Width
-- Height
-- Transform
-- Bounds
-- Cell size
-
-No spatial resampling is performed here.
+It only:
+1. Reads the existing FLI raster.
+2. Applies fars.geojson as a WEB DISPLAY mask.
+3. Makes pixels outside Fars transparent in PNG.
+4. Preserves the original FLI raster grid.
+5. Generates metadata and lightweight grid JSON.
 
 Outputs
 -------
@@ -95,19 +87,22 @@ def parse_args():
     parser.add_argument(
         "--input",
         required=True,
-        help="Input FLI GeoTIFF"
+        type=Path,
+        help="Existing FLI GeoTIFF"
     )
 
     parser.add_argument(
         "--output-dir",
         required=True,
+        type=Path,
         help="Output directory"
     )
 
     parser.add_argument(
         "--boundary",
         required=False,
-        default="fars.geojson",
+        type=Path,
+        default=Path("fars.geojson"),
         help="Fars Province boundary GeoJSON"
     )
 
@@ -133,33 +128,28 @@ def colorize(
     )
 
     classes = [
-
         (
             valid & (values < 20),
             (46, 125, 50, 215)
         ),
-
         (
             valid
             & (values >= 20)
             & (values < 40),
             (253, 216, 53, 220)
         ),
-
         (
             valid
             & (values >= 40)
             & (values < 60),
             (251, 140, 0, 225)
         ),
-
         (
             valid
             & (values >= 60)
             & (values < 80),
             (229, 57, 53, 230)
         ),
-
         (
             valid & (values >= 80),
             (136, 14, 79, 235)
@@ -167,26 +157,23 @@ def colorize(
     ]
 
     for mask, color in classes:
-
         rgba[mask] = color
 
     return rgba
 
 
 # ============================================================
-# LOAD FARS BOUNDARY
+# LOAD BOUNDARY
 # ============================================================
 
-def load_fars_boundary(
+def load_boundary_geometries(
     boundary_path: Path,
     target_crs
 ):
 
     if not boundary_path.is_file():
-
         raise FileNotFoundError(
-            f"Fars boundary not found: "
-            f"{boundary_path}"
+            f"Fars boundary not found: {boundary_path}"
         )
 
     with boundary_path.open(
@@ -197,9 +184,8 @@ def load_fars_boundary(
         geojson = json.load(file)
 
     if geojson.get("type") != "FeatureCollection":
-
         raise ValueError(
-            "Boundary must be a GeoJSON FeatureCollection."
+            "Boundary GeoJSON must be a FeatureCollection."
         )
 
     features = geojson.get(
@@ -208,7 +194,6 @@ def load_fars_boundary(
     )
 
     if not features:
-
         raise ValueError(
             "Fars boundary contains no features."
         )
@@ -222,13 +207,11 @@ def load_fars_boundary(
         )
 
         if geometry:
-
             geometries.append(
                 geometry
             )
 
     if not geometries:
-
         raise ValueError(
             "Fars boundary contains no valid geometries."
         )
@@ -263,32 +246,35 @@ def load_fars_boundary(
 
     if str(target_crs) != source_crs:
 
-        geometries = [
+        transformed = []
 
-            transform_geom(
-                source_crs,
-                target_crs,
-                geometry,
-                precision=12
+        for geometry in geometries:
+
+            transformed.append(
+                transform_geom(
+                    source_crs,
+                    target_crs,
+                    geometry,
+                    precision=12
+                )
             )
 
-            for geometry in geometries
-        ]
+        geometries = transformed
 
     return geometries, source_crs
 
 
 # ============================================================
-# BUILD BOUNDARY MASK
+# BUILD FARS MASK
 # ============================================================
 
-def build_boundary_mask(
+def build_fars_mask(
     boundary_path: Path,
     src
 ):
 
     geometries, source_crs = (
-        load_fars_boundary(
+        load_boundary_geometries(
             boundary_path,
             src.crs
         )
@@ -305,40 +291,25 @@ def build_boundary_mask(
         all_touched=False
     )
 
-    count = int(
-        np.sum(mask)
+    pixels_inside = int(
+        np.count_nonzero(mask)
     )
 
-    if count == 0:
+    if pixels_inside == 0:
 
         raise RuntimeError(
             "Fars boundary does not overlap "
             "the FLI raster grid."
         )
 
-    print()
-    print(
-        "FARS WEB MASK"
-    )
-    print(
-        "-------------"
-    )
-
-    print(
-        f"Boundary       : {boundary_path}"
-    )
-
-    print(
-        f"Boundary CRS   : {source_crs}"
-    )
-
-    print(
-        f"Target CRS     : {src.crs}"
-    )
-
-    print(
-        f"Province pixels: {count:,}"
-    )
+    print("")
+    print("FARS WEB MASK")
+    print("-------------")
+    print(f"Boundary       : {boundary_path}")
+    print(f"Boundary CRS   : {source_crs}")
+    print(f"Raster CRS     : {src.crs}")
+    print(f"Raster size    : {src.width} x {src.height}")
+    print(f"Pixels in Fars : {pixels_inside:,}")
 
     return mask
 
@@ -351,23 +322,14 @@ def main():
 
     args = parse_args()
 
-    input_path = Path(
-        args.input
-    )
-
-    output_dir = Path(
-        args.output_dir
-    )
-
-    boundary_path = Path(
-        args.boundary
-    )
+    input_path = args.input
+    output_dir = args.output_dir
+    boundary_path = args.boundary
 
     if not input_path.is_file():
 
         raise FileNotFoundError(
-            f"FLI raster not found: "
-            f"{input_path}"
+            f"FLI raster not found: {input_path}"
         )
 
     output_dir.mkdir(
@@ -400,7 +362,6 @@ def main():
     ) as src:
 
         if src.crs is None:
-
             raise ValueError(
                 "FLI raster has no CRS."
             )
@@ -414,7 +375,7 @@ def main():
 
 
         # ----------------------------------------------------
-        # READ FLI
+        # READ SOURCE FLI
         # ----------------------------------------------------
 
         data = src.read(
@@ -440,7 +401,6 @@ def main():
             (values <= 100)
         )
 
-
         if not np.any(valid):
 
             raise ValueError(
@@ -449,18 +409,22 @@ def main():
 
 
         # ----------------------------------------------------
-        # APPLY FARS BOUNDARY MASK
-        #
-        # THIS IS THE IMPORTANT FIX.
-        #
-        # Any valid FLI pixel outside the actual
-        # Fars boundary becomes invalid for WEB display.
+        # BUILD FARS MASK
         # ----------------------------------------------------
 
-        fars_mask = build_boundary_mask(
+        fars_mask = build_fars_mask(
             boundary_path,
             src
         )
+
+
+        # ----------------------------------------------------
+        # FINAL WEB VALIDITY
+        #
+        # ONLY FOR WEB DISPLAY.
+        #
+        # FLI CALCULATION IS NOT TOUCHED.
+        # ----------------------------------------------------
 
         web_valid = (
             valid
@@ -469,76 +433,43 @@ def main():
         )
 
 
-        province_valid_count = int(
-            np.sum(web_valid)
+        inside_count = int(
+            np.count_nonzero(
+                web_valid
+            )
         )
 
-        original_valid_count = int(
-            np.sum(valid)
+        original_count = int(
+            np.count_nonzero(
+                valid
+            )
         )
 
-        outside_removed = (
-            original_valid_count
-            - province_valid_count
+        removed_count = (
+            original_count
+            - inside_count
         )
 
 
-        if province_valid_count == 0:
+        if inside_count == 0:
 
             raise RuntimeError(
-                "No valid FLI pixels remain "
-                "inside the Fars boundary."
+                "No valid FLI pixels remain inside "
+                "the Fars boundary."
             )
 
 
-        print()
-        print(
-            "WEB FLI MASK VALIDATION"
-        )
-        print(
-            "-----------------------"
-        )
-
-        print(
-            f"Original valid pixels : "
-            f"{original_valid_count:,}"
-        )
-
-        print(
-            f"Inside Fars           : "
-            f"{province_valid_count:,}"
-        )
-
-        print(
-            f"Removed outside Fars  : "
-            f"{outside_removed:,}"
-        )
-
-        print(
-            f"Coverage retained     : "
-            f"{100 * province_valid_count / "
-            "max(original_valid_count, 1):.2f}%"
-        )
-
-
         # ----------------------------------------------------
-        # FULL GRID
-        #
-        # DO NOT CROP.
+        # FULL SOURCE GRID
         # ----------------------------------------------------
-
-        height = int(
-            src.height
-        )
 
         width = int(
             src.width
         )
 
-
-        # ----------------------------------------------------
-        # FULL RASTER BOUNDS
-        # ----------------------------------------------------
+        height = int(
+            src.height
+        )
 
         left = float(
             src.bounds.left
@@ -558,9 +489,7 @@ def main():
 
 
         # ----------------------------------------------------
-        # WEB IMAGE
-        #
-        # Outside Fars = transparent
+        # CREATE TRANSPARENT WEB IMAGE
         # ----------------------------------------------------
 
         rgba = colorize(
@@ -580,9 +509,7 @@ def main():
 
 
         # ----------------------------------------------------
-        # STATISTICS
-        #
-        # Statistics now refer ONLY to Fars.
+        # STATISTICS ONLY INSIDE FARS
         # ----------------------------------------------------
 
         province_values = values[
@@ -616,7 +543,7 @@ def main():
                 ),
 
             "valid_pixels":
-                province_valid_count
+                inside_count
         }
 
 
@@ -630,8 +557,7 @@ def main():
             1,
             int(
                 np.ceil(
-                    height
-                    /
+                    height /
                     max_dimension
                 )
             )
@@ -641,25 +567,21 @@ def main():
             1,
             int(
                 np.ceil(
-                    width
-                    /
+                    width /
                     max_dimension
                 )
             )
         )
-
 
         sample = values[
             ::row_step,
             ::col_step
         ]
 
-
         sample_valid = web_valid[
             ::row_step,
             ::col_step
         ]
-
 
         sample = np.where(
             np.isfinite(sample)
@@ -669,11 +591,9 @@ def main():
         )
 
 
-        # ----------------------------------------------------
-        # Grid
-        #
-        # row_step / col_step are explicitly stored.
-        # ----------------------------------------------------
+        # ====================================================
+        # GRID JSON
+        # ====================================================
 
         grid = {
 
@@ -755,9 +675,9 @@ def main():
         }
 
 
-        # ----------------------------------------------------
+        # ====================================================
         # RASTER INFORMATION
-        # ----------------------------------------------------
+        # ====================================================
 
         transform = src.transform
 
@@ -813,6 +733,7 @@ def main():
                 float(transform.e),
 
                 float(transform.f)
+
             ]
         }
 
@@ -854,6 +775,7 @@ def main():
                 top,
                 right
             ]
+
         ],
 
         "raster":
@@ -873,11 +795,14 @@ def main():
             "mask_applied":
                 True,
 
+            "original_valid_pixels":
+                original_count,
+
             "valid_pixels_inside_fars":
-                province_valid_count,
+                inside_count,
 
             "valid_pixels_removed_outside_fars":
-                outside_removed
+                removed_count
         },
 
         "spatial_policy": {
@@ -886,7 +811,7 @@ def main():
                 "FLI source raster",
 
             "web_boundary":
-                "fars.geojson",
+                str(boundary_path),
 
             "cropping":
                 False,
@@ -919,7 +844,6 @@ def main():
         encoding="utf-8"
     )
 
-
     grid_path.write_text(
         json.dumps(
             grid,
@@ -937,108 +861,51 @@ def main():
     # REPORT
     # ========================================================
 
-    print()
-    print(
-        "============================================================"
-    )
+    print("")
+    print("=" * 70)
+    print("FIRIS WEB MAP BUILD")
+    print("=" * 70)
 
-    print(
-        "FIRIS WEB MAP BUILD"
-    )
+    print("")
+    print(f"Input : {input_path}")
+    print(f"PNG   : {png_path}")
+    print(f"JSON  : {json_path}")
+    print(f"GRID  : {grid_path}")
 
-    print(
-        "============================================================"
-    )
-
-    print(
-        f"Input : {input_path}"
-    )
-
-    print(
-        f"PNG   : {png_path}"
-    )
-
-    print(
-        f"JSON  : {json_path}"
-    )
-
-    print(
-        f"GRID  : {grid_path}"
-    )
-
-    print()
-    print(
-        "FLI WEB GRID"
-    )
-
-    print(
-        f"Width : {width}"
-    )
-
-    print(
-        f"Height: {height}"
-    )
-
+    print("")
+    print("FULL RASTER GRID")
+    print(f"Width : {width}")
+    print(f"Height: {height}")
     print(
         f"Cell  : "
-        f"{float(src.res[0])}, "
-        f"{float(abs(src.res[1]))}"
+        f"{float(raster_information['cell_size_x'])}, "
+        f"{float(raster_information['cell_size_y'])}"
     )
 
-    print()
-    print(
-        "FULL RASTER BOUNDS"
-    )
+    print("")
+    print("FULL RASTER BOUNDS")
+    print(f"South: {bottom:.8f}")
+    print(f"West : {left:.8f}")
+    print(f"North: {top:.8f}")
+    print(f"East : {right:.8f}")
 
-    print(
-        f"South: {bottom:.8f}"
-    )
+    print("")
+    print("WEB MASK RESULTS")
+    print(f"Original valid pixels : {original_count:,}")
+    print(f"Valid inside Fars     : {inside_count:,}")
+    print(f"Removed outside Fars  : {removed_count:,}")
 
-    print(
-        f"West : {left:.8f}"
-    )
+    print("")
+    print(f"Stats : {statistics}")
 
-    print(
-        f"North: {top:.8f}"
-    )
+    print("")
+    print("Fars boundary mask : APPLIED")
+    print("Outside Fars       : TRANSPARENT")
+    print("Grid cropping      : DISABLED")
+    print("FLI calculation     : UNCHANGED")
 
-    print(
-        f"East : {right:.8f}"
-    )
-
-    print()
-    print(
-        f"Fars valid pixels: "
-        f"{province_valid_count:,}"
-    )
-
-    print(
-        f"Removed outside : "
-        f"{outside_removed:,}"
-    )
-
-    print(
-        f"Stats : {statistics}"
-    )
-
-    print()
-    print(
-        "Fars boundary mask : APPLIED"
-    )
-
-    print(
-        "Outside Fars       : TRANSPARENT"
-    )
-
-    print(
-        "Grid cropping      : DISABLED"
-    )
-
-    print(
-        "============================================================"
-    )
+    print("=" * 70)
 
 
 if __name__ == "__main__":
-
     main()
