@@ -1,6 +1,6 @@
 {
   "project": "FIRIS - Fars Integrated Fire Information System",
-  "generated_at_utc": "2026-08-28T06:42:53.924675+00:00",
+  "generated_at_utc": "2026-08-28T07:04:52.619383+00:00",
   "run_date": "2026-08-28",
   "boundary": "fars.geojson",
   "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
@@ -40,15 +40,15 @@
     },
     "Fuel": {
       "crs": "EPSG:4326",
-      "width": 2089,
-      "height": 1350,
-      "cell_size_x": 0.002776463280427471,
-      "cell_size_y": 0.0027764632804274715,
+      "width": 2506,
+      "height": 1619,
+      "cell_size_x": 0.0027769971134153806,
+      "cell_size_y": 0.0027769971134153806,
       "bounds": {
-        "left": 49.043989646317755,
-        "bottom": 28.754681182755725,
-        "right": 54.84402143913074,
-        "top": 32.50290661133281
+        "left": 49.45121465613049,
+        "bottom": 26.832288289763955,
+        "right": 56.41036942234943,
+        "top": 31.328246616383456
       },
       "nodata": 2147483647.0
     },
@@ -81,13 +81,13 @@
     "province_pixels": 1711149,
     "FWI_valid_pixels": 1711149,
     "FWI_valid_percent": 100.0,
-    "Fuel_valid_pixels": 708712,
-    "Fuel_valid_percent": 41.4173,
+    "Fuel_valid_pixels": 890191,
+    "Fuel_valid_percent": 52.023,
     "Topo_valid_pixels": 1711148,
     "Topo_valid_percent": 99.9999,
-    "common_valid_pixels": 708712,
-    "common_valid_percent": 41.4173,
-    "common_valid_percent_of_FWI": 41.4173
+    "common_valid_pixels": 890191,
+    "common_valid_percent": 52.023,
+    "common_valid_percent_of_FWI": 52.023
   },
   "statistics": {
     "FWI": {
@@ -105,11 +105,11 @@
       "std": 0.255365
     },
     "F_Fuel": {
-      "count": 708712,
+      "count": 890191,
       "min": 0.0,
       "max": 0.216056,
-      "mean": 0.071307,
-      "std": 0.035869
+      "mean": 0.063495,
+      "std": 0.040818
     },
     "Slope_degrees": {
       "count": 1711148,
@@ -126,11 +126,11 @@
       "std": 0.183636
     },
     "FLI": {
-      "count": 708712,
-      "min": 0.286626,
-      "max": 66.166588,
-      "mean": 38.200111,
-      "std": 6.505222
+      "count": 890191,
+      "min": 0.0,
+      "max": 66.536819,
+      "mean": 36.903996,
+      "std": 8.801897
     }
   },
   "fuel": {
