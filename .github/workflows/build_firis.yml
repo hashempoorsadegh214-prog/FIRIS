@@ -1,4 +1,4 @@
-```yaml
+
 name: Build FIRIS Fire Risk Map
 
 on:
@@ -529,4 +529,3 @@ jobs:
           # ---------------------------------------------------
 
           git push origin HEAD:main
-```
