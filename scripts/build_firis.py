@@ -16,6 +16,7 @@ Spatial rules:
 - All final calculations are restricted to fars.geojson.
 - NoData is never artificially filled.
 - Coverage inside Fars is explicitly reported.
+- Final output grids are strictly validated against FWI.
 """
 
 from __future__ import annotations
@@ -169,8 +170,220 @@ def raster_metadata(path: Path):
                 None
                 if src.nodata is None
                 else float(src.nodata)
-            )
+            ),
+            "transform": [
+                float(src.transform.a),
+                float(src.transform.b),
+                float(src.transform.c),
+                float(src.transform.d),
+                float(src.transform.e),
+                float(src.transform.f),
+            ]
         }
+
+
+# ============================================================
+# GRID VALIDATION
+# ============================================================
+
+def transform_values(transform):
+
+    return np.array(
+        [
+            transform.a,
+            transform.b,
+            transform.c,
+            transform.d,
+            transform.e,
+            transform.f,
+        ],
+        dtype=np.float64
+    )
+
+
+def grid_matches(
+    reference: dict,
+    metadata: dict,
+    tolerance: float = 1e-10
+):
+
+    reasons = []
+
+    if metadata["crs"] != str(reference["crs"]):
+        reasons.append(
+            f"CRS mismatch: "
+            f"{metadata['crs']} != {reference['crs']}"
+        )
+
+    if metadata["width"] != int(reference["width"]):
+        reasons.append(
+            f"Width mismatch: "
+            f"{metadata['width']} != {reference['width']}"
+        )
+
+    if metadata["height"] != int(reference["height"]):
+        reasons.append(
+            f"Height mismatch: "
+            f"{metadata['height']} != {reference['height']}"
+        )
+
+    reference_transform = transform_values(
+        reference["transform"]
+    )
+
+    output_transform = np.array(
+        metadata["transform"],
+        dtype=np.float64
+    )
+
+    if not np.allclose(
+        reference_transform,
+        output_transform,
+        rtol=0.0,
+        atol=tolerance
+    ):
+
+        reasons.append(
+            "Transform mismatch"
+        )
+
+    reference_bounds = np.array(
+        [
+            reference["bounds"].left,
+            reference["bounds"].bottom,
+            reference["bounds"].right,
+            reference["bounds"].top
+        ],
+        dtype=np.float64
+    )
+
+    output_bounds = np.array(
+        [
+            metadata["bounds"]["left"],
+            metadata["bounds"]["bottom"],
+            metadata["bounds"]["right"],
+            metadata["bounds"]["top"]
+        ],
+        dtype=np.float64
+    )
+
+    if not np.allclose(
+        reference_bounds,
+        output_bounds,
+        rtol=0.0,
+        atol=tolerance
+    ):
+
+        reasons.append(
+            "Bounds mismatch"
+        )
+
+    return len(reasons) == 0, reasons
+
+
+def validate_output_grids(
+    output_paths: dict,
+    reference: dict
+):
+
+    print()
+    print("=" * 70)
+    print("FINAL GRID VALIDATION")
+    print("=" * 70)
+
+    print()
+    print("Reference grid: FWI")
+
+    print(
+        f"CRS        : {reference['crs']}"
+    )
+
+    print(
+        f"Width      : {reference['width']}"
+    )
+
+    print(
+        f"Height     : {reference['height']}"
+    )
+
+    print(
+        f"Cell size  : {reference['res']}"
+    )
+
+    print(
+        f"Bounds     : {reference['bounds']}"
+    )
+
+    failures = []
+
+    validation = {}
+
+    for name, path in output_paths.items():
+
+        metadata = raster_metadata(path)
+
+        ok, reasons = grid_matches(
+            reference,
+            metadata
+        )
+
+        validation[name] = {
+            "path": str(path),
+            "matches_fwi_grid": bool(ok),
+            "reasons": reasons,
+            "metadata": metadata
+        }
+
+        if ok:
+
+            print(
+                f"✓ {name:<16} "
+                f"GRID MATCH"
+            )
+
+        else:
+
+            print(
+                f"✗ {name:<16} "
+                f"GRID MISMATCH"
+            )
+
+            for reason in reasons:
+
+                print(
+                    f"    - {reason}"
+                )
+
+            failures.append(name)
+
+    print()
+
+    if failures:
+
+        print(
+            "FINAL GRID VALIDATION FAILED"
+        )
+
+        print(
+            "Files with mismatched grids:"
+        )
+
+        for name in failures:
+
+            print(
+                f"  - {name}"
+            )
+
+        raise RuntimeError(
+            "One or more output rasters do not "
+            "match the FWI reference grid."
+        )
+
+    print(
+        "✓ ALL OUTPUT RASTERS MATCH THE FWI GRID"
+    )
+
+    return validation
 
 
 # ============================================================
@@ -322,6 +535,7 @@ def read_fwi(path: Path):
     print(f"Height     : {reference['height']}")
     print(f"Cell size  : {reference['res']}")
     print(f"Bounds     : {reference['bounds']}")
+    print(f"Transform  : {reference['transform']}")
     print(f"Statistics : {stats(data)}")
 
     return data, reference
@@ -372,12 +586,24 @@ def align_to_fwi(
             f"Source bounds   : {src.bounds}"
         )
         print(
+            f"Source transform: {src.transform}"
+        )
+        print(
             f"Target CRS      : {reference['crs']}"
         )
         print(
             f"Target size     : "
             f"{reference['width']} x "
             f"{reference['height']}"
+        )
+        print(
+            f"Target cell     : {reference['res']}"
+        )
+        print(
+            f"Target bounds   : {reference['bounds']}"
+        )
+        print(
+            f"Target transform: {reference['transform']}"
         )
         print(
             f"Resampling      : {resampling.name}"
@@ -508,6 +734,12 @@ def calculate_native_slope(
         )
         print(
             f"DEM cell      : {src.res}"
+        )
+        print(
+            f"DEM bounds    : {src.bounds}"
+        )
+        print(
+            f"DEM transform : {src.transform}"
         )
         print(
             f"Metric spacing: "
@@ -1469,6 +1701,36 @@ def main():
     )
 
     # --------------------------------------------------------
+    # FINAL GRID VALIDATION
+    # --------------------------------------------------------
+
+    output_paths = {
+
+        "F_FWI":
+            f_fwi_path,
+
+        "F_Fuel":
+            f_fuel_path,
+
+        "Slope":
+            slope_path,
+
+        "F_Topo":
+            f_topo_path,
+
+        "FLI":
+            fli_path,
+
+        "FuelCoverage":
+            coverage_path
+    }
+
+    grid_validation = validate_output_grids(
+        output_paths,
+        reference
+    )
+
+    # --------------------------------------------------------
     # Report
     # --------------------------------------------------------
 
@@ -1523,7 +1785,16 @@ def main():
             "bounds":
                 bounds_dict(
                     reference["bounds"]
-                )
+                ),
+
+            "transform": [
+                float(reference["transform"].a),
+                float(reference["transform"].b),
+                float(reference["transform"].c),
+                float(reference["transform"].d),
+                float(reference["transform"].e),
+                float(reference["transform"].f)
+            ]
         },
 
         "input_metadata": {
@@ -1568,6 +1839,9 @@ def main():
             "F_Topo":
                 "clip(slope_degrees / 45, 0, 1)"
         },
+
+        "grid_validation":
+            grid_validation,
 
         "coverage_inside_fars": {
 
@@ -1702,7 +1976,13 @@ def main():
                 bool(
                     fuel_count
                     < province_pixels
-                )
+                ),
+
+            "grid_policy":
+                "All final output rasters must "
+                "match the FWI reference grid "
+                "in CRS, dimensions, transform "
+                "and bounds."
         }
     }
 
