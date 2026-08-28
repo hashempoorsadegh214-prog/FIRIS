@@ -1,0 +1,59 @@
+{
+  "project": "FIRIS",
+  "indicator": "ECMWF Fire Weather Index (FWI)",
+  "source": "Copernicus GWIS WMS",
+  "source_url": "https://maps.effis.emergency.copernicus.eu/gwis",
+  "layer": "ecmwf.fwi",
+  "target_date": "2026-08-29",
+  "downloaded_at_utc": "2026-08-28T13:29:33.750692+00:00",
+  "boundary_file": "fars.geojson",
+  "boundary_margin_degree": 0.1,
+  "boundary_bbox": {
+    "west": 50.50318309972035,
+    "south": 26.94561700022441,
+    "east": 55.68006519994905,
+    "north": 31.76959889996929
+  },
+  "request_bbox": "50.50318310,26.94561700,55.68006520,31.76959890",
+  "request_parameters": {
+    "SERVICE": "WMS",
+    "VERSION": "1.1.1",
+    "REQUEST": "GetMap",
+    "LAYERS": "ecmwf.fwi",
+    "STYLES": "",
+    "SRS": "EPSG:4326",
+    "BBOX": "50.50318310,26.94561700,55.68006520,31.76959890",
+    "WIDTH": "2000",
+    "HEIGHT": "2000",
+    "FORMAT": "image/tiff",
+    "TRANSPARENT": "FALSE",
+    "TIME": "2026-08-29"
+  },
+  "request_url": "https://maps.effis.emergency.copernicus.eu/gwis?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=ecmwf.fwi&STYLES=&SRS=EPSG%3A4326&BBOX=50.50318310%2C26.94561700%2C55.68006520%2C31.76959890&WIDTH=2000&HEIGHT=2000&FORMAT=image%2Ftiff&TRANSPARENT=FALSE&TIME=2026-08-29",
+  "http_status": 200,
+  "content_type": "image/tiff",
+  "output_file": "fwi_ecmwf_fars_2026-08-29.tif",
+  "output_file_size_bytes": 16012418,
+  "raster": {
+    "driver": "GTiff",
+    "crs": "EPSG:4326",
+    "width": 2000,
+    "height": 2000,
+    "resolution": {
+      "x": 0.002588441050000003,
+      "y": 0.002411990949999999
+    },
+    "bounds": {
+      "left": 50.5031831,
+      "bottom": 26.945617,
+      "right": 55.68006520000001,
+      "top": 31.7695989
+    },
+    "nodata": null,
+    "dtype": "float32",
+    "valid_pixel_count": 4000000,
+    "min": 0.0,
+    "max": 115.5836410522461,
+    "mean": 41.07906723022461
+  }
+}
