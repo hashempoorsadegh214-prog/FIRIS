@@ -55,23 +55,14 @@
   --footer-height:
     36px;
 
-  --red-dark:
-    #670606;
-
   --red:
-    #ad1010;
+    #b50d0d;
 
   --red-light:
-    #e02a2a;
+    #e22b2b;
 
   --green:
     #176b2c;
-
-  --blue:
-    #1565c0;
-
-  --purple:
-    #7b1fa2;
 
   --text:
     #222;
@@ -88,6 +79,7 @@
 
 
 * {
+
   box-sizing:
     border-box;
 }
@@ -184,19 +176,19 @@ a {
   background:
     linear-gradient(
       180deg,
-      #df2828 0%,
-      #b91010 45%,
-      #8b0707 100%
+      #e12b2b 0%,
+      #bd1111 42%,
+      #8e0707 100%
     );
 
   box-shadow:
     inset 0 1px 0
       rgba(255,255,255,.40),
 
-    inset 0 -12px 25px
+    inset 0 -14px 28px
       rgba(60,0,0,.20),
 
-    0 2px 13px
+    0 2px 14px
       rgba(0,0,0,.22);
 
   z-index:
@@ -222,12 +214,12 @@ a {
     0;
 
   height:
-    45%;
+    44%;
 
   background:
     linear-gradient(
       to bottom,
-      rgba(255,255,255,.24),
+      rgba(255,255,255,.25),
       rgba(255,255,255,0)
     );
 
@@ -235,6 +227,10 @@ a {
     none;
 }
 
+
+/* ============================================================
+   LOGO
+   ============================================================ */
 
 .header-logo {
 
@@ -271,6 +267,10 @@ a {
     2;
 }
 
+
+/* ============================================================
+   HEADER CENTER
+   ============================================================ */
 
 .header-center {
 
@@ -333,7 +333,7 @@ a {
 
   border:
     1px solid
-    rgba(255,255,255,.30);
+    rgba(255,255,255,.32);
 
   border-radius:
     8px;
@@ -476,8 +476,19 @@ a {
 }
 
 
+.toolbar-select:focus {
+
+  border-color:
+    var(--red);
+
+  box-shadow:
+    0 0 0 2px
+    rgba(181,13,13,.10);
+}
+
+
 /* ============================================================
-   ICON BUTTONS
+   ICON BUTTON
    ============================================================ */
 
 .header-btn {
@@ -603,8 +614,6 @@ a {
 }
 
 
-/* remove map zoom buttons */
-
 .leaflet-control-zoom {
 
   display:
@@ -634,7 +643,7 @@ a {
     none;
 
   background:
-    rgba(25,30,38,.14);
+    rgba(28,33,40,.14);
 }
 
 
@@ -900,7 +909,7 @@ body.night
 
 
 /* ============================================================
-   POPUP
+   POPUPS
    ============================================================ */
 
 .fli-popup,
@@ -986,7 +995,7 @@ body.night
 
 
 /* ============================================================
-   ABOUT
+   ABOUT MODAL
    ============================================================ */
 
 .about-overlay {
@@ -1027,7 +1036,7 @@ body.night
 .about-box {
 
   width:
-    min(680px,96vw);
+    min(690px,96vw);
 
   max-height:
     88vh;
@@ -1305,6 +1314,9 @@ body.night
     min-height:
       92px;
 
+    height:
+      auto;
+
     flex-direction:
       column;
 
@@ -1431,7 +1443,6 @@ body.night
 
 <body>
 
-
 <div id="app">
 
 
@@ -1471,7 +1482,7 @@ body.night
       class="header-forecast"
     >
 
-      پیش‌بینی خطر حریق برای فردا
+      پیش‌بینی خطر حریق
 
     </div>
 
@@ -1482,7 +1493,7 @@ body.night
 
 
 <!-- =========================================================
-     TOP TOOLBAR
+     TOOLBAR
      ========================================================= -->
 
 <div class="toolbar">
@@ -1506,10 +1517,22 @@ body.night
       </option>
 
 
+      <!--
+        طبق درخواست پروژه:
+        protected_areas.geojson
+        -> مناطق چهارگانه
+      -->
+
       <option value="protected">
-        مناطق چهارگانه محیط زیست
+        مناطق چهارگانه
       </option>
 
+
+      <!--
+        طبق درخواست پروژه:
+        hunting_banned.geojson
+        -> مناطق شکار ممنوع
+      -->
 
       <option value="hunting">
         مناطق شکار ممنوع
@@ -1522,6 +1545,13 @@ body.night
 
     </select>
 
+  </div>
+
+
+  <div class="toolbar-group toolbar-left">
+
+
+    <!-- INTRODUCTION -->
 
     <button
       id="aboutButton"
@@ -1532,15 +1562,8 @@ body.night
       ℹ
     </button>
 
-  </div>
 
-
-  <div class="toolbar-group toolbar-left">
-
-
-    <!-- ======================================================
-         FARS FIT
-         ====================================================== -->
+    <!-- FARS FULL EXTENT -->
 
     <button
       id="fitButton"
@@ -1552,37 +1575,19 @@ body.night
     </button>
 
 
-    <!-- ======================================================
-         DAY
-         ====================================================== -->
+    <!-- DAY / NIGHT SINGLE BUTTON -->
 
     <button
-      id="dayButton"
-      class="header-btn active"
-      title="حالت روز"
-      aria-label="حالت روز"
+      id="modeButton"
+      class="header-btn"
+      title="حالت شب"
+      aria-label="تغییر حالت روز و شب"
     >
       ☀️
     </button>
 
 
-    <!-- ======================================================
-         NIGHT
-         ====================================================== -->
-
-    <button
-      id="nightButton"
-      class="header-btn"
-      title="حالت شب"
-      aria-label="حالت شب"
-    >
-      🌙
-    </button>
-
-
-    <!-- ======================================================
-         EXCEL
-         ====================================================== -->
+    <!-- EXCEL -->
 
     <a
       href="data/report/firis_report.xlsx"
@@ -1618,6 +1623,7 @@ body.night
        ======================================================= -->
 
   <div class="legend">
+
 
     <div class="legend-title">
       طبقات خطر شاخص
@@ -1683,6 +1689,7 @@ body.night
 
     </div>
 
+
   </div>
 
 
@@ -1692,6 +1699,7 @@ body.night
 
   <div class="gauge-panel">
 
+
     <div class="gauge-title">
       وضعیت انتخاب‌شده
     </div>
@@ -1699,7 +1707,9 @@ body.night
 
     <div class="gauge">
 
+
       <div class="gauge-content">
+
 
         <div
           id="gaugeValue"
@@ -1716,7 +1726,9 @@ body.night
           یک نقطه یا منطقه را انتخاب کنید
         </div>
 
+
       </div>
+
 
     </div>
 
@@ -1727,6 +1739,7 @@ body.night
     >
       —
     </div>
+
 
   </div>
 
@@ -1779,6 +1792,7 @@ body.night
         ×
       </button>
 
+
     </div>
 
 
@@ -1796,20 +1810,21 @@ body.night
 
       <p>
 
-        شاخص خطر حریق از ترکیب سه مؤلفه اصلی
-        هواشناسی، سوخت و توپوگرافی تشکیل می‌شود.
+        پیش‌بینی خطر حریق بر پایه ترکیب سه
+        مؤلفه اصلی محیطی انجام می‌شود:
 
       </p>
 
 
       <table class="about-table">
 
+
         <thead>
 
           <tr>
 
             <th>
-              لایه
+              مؤلفه
             </th>
 
             <th>
@@ -1817,7 +1832,7 @@ body.night
             </th>
 
             <th>
-              استفاده
+              منطق استفاده
             </th>
 
           </tr>
@@ -1839,7 +1854,8 @@ body.night
             </td>
 
             <td>
-              شرایط جوی مؤثر بر خطر حریق
+              وضعیت جوی مؤثر بر پتانسیل وقوع
+              و گسترش حریق
             </td>
 
           </tr>
@@ -1852,11 +1868,11 @@ body.night
             </td>
 
             <td>
-              سوخت گیاهی
+              سوخت
             </td>
 
             <td>
-              بار و مشخصات مواد قابل اشتعال
+              بار و ویژگی مواد گیاهی قابل اشتعال
             </td>
 
           </tr>
@@ -1890,7 +1906,8 @@ body.night
             </td>
 
             <td>
-              ترکیب استانداردشده مؤلفه‌های سامانه
+              ترکیب مؤلفه‌های استانداردشده
+              هواشناسی، سوخت و توپوگرافی
             </td>
 
           </tr>
@@ -1898,26 +1915,41 @@ body.night
 
         </tbody>
 
+
       </table>
 
 
       <div class="about-note">
 
-        شاخص FLI در بخش پردازش محاسبه می‌شود.
-        نقشه وب صرفاً خروجی نهایی را نمایش می‌دهد
-        و نمایش مکانی آن با مرز استان فارس محدود شده است.
+        نقشه وب خروجی نهایی شاخص خطر حریق
+        را نمایش می‌دهد و محدوده نمایش شاخص
+        با مرز استان فارس محدود شده است.
+
+      </div>
+
+
+      <div class="about-note">
+
+        با کلیک روی هر نقطه داخل فارس،
+        مقدار شاخص خطر همان نقطه نمایش داده می‌شود.
+        همچنین با فعال کردن مناطق چهارگانه
+        یا مناطق شکار ممنوع، میانگین شاخص
+        داخل هر منطقه قابل مشاهده است.
 
       </div>
 
 
     </div>
 
+
   </div>
 
 </div>
 
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+></script>
 
 
 <script>
@@ -1932,29 +1964,26 @@ body.night
 let map =
   null;
 
-
 let farsLayer =
   null;
-
 
 let fliLayer =
   null;
 
-
 let protectedLayer =
   null;
-
 
 let huntingLayer =
   null;
 
-
 let fliGrid =
   null;
 
-
 let fliMetadata =
   null;
+
+let nightMode =
+  false;
 
 
 /* ============================================================
@@ -2018,7 +2047,7 @@ function setStatus(
 
 
 /* ============================================================
-   FORMAT
+   NUMBER
    ============================================================ */
 
 function formatNumber(
@@ -2208,7 +2237,9 @@ function updateGauge(
 
 
   const number =
-    Number(value);
+    Number(
+      value
+    );
 
 
   const risk =
@@ -2292,12 +2323,6 @@ async function loadFars() {
     );
 
 
-  /*
-   * ADD FIRST.
-   * This bounds object is the ONLY source
-   * for initial Fars fit.
-   */
-
   farsLayer.addTo(
     map
   );
@@ -2308,7 +2333,7 @@ async function loadFars() {
 
 
 /* ============================================================
-   FIT EXACT FARS
+   FIT FARS
    ============================================================ */
 
 function fitFars() {
@@ -2333,19 +2358,14 @@ function fitFars() {
   }
 
 
-  /*
-   * Exact Fars bounds.
-   * FLI bounds are NOT used here.
-   */
-
   map.fitBounds(
     bounds,
     {
 
       padding:
         [
-          18,
-          18
+          24,
+          24
         ],
 
       maxZoom:
@@ -2394,6 +2414,10 @@ function getRegionName(
     properties.ShapeName
     ||
     properties.NAME_1
+    ||
+    properties.NAME_FA
+    ||
+    properties.name_fa
     ||
     fallback
 
@@ -2491,7 +2515,7 @@ function regionMean(
       north
       -
       (
-        (row + .5)
+        (row + 0.5)
         /
         rows
       )
@@ -2507,10 +2531,13 @@ function regionMean(
       col++
     ) {
 
+      const rawValue =
+        fliGrid.values?.[row]?.[col];
+
+
       const value =
         Number(
-          fliGrid
-            .values?.[row]?.[col]
+          rawValue
         );
 
 
@@ -2532,7 +2559,7 @@ function regionMean(
         west
         +
         (
-          (col + .5)
+          (col + 0.5)
           /
           cols
         )
@@ -2542,16 +2569,16 @@ function regionMean(
         );
 
 
+      const point =
+        turf.point(
+          [
+            lon,
+            lat
+          ]
+        );
+
+
       try {
-
-        const point =
-          turf.point(
-            [
-              lon,
-              lat
-            ]
-          );
-
 
         if (
           turf.booleanPointInPolygon(
@@ -2564,6 +2591,7 @@ function regionMean(
             value;
 
           count++;
+
         }
 
       } catch (
@@ -2571,7 +2599,6 @@ function regionMean(
       ) {
 
         console.warn(
-          "Region mean error:",
           error
         );
       }
@@ -2588,8 +2615,7 @@ function regionMean(
 
 
   return (
-    sum /
-    count
+    sum / count
   );
 }
 
@@ -2611,13 +2637,12 @@ function bindRegion(
 
 
   /*
-   * IMPORTANT:
+   * IMPORTANT
    *
-   * regionType is passed by the file loader.
-   * It is NEVER inferred from properties.
+   * طبق خواسته شما:
    *
    * protected_areas.geojson
-   *     -> مناطق چهارگانه محیط زیست
+   *     -> مناطق چهارگانه
    *
    * hunting_banned.geojson
    *     -> مناطق شکار ممنوع
@@ -2625,13 +2650,13 @@ function bindRegion(
 
   const fixedType =
     regionType === "protected"
-      ? "مناطق چهارگانه محیط زیست"
+      ? "مناطق چهارگانه"
       : "مناطق شکار ممنوع";
 
 
   const fallbackName =
     regionType === "protected"
-      ? "منطقه چهارگانه محیط زیست"
+      ? "منطقه چهارگانه"
       : "منطقه شکار ممنوع";
 
 
@@ -2710,7 +2735,7 @@ function bindRegion(
 
 
 /* ============================================================
-   LOAD PROTECTED AREAS
+   LOAD PROTECTED
    ============================================================ */
 
 async function loadProtected() {
@@ -2769,11 +2794,6 @@ async function loadProtected() {
             layer
           ) {
 
-            /*
-             * HARD-CODED TYPE:
-             * This file always means protected areas.
-             */
-
             bindRegion(
               feature,
               layer,
@@ -2789,7 +2809,7 @@ async function loadProtected() {
 
 
 /* ============================================================
-   LOAD HUNTING BANNED
+   LOAD HUNTING
    ============================================================ */
 
 async function loadHunting() {
@@ -2847,11 +2867,6 @@ async function loadHunting() {
             feature,
             layer
           ) {
-
-            /*
-             * HARD-CODED TYPE:
-             * This file always means hunting banned.
-             */
 
             bindRegion(
               feature,
@@ -2925,16 +2940,16 @@ async function loadFLI() {
                 color,
 
               weight:
-                .15,
+                0.15,
 
               opacity:
-                .85,
+                0.85,
 
               fillColor:
                 color,
 
               fillOpacity:
-                .72
+                0.72
             };
           },
 
@@ -2990,52 +3005,45 @@ async function loadFLIData() {
 
 
   if (
-    forecastDate
+    !forecastDate
   ) {
-
-    const date =
-      new Date(
-        `${forecastDate}T12:00:00`
-      );
-
-
-    const shamsi =
-      date.toLocaleDateString(
-        "fa-IR-u-ca-persian",
-        {
-
-          year:
-            "numeric",
-
-          month:
-            "long",
-
-          day:
-            "numeric"
-        }
-      );
-
-
-    document.getElementById(
-      "forecastText"
-    ).textContent =
-      `پیش‌بینی خطر حریق برای ${shamsi}`;
-  }
-
-
-  /*
-   * Safety fallback:
-   * If metadata does not contain the forecast date,
-   * DO NOT replace it with generated_at_utc.
-   */
-
-  else {
 
     document.getElementById(
       "forecastText"
     ).textContent =
       "تاریخ پیش‌بینی در دسترس نیست";
+
+    return;
   }
+
+
+  const date =
+    new Date(
+      `${forecastDate}T12:00:00`
+    );
+
+
+  const shamsi =
+    date.toLocaleDateString(
+      "fa-IR-u-ca-persian",
+      {
+
+        year:
+          "numeric",
+
+        month:
+          "long",
+
+        day:
+          "numeric"
+      }
+    );
+
+
+  document.getElementById(
+    "forecastText"
+  ).textContent =
+    `پیش‌بینی خطر حریق برای ${shamsi}`;
 }
 
 
@@ -3277,7 +3285,7 @@ function pointInsideFars(
     ) {
 
       console.warn(
-        "Fars point check error:",
+        "Fars boundary check:",
         error
       );
     }
@@ -3303,10 +3311,6 @@ map.on(
     const lon =
       event.latlng.lng;
 
-
-    /*
-     * Only clicks inside Fars are accepted.
-     */
 
     if (
       !pointInsideFars(
@@ -3472,10 +3476,6 @@ document.getElementById(
       event.target.value;
 
 
-    /*
-     * FLI ONLY
-     */
-
     if (
       value === "fli"
     ) {
@@ -3495,6 +3495,7 @@ document.getElementById(
         false
       );
 
+
       setStatus(
         "شاخص خطر حریق فعال است.",
         true
@@ -3503,10 +3504,6 @@ document.getElementById(
       return;
     }
 
-
-    /*
-     * PROTECTED AREAS
-     */
 
     if (
       value === "protected"
@@ -3527,18 +3524,15 @@ document.getElementById(
         false
       );
 
+
       setStatus(
-        "مناطق چهارگانه محیط زیست فعال است.",
+        "مناطق چهارگانه فعال است.",
         true
       );
 
       return;
     }
 
-
-    /*
-     * HUNTING BANNED
-     */
 
     if (
       value === "hunting"
@@ -3559,6 +3553,7 @@ document.getElementById(
         true
       );
 
+
       setStatus(
         "مناطق شکار ممنوع فعال است.",
         true
@@ -3567,10 +3562,6 @@ document.getElementById(
       return;
     }
 
-
-    /*
-     * ALL
-     */
 
     setLayerVisible(
       fliLayer,
@@ -3587,10 +3578,55 @@ document.getElementById(
       true
     );
 
+
     setStatus(
       "همه لایه‌های سامانه فعال هستند.",
       true
     );
+
+  }
+);
+
+
+/* ============================================================
+   DAY / NIGHT SINGLE BUTTON
+   ============================================================ */
+
+document.getElementById(
+  "modeButton"
+).addEventListener(
+  "click",
+  function() {
+
+    nightMode =
+      !nightMode;
+
+
+    document.body.classList.toggle(
+      "night",
+      nightMode
+    );
+
+
+    this.textContent =
+      nightMode
+        ? "🌙"
+        : "☀️";
+
+
+    this.title =
+      nightMode
+        ? "حالت روز"
+        : "حالت شب";
+
+
+    setStatus(
+      nightMode
+        ? "حالت شب فعال است."
+        : "حالت روز فعال است.",
+      true
+    );
+
   }
 );
 
@@ -3610,68 +3646,6 @@ document.getElementById(
     setStatus(
       "نمای کامل استان فارس",
       true
-    );
-  }
-);
-
-
-/* ============================================================
-   DAY
-   ============================================================ */
-
-document.getElementById(
-  "dayButton"
-).addEventListener(
-  "click",
-  function() {
-
-    document.body.classList.remove(
-      "night"
-    );
-
-
-    document.getElementById(
-      "dayButton"
-    ).classList.add(
-      "active"
-    );
-
-
-    document.getElementById(
-      "nightButton"
-    ).classList.remove(
-      "active"
-    );
-  }
-);
-
-
-/* ============================================================
-   NIGHT
-   ============================================================ */
-
-document.getElementById(
-  "nightButton"
-).addEventListener(
-  "click",
-  function() {
-
-    document.body.classList.add(
-      "night"
-    );
-
-
-    document.getElementById(
-      "nightButton"
-    ).classList.add(
-      "active"
-    );
-
-
-    document.getElementById(
-      "dayButton"
-    ).classList.remove(
-      "active"
     );
   }
 );
@@ -3744,14 +3718,14 @@ async function startFIRIS() {
 
 
     /*
-     * Order matters:
+     * IMPORTANT ORDER:
      *
-     * 1. FLI metadata
-     * 2. FLI grid
-     * 3. Fars boundary
-     * 4. FLI
-     * 5. protected areas
-     * 6. hunting banned
+     * Metadata
+     * Grid
+     * Fars boundary
+     * FLI
+     * Protected
+     * Hunting
      */
 
     await loadFLIData();
@@ -3768,7 +3742,7 @@ async function startFIRIS() {
 
 
     /*
-     * Default visibility
+     * Initial visibility
      */
 
     setLayerVisible(
@@ -3790,8 +3764,7 @@ async function startFIRIS() {
 
 
     /*
-     * VERY IMPORTANT:
-     * Initial view comes from Fars boundary ONLY.
+     * Initial extent = Fars boundary ONLY
      */
 
     fitFars();
@@ -3805,7 +3778,7 @@ async function startFIRIS() {
         fitFars();
 
       },
-      350
+      400
     );
 
 
@@ -3836,7 +3809,7 @@ async function startFIRIS() {
 
 
 /* ============================================================
-   START
+   START APPLICATION
    ============================================================ */
 
 startFIRIS();
