@@ -76,12 +76,19 @@ jobs:
             pandas \
             openpyxl \
             rasterio \
-            shap      - name: Define input files
+            shapely \
+            pyproj \
+            pillow
+
+
+      # ========================================================
+      # SET RUN DATE
+      # ========================================================
+
+      - name: Set run date
         shell: bash
         run: |
           set -euo pipefail
-          FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
-          FUEL_
           RUN_DATE="$(date -u +%Y-%m-%d)"
           echo "RUN_DATE=${RUN_DATE}" >> "${GITHUB_ENV}"
           echo ""
