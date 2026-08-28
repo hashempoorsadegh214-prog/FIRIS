@@ -1,6 +1,6 @@
 {
   "project": "FIRIS - Fars Integrated Fire Information System",
-  "generated_at_utc": "2026-08-28T07:04:52.619383+00:00",
+  "generated_at_utc": "2026-08-28T07:23:34.015740+00:00",
   "run_date": "2026-08-28",
   "boundary": "fars.geojson",
   "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
