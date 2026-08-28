@@ -95,7 +95,10 @@ jobs:
 
           FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
 
-          FUEL_RASTER="data/raw/fuel/fars_fuel_aligned.tif"
+          # IMPORTANT:
+          # Use the ORIGINAL fuel raster.
+          # Alignment to the FWI grid is performed inside build_firis.py.
+          FUEL_RASTER="data/raw/fuel/fars_fuel.tif"
 
           DEM_RASTER="data/raw/topography/dem_fars.tif"
 
@@ -115,11 +118,8 @@ jobs:
 
           if [ ! -f "${FUEL_RASTER}" ]; then
             echo ""
-            echo "ERROR: ALIGNED fuel raster not found:"
+            echo "ERROR: RAW fuel raster not found:"
             echo "${FUEL_RASTER}"
-            echo ""
-            echo "Expected file:"
-            echo "data/raw/fuel/fars_fuel_aligned.tif"
             exit 1
           fi
 
@@ -137,15 +137,22 @@ jobs:
             exit 1
           fi
 
+          if [ ! -f "fars.geojson" ]; then
+            echo ""
+            echo "ERROR: Fars boundary not found:"
+            echo "fars.geojson"
+            exit 1
+          fi
+
           echo ""
           echo "All input files found."
 
 
       # ============================================================
-      # VERIFY RASTER GEOMETRY
+      # SHOW SOURCE RASTER INFORMATION
       # ============================================================
 
-      - name: Verify raster alignment
+      - name: Inspect source rasters
         shell: bash
         run: |
           set -euo pipefail
@@ -153,64 +160,36 @@ jobs:
           python - <<'PY'
           import rasterio
 
-          fwi = "data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
-          fuel = "data/raw/fuel/fars_fuel_aligned.tif"
+          files = [
+              "data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif",
+              "data/raw/fuel/fars_fuel.tif",
+              "data/raw/topography/dem_fars.tif",
+          ]
 
           print("")
-          print("============================================================")
-          print("VERIFYING FWI / FUEL GRID")
-          print("============================================================")
+          print("=" * 70)
+          print("SOURCE RASTER INFORMATION")
+          print("=" * 70)
 
-          with rasterio.open(fwi) as a:
+          for path in files:
+
               print("")
-              print("FWI")
-              print("CRS      :", a.crs)
-              print("SIZE     :", a.width, "x", a.height)
-              print("CELL     :", a.res)
-              print("BOUNDS   :", a.bounds)
-              print("TRANSFORM:", a.transform)
+              print("FILE:", path)
+              print("-" * 70)
 
-          with rasterio.open(fuel) as b:
-              print("")
-              print("FUEL")
-              print("CRS      :", b.crs)
-              print("SIZE     :", b.width, "x", b.height)
-              print("CELL     :", b.res)
-              print("BOUNDS   :", b.bounds)
-              print("TRANSFORM:", b.transform)
+              with rasterio.open(path) as src:
 
-          with rasterio.open(fwi) as a, rasterio.open(fuel) as b:
-
-              if a.crs != b.crs:
-                  raise RuntimeError(
-                      "ERROR: FWI and Fuel CRS are different."
-                  )
-
-              if a.width != b.width or a.height != b.height:
-                  raise RuntimeError(
-                      "ERROR: FWI and Fuel dimensions are different."
-                  )
-
-              if abs(a.res[0] - b.res[0]) > 1e-9:
-                  raise RuntimeError(
-                      "ERROR: FWI and Fuel cell sizes are different."
-                  )
-
-              if abs(a.res[1] - b.res[1]) > 1e-9:
-                  raise RuntimeError(
-                      "ERROR: FWI and Fuel cell sizes are different."
-                  )
-
-              if not a.transform.almost_equals(
-                  b.transform,
-                  precision=7
-              ):
-                  raise RuntimeError(
-                      "ERROR: FWI and Fuel grids are not aligned."
-                  )
+                  print("CRS        :", src.crs)
+                  print("SIZE       :", src.width, "x", src.height)
+                  print("CELL       :", src.res)
+                  print("BOUNDS     :", src.bounds)
+                  print("TRANSFORM  :", src.transform)
+                  print("NODATA     :", src.nodata)
 
           print("")
-          print("FWI and Fuel grids are aligned.")
+          print("=" * 70)
+          print("SOURCE RASTER INSPECTION COMPLETED")
+          print("=" * 70)
           PY
 
 
@@ -230,9 +209,10 @@ jobs:
 
           python scripts/build_firis.py \
             --fwi-raster "data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif" \
-            --fuel-raster "data/raw/fuel/fars_fuel_aligned.tif" \
+            --fuel-raster "data/raw/fuel/fars_fuel.tif" \
             --dem-raster "data/raw/topography/dem_fars.tif" \
             --fuel-excel "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx" \
+            --boundary "fars.geojson" \
             --output-dir "data/outputs" \
             --run-date "${RUN_DATE}"
 
@@ -249,6 +229,7 @@ jobs:
           FLI_RASTER="data/outputs/fli_fars_${RUN_DATE}.tif"
 
           if [ ! -f "${FLI_RASTER}" ]; then
+            echo ""
             echo "ERROR: FLI output not found:"
             echo "${FLI_RASTER}"
             exit 1
@@ -259,6 +240,140 @@ jobs:
           python scripts/build_web_map.py \
             --input "${FLI_RASTER}" \
             --output-dir "data/web"
+
+
+      # ============================================================
+      # FINAL GRID VALIDATION
+      # ============================================================
+
+      - name: Validate final FIRIS grids
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import rasterio
+          from pathlib import Path
+
+          date = "${RUN_DATE}"
+
+          output_dir = Path("data/outputs")
+
+          files = {
+              "F_FWI":
+                  output_dir / f"f_fwi_fars_{date}.tif",
+
+              "F_Fuel":
+                  output_dir / f"f_fuel_fars_{date}.tif",
+
+              "Slope":
+                  output_dir / f"slope_fars_{date}.tif",
+
+              "F_Topo":
+                  output_dir / f"f_topo_fars_{date}.tif",
+
+              "FLI":
+                  output_dir / f"fli_fars_{date}.tif",
+
+              "FuelCoverage":
+                  output_dir / f"fuel_coverage_fars_{date}.tif",
+          }
+
+          print("")
+          print("=" * 70)
+          print("FINAL FIRIS GRID VALIDATION")
+          print("=" * 70)
+
+          reference_path = files["F_FWI"]
+
+          if not reference_path.exists():
+              raise RuntimeError(
+                  f"Reference raster not found: {reference_path}"
+              )
+
+          with rasterio.open(reference_path) as ref:
+
+              ref_crs = ref.crs
+              ref_width = ref.width
+              ref_height = ref.height
+              ref_transform = ref.transform
+              ref_bounds = ref.bounds
+
+              print("")
+              print("REFERENCE GRID = F_FWI")
+              print("CRS       :", ref_crs)
+              print("SIZE      :", ref_width, "x", ref_height)
+              print("CELL      :", ref.res)
+              print("BOUNDS    :", ref_bounds)
+              print("TRANSFORM :", ref_transform)
+
+          failures = []
+
+          for name, path in files.items():
+
+              if not path.exists():
+
+                  failures.append(
+                      f"{name}: FILE NOT FOUND"
+                  )
+
+                  continue
+
+              with rasterio.open(path) as src:
+
+                  problems = []
+
+                  if src.crs != ref_crs:
+                      problems.append("CRS")
+
+                  if src.width != ref_width:
+                      problems.append("WIDTH")
+
+                  if src.height != ref_height:
+                      problems.append("HEIGHT")
+
+                  if not src.transform.almost_equals(
+                      ref_transform,
+                      precision=7
+                  ):
+                      problems.append("TRANSFORM")
+
+                  if not src.bounds == ref_bounds:
+                      problems.append("BOUNDS")
+
+                  if problems:
+
+                      failures.append(
+                          f"{name}: "
+                          + ", ".join(problems)
+                      )
+
+                      print(
+                          f"✗ {name:<16} "
+                          f"GRID MISMATCH: "
+                          f"{', '.join(problems)}"
+                      )
+
+                  else:
+
+                      print(
+                          f"✓ {name:<16} GRID MATCH"
+                      )
+
+          print("")
+
+          if failures:
+
+              print("GRID VALIDATION FAILED")
+
+              for failure in failures:
+                  print(" -", failure)
+
+              raise SystemExit(1)
+
+          print("✓ ALL FIRIS OUTPUTS MATCH THE FWI REFERENCE GRID")
+          print("=" * 70)
+          PY
 
 
       # ============================================================
@@ -275,12 +390,20 @@ jobs:
           echo "OUTPUT FILES"
           echo "============================================================"
 
-          find data/outputs -maxdepth 1 -type f -print | sort
+          find data/outputs \
+            -maxdepth 1 \
+            -type f \
+            -print \
+            | sort
 
           echo ""
           echo "WEB FILES"
 
-          find data/web -maxdepth 1 -type f -print | sort
+          find data/web \
+            -maxdepth 1 \
+            -type f \
+            -print \
+            | sort
 
 
       # ============================================================
