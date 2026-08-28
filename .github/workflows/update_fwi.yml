@@ -1,4 +1,4 @@
-name: Build FIRIS
+name:    update_fwi.yml
 
 on:
 
