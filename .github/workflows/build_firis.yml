@@ -2,7 +2,6 @@
 name: Build FIRIS Fire Risk Map
 
 on:
-
   workflow_dispatch:
 
   schedule:
@@ -20,11 +19,8 @@ permissions:
   contents: write
 
 concurrency:
-
   group: firis-build-main
-
   cancel-in-progress: false
-
 
 jobs:
 
@@ -33,7 +29,6 @@ jobs:
     name: Build FIRIS FLI
 
     runs-on: ubuntu-latest
-
 
     steps:
 
@@ -128,7 +123,6 @@ jobs:
 
           set -euo pipefail
 
-
           echo "============================================================"
           echo "SELECTING FIRIS INPUTS"
           echo "============================================================"
@@ -136,24 +130,15 @@ jobs:
 
           # ---------------------------------------------------
           # FWI
-          #
-          # Select newest date-stamped FWI raster.
-          # Example:
-          #   fwi_ecmwf_fars_2026-08-27.tif
-          #   fwi_ecmwf_fars_2026-08-28.tif
-          #
-          # The latter is selected automatically.
           # ---------------------------------------------------
 
           mapfile -t FWI_FILES < <(
-
             find data/raw/fwi \
               -maxdepth 1 \
               -type f \
               \( -iname "*.tif" -o -iname "*.tiff" \) \
-              -iname "*fwi*.tif*" \
+              -iname "*fwi*" \
               | sort
-
           )
 
 
@@ -174,7 +159,7 @@ jobs:
 
 
           # ---------------------------------------------------
-          # Fuel
+          # FUEL
           # ---------------------------------------------------
 
           FUEL_RASTER="data/raw/fuel/fars_fuel.tif"
@@ -191,7 +176,7 @@ jobs:
 
 
           # ---------------------------------------------------
-          # Fuel Excel
+          # FUEL EXCEL
           # ---------------------------------------------------
 
           FUEL_EXCEL="data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
@@ -225,7 +210,7 @@ jobs:
 
 
           # ---------------------------------------------------
-          # Export
+          # EXPORT VARIABLES
           # ---------------------------------------------------
 
           echo ""
@@ -240,16 +225,13 @@ jobs:
 
 
           echo "FWI_RASTER=${FWI_RASTER}" >> "${GITHUB_ENV}"
-
           echo "FUEL_RASTER=${FUEL_RASTER}" >> "${GITHUB_ENV}"
-
           echo "FUEL_EXCEL=${FUEL_EXCEL}" >> "${GITHUB_ENV}"
-
           echo "DEM_RASTER=${DEM_RASTER}" >> "${GITHUB_ENV}"
 
 
       # =====================================================
-      # INPUT METADATA
+      # INSPECT INPUT RASTERS
       # =====================================================
 
       - name: Inspect input raster metadata
@@ -260,7 +242,6 @@ jobs:
 
           set -euo pipefail
 
-
           python - <<'PY'
 
           import os
@@ -268,16 +249,9 @@ jobs:
 
 
           files = {
-
-              "FWI":
-                  os.environ["FWI_RASTER"],
-
-              "Fuel":
-                  os.environ["FUEL_RASTER"],
-
-              "DEM":
-                  os.environ["DEM_RASTER"],
-
+              "FWI": os.environ["FWI_RASTER"],
+              "Fuel": os.environ["FUEL_RASTER"],
+              "DEM": os.environ["DEM_RASTER"],
           }
 
 
@@ -293,36 +267,15 @@ jobs:
               print(f"[{name}]")
               print(f"Path       : {path}")
 
-
               with rasterio.open(path) as src:
 
-                  print(
-                      f"CRS        : {src.crs}"
-                  )
-
-                  print(
-                      f"Width      : {src.width}"
-                  )
-
-                  print(
-                      f"Height     : {src.height}"
-                  )
-
-                  print(
-                      f"Cell Size  : {src.res}"
-                  )
-
-                  print(
-                      f"Bounds     : {src.bounds}"
-                  )
-
-                  print(
-                      f"NoData     : {src.nodata}"
-                  )
-
-                  print(
-                      f"Data Type  : {src.dtypes[0]}"
-                  )
+                  print(f"CRS        : {src.crs}")
+                  print(f"Width      : {src.width}")
+                  print(f"Height     : {src.height}")
+                  print(f"Cell Size  : {src.res}")
+                  print(f"Bounds     : {src.bounds}")
+                  print(f"NoData     : {src.nodata}")
+                  print(f"Data Type  : {src.dtypes[0]}")
 
           PY
 
@@ -339,12 +292,9 @@ jobs:
 
           set -euo pipefail
 
-
           mkdir -p data/outputs
 
-
           RUN_DATE="$(date -u +'%Y-%m-%d')"
-
 
           echo ""
           echo "============================================================"
@@ -353,22 +303,74 @@ jobs:
 
           echo "Run date: ${RUN_DATE}"
 
+          echo ""
+          echo "FWI_RASTER  = ${FWI_RASTER}"
+          echo "FUEL_RASTER = ${FUEL_RASTER}"
+          echo "FUEL_EXCEL  = ${FUEL_EXCEL}"
+          echo "DEM_RASTER  = ${DEM_RASTER}"
 
           python scripts/build_firis.py \
-
             --fwi-raster "${FWI_RASTER}" \
-
             --fuel-raster "${FUEL_RASTER}" \
-
             --dem-raster "${DEM_RASTER}" \
-
             --fuel-excel "${FUEL_EXCEL}" \
-
             --fuel-code-column "JOIN_VALUE" \
-
             --output-dir "data/outputs" \
-
             --run-date "${RUN_DATE}"
+
+
+      # =====================================================
+      # CHECK FIRIS OUTPUT
+      # =====================================================
+
+      - name: Check FIRIS output
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          RUN_DATE="$(date -u +'%Y-%m-%d')"
+
+          FLI_OUTPUT="data/outputs/fli_fars_${RUN_DATE}.tif"
+
+          REPORT_OUTPUT="data/outputs/firis_report_${RUN_DATE}.json"
+
+
+          echo ""
+          echo "============================================================"
+          echo "CHECKING FIRIS OUTPUT"
+          echo "============================================================"
+
+
+          if [ ! -f "${FLI_OUTPUT}" ]; then
+
+            echo "ERROR: FLI output was not created:"
+            echo "${FLI_OUTPUT}"
+
+            exit 1
+
+          fi
+
+
+          if [ ! -f "${REPORT_OUTPUT}" ]; then
+
+            echo "ERROR: FIRIS report was not created:"
+            echo "${REPORT_OUTPUT}"
+
+            exit 1
+
+          fi
+
+
+          echo "FLI output:"
+          echo "${FLI_OUTPUT}"
+
+          echo ""
+
+          echo "Report:"
+          echo "${REPORT_OUTPUT}"
 
 
       # =====================================================
@@ -383,12 +385,9 @@ jobs:
 
           set -euo pipefail
 
-
           mkdir -p data/web
 
-
           RUN_DATE="$(date -u +'%Y-%m-%d')"
-
 
           INPUT_FLI="data/outputs/fli_fars_${RUN_DATE}.tif"
 
@@ -420,12 +419,10 @@ jobs:
 
           set -euo pipefail
 
-
           echo ""
           echo "============================================================"
           echo "FIRIS OUTPUT FILES"
           echo "============================================================"
-
 
           find data/outputs \
             -maxdepth 1 \
@@ -439,7 +436,6 @@ jobs:
           echo "WEB OUTPUT FILES"
           echo "============================================================"
 
-
           find data/web \
             -maxdepth 1 \
             -type f \
@@ -452,9 +448,7 @@ jobs:
           echo "FIRIS REPORT"
           echo "============================================================"
 
-
           RUN_DATE="$(date -u +'%Y-%m-%d')"
-
 
           REPORT="data/outputs/firis_report_${RUN_DATE}.json"
 
@@ -462,10 +456,6 @@ jobs:
           if [ -f "${REPORT}" ]; then
 
             cat "${REPORT}"
-
-          else
-
-            echo "WARNING: FIRIS report not found."
 
           fi
 
@@ -482,11 +472,9 @@ jobs:
 
           set -euo pipefail
 
-
           git config \
             user.name \
             "github-actions[bot]"
-
 
           git config \
             user.email \
