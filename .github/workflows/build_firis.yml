@@ -1,4 +1,4 @@
-
+```yaml
 name: Build FIRIS Fire Risk Map
 
 on:
@@ -334,7 +334,6 @@ jobs:
           RUN_DATE="$(date -u +'%Y-%m-%d')"
 
           FLI_OUTPUT="data/outputs/fli_fars_${RUN_DATE}.tif"
-
           REPORT_OUTPUT="data/outputs/firis_report_${RUN_DATE}.json"
 
 
@@ -461,7 +460,7 @@ jobs:
 
 
       # =====================================================
-      # COMMIT OUTPUTS
+      # COMMIT AND PUSH
       # =====================================================
 
       - name: Commit and push generated outputs
@@ -472,6 +471,7 @@ jobs:
 
           set -euo pipefail
 
+
           git config \
             user.name \
             "github-actions[bot]"
@@ -481,10 +481,18 @@ jobs:
             "41898282+github-actions[bot]@users.noreply.github.com"
 
 
+          # ---------------------------------------------------
+          # Stage generated files
+          # ---------------------------------------------------
+
           git add \
             data/outputs/ \
             data/web/
 
+
+          # ---------------------------------------------------
+          # Nothing changed
+          # ---------------------------------------------------
 
           if git diff --cached --quiet; then
 
@@ -495,8 +503,30 @@ jobs:
           fi
 
 
+          # ---------------------------------------------------
+          # Create local commit
+          # ---------------------------------------------------
+
           git commit \
             -m "chore(firis): update FLI outputs [skip ci]"
 
 
+          # ---------------------------------------------------
+          # Synchronize with remote main
+          #
+          # IMPORTANT:
+          # Do NOT force push.
+          # ---------------------------------------------------
+
+          git fetch origin main
+
+
+          git rebase origin/main
+
+
+          # ---------------------------------------------------
+          # Push the rebased commit
+          # ---------------------------------------------------
+
           git push origin HEAD:main
+```
