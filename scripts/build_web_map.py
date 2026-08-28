@@ -1,29 +1,28 @@
-
 #!/usr/bin/env python3
 
 """
 FIRIS - Web Map Builder
+=======================
 
-Purpose
--------
-Convert the existing FLI GeoTIFF into web-ready files.
+Build web-ready FIRIS outputs from the EXISTING FLI raster.
 
 IMPORTANT
 ---------
-This script does NOT recalculate or modify FLI.
+This script does NOT recalculate FLI.
 
 It only:
-1. Reads the existing FLI raster.
-2. Applies fars.geojson as a WEB DISPLAY mask.
-3. Makes pixels outside Fars transparent in PNG.
-4. Preserves the original FLI raster grid.
-5. Generates metadata and lightweight grid JSON.
+1. Reads the final FLI GeoTIFF.
+2. Applies fars.geojson as the authoritative province mask.
+3. Creates a classified GeoJSON layer for web display.
+4. Keeps the original FLI values in a lightweight grid JSON.
+5. Creates a PNG as an optional backup/preview.
+6. Writes metadata.
 
-Outputs
--------
-fli_latest.png
-fli_latest.json
-fli_latest_grid.json
+The MAIN WEB DISPLAY layer is:
+
+    data/web/fli_polygons.geojson
+
+The PNG is NOT the authoritative spatial display layer.
 """
 
 from __future__ import annotations
@@ -36,9 +35,13 @@ from pathlib import Path
 import numpy as np
 import rasterio
 from PIL import Image
-from rasterio.features import geometry_mask
+from rasterio.features import geometry_mask, shapes
 from rasterio.warp import transform_geom
 
+
+# ============================================================
+# LEGEND
+# ============================================================
 
 LEGEND = [
     {
@@ -87,93 +90,37 @@ def parse_args():
     parser.add_argument(
         "--input",
         required=True,
-        type=Path,
-        help="Existing FLI GeoTIFF"
+        type=Path
     )
 
     parser.add_argument(
         "--output-dir",
         required=True,
-        type=Path,
-        help="Output directory"
+        type=Path
     )
 
     parser.add_argument(
         "--boundary",
         required=False,
         type=Path,
-        default=Path("fars.geojson"),
-        help="Fars Province boundary GeoJSON"
+        default=Path("fars.geojson")
     )
 
     return parser.parse_args()
 
 
 # ============================================================
-# COLORIZE
-# ============================================================
-
-def colorize(
-    values: np.ndarray,
-    valid: np.ndarray
-) -> np.ndarray:
-
-    rgba = np.zeros(
-        (
-            values.shape[0],
-            values.shape[1],
-            4
-        ),
-        dtype=np.uint8
-    )
-
-    classes = [
-        (
-            valid & (values < 20),
-            (46, 125, 50, 215)
-        ),
-        (
-            valid
-            & (values >= 20)
-            & (values < 40),
-            (253, 216, 53, 220)
-        ),
-        (
-            valid
-            & (values >= 40)
-            & (values < 60),
-            (251, 140, 0, 225)
-        ),
-        (
-            valid
-            & (values >= 60)
-            & (values < 80),
-            (229, 57, 53, 230)
-        ),
-        (
-            valid & (values >= 80),
-            (136, 14, 79, 235)
-        )
-    ]
-
-    for mask, color in classes:
-        rgba[mask] = color
-
-    return rgba
-
-
-# ============================================================
 # LOAD BOUNDARY
 # ============================================================
 
-def load_boundary_geometries(
+def load_boundary(
     boundary_path: Path,
     target_crs
 ):
 
     if not boundary_path.is_file():
         raise FileNotFoundError(
-            f"Fars boundary not found: {boundary_path}"
+            f"Boundary not found: {boundary_path}"
         )
 
     with boundary_path.open(
@@ -185,7 +132,7 @@ def load_boundary_geometries(
 
     if geojson.get("type") != "FeatureCollection":
         raise ValueError(
-            "Boundary GeoJSON must be a FeatureCollection."
+            "Boundary must be a GeoJSON FeatureCollection."
         )
 
     features = geojson.get(
@@ -195,7 +142,7 @@ def load_boundary_geometries(
 
     if not features:
         raise ValueError(
-            "Fars boundary contains no features."
+            "Boundary contains no features."
         )
 
     geometries = []
@@ -213,19 +160,14 @@ def load_boundary_geometries(
 
     if not geometries:
         raise ValueError(
-            "Fars boundary contains no valid geometries."
+            "Boundary contains no valid geometries."
         )
 
     source_crs = "EPSG:4326"
 
-    crs_obj = geojson.get(
-        "crs"
-    )
+    crs_obj = geojson.get("crs")
 
-    if isinstance(
-        crs_obj,
-        dict
-    ):
+    if isinstance(crs_obj, dict):
 
         props = crs_obj.get(
             "properties",
@@ -237,81 +179,248 @@ def load_boundary_geometries(
             or props.get("href")
         )
 
-        if isinstance(
-            name,
-            str
-        ) and name.strip():
-
+        if isinstance(name, str) and name.strip():
             source_crs = name.strip()
 
     if str(target_crs) != source_crs:
 
-        transformed = []
+        geometries = [
 
-        for geometry in geometries:
-
-            transformed.append(
-                transform_geom(
-                    source_crs,
-                    target_crs,
-                    geometry,
-                    precision=12
-                )
+            transform_geom(
+                source_crs,
+                target_crs,
+                geom,
+                precision=12
             )
 
-        geometries = transformed
+            for geom in geometries
+        ]
 
-    return geometries, source_crs
+    return geometries
 
 
 # ============================================================
-# BUILD FARS MASK
+# CLASSIFY FLI
 # ============================================================
 
-def build_fars_mask(
-    boundary_path: Path,
-    src
+def classify_fli(
+    values: np.ndarray
+) -> np.ndarray:
+
+    result = np.full(
+        values.shape,
+        -1,
+        dtype=np.int8
+    )
+
+    valid = (
+        np.isfinite(values)
+        &
+        (values >= 0)
+        &
+        (values <= 100)
+    )
+
+    result[
+        valid & (values < 20)
+    ] = 0
+
+    result[
+        valid
+        & (values >= 20)
+        & (values < 40)
+    ] = 1
+
+    result[
+        valid
+        & (values >= 40)
+        & (values < 60)
+    ] = 2
+
+    result[
+        valid
+        & (values >= 60)
+        & (values < 80)
+    ] = 3
+
+    result[
+        valid & (values >= 80)
+    ] = 4
+
+    return result
+
+
+# ============================================================
+# CLASS INFORMATION
+# ============================================================
+
+def class_info(class_id: int):
+
+    item = LEGEND[class_id]
+
+    return {
+        "class_id": class_id,
+        "min": item["min"],
+        "max": item["max"],
+        "label": item["label"],
+        "color": item["color"]
+    }
+
+
+# ============================================================
+# CREATE CLASSIFIED GEOJSON
+# ============================================================
+
+def build_polygon_geojson(
+    class_raster: np.ndarray,
+    transform,
+    fars_mask: np.ndarray
 ):
 
-    geometries, source_crs = (
-        load_boundary_geometries(
-            boundary_path,
-            src.crs
-        )
-    )
+    features = []
 
-    mask = geometry_mask(
-        geometries,
-        out_shape=(
-            src.height,
-            src.width
+    # --------------------------------------------------------
+    # Only five risk classes are polygonized.
+    # Each polygon is already restricted to Fars.
+    # --------------------------------------------------------
+
+    for class_id in range(5):
+
+        class_mask = (
+            (class_raster == class_id)
+            &
+            fars_mask
+        )
+
+        if not np.any(class_mask):
+            continue
+
+        for geometry, value in shapes(
+            class_raster.astype(np.int16),
+            mask=class_mask,
+            transform=transform
+        ):
+
+            if int(value) != class_id:
+                continue
+
+            info = class_info(
+                class_id
+            )
+
+            feature = {
+
+                "type": "Feature",
+
+                "properties": {
+
+                    "class_id":
+                        info["class_id"],
+
+                    "risk":
+                        info["label"],
+
+                    "min":
+                        info["min"],
+
+                    "max":
+                        info["max"],
+
+                    "color":
+                        info["color"]
+                },
+
+                "geometry":
+                    geometry
+            }
+
+            features.append(
+                feature
+            )
+
+    return {
+
+        "type": "FeatureCollection",
+
+        "name":
+            "FIRIS FLI Risk Classes",
+
+        "features":
+            features
+    }
+
+
+# ============================================================
+# COLORIZE PNG
+# ============================================================
+
+def colorize(
+    values: np.ndarray,
+    valid: np.ndarray
+):
+
+    rgba = np.zeros(
+        (
+            values.shape[0],
+            values.shape[1],
+            4
         ),
-        transform=src.transform,
-        invert=True,
-        all_touched=False
+        dtype=np.uint8
     )
 
-    pixels_inside = int(
-        np.count_nonzero(mask)
+    rgba[
+        valid & (values < 20)
+    ] = (
+        46,
+        125,
+        50,
+        215
     )
 
-    if pixels_inside == 0:
+    rgba[
+        valid
+        & (values >= 20)
+        & (values < 40)
+    ] = (
+        253,
+        216,
+        53,
+        220
+    )
 
-        raise RuntimeError(
-            "Fars boundary does not overlap "
-            "the FLI raster grid."
-        )
+    rgba[
+        valid
+        & (values >= 40)
+        & (values < 60)
+    ] = (
+        251,
+        140,
+        0,
+        225
+    )
 
-    print("")
-    print("FARS WEB MASK")
-    print("-------------")
-    print(f"Boundary       : {boundary_path}")
-    print(f"Boundary CRS   : {source_crs}")
-    print(f"Raster CRS     : {src.crs}")
-    print(f"Raster size    : {src.width} x {src.height}")
-    print(f"Pixels in Fars : {pixels_inside:,}")
+    rgba[
+        valid
+        & (values >= 60)
+        & (values < 80)
+    ] = (
+        229,
+        57,
+        53,
+        230
+    )
 
-    return mask
+    rgba[
+        valid
+        & (values >= 80)
+    ] = (
+        136,
+        14,
+        79,
+        235
+    )
+
+    return rgba
 
 
 # ============================================================
@@ -327,7 +436,6 @@ def main():
     boundary_path = args.boundary
 
     if not input_path.is_file():
-
         raise FileNotFoundError(
             f"FLI raster not found: {input_path}"
         )
@@ -342,7 +450,7 @@ def main():
         "fli_latest.png"
     )
 
-    json_path = (
+    metadata_path = (
         output_dir /
         "fli_latest.json"
     )
@@ -350,6 +458,11 @@ def main():
     grid_path = (
         output_dir /
         "fli_latest_grid.json"
+    )
+
+    polygons_path = (
+        output_dir /
+        "fli_polygons.geojson"
     )
 
 
@@ -367,31 +480,18 @@ def main():
             )
 
         if src.crs.to_epsg() != 4326:
-
             raise ValueError(
                 "FLI CRS must be EPSG:4326. "
                 f"Current CRS: {src.crs}"
             )
 
-
-        # ----------------------------------------------------
-        # READ SOURCE FLI
-        # ----------------------------------------------------
-
-        data = src.read(
-            1,
-            masked=True
-        )
-
         values = np.asarray(
-            data.filled(np.nan),
+            src.read(
+                1,
+                masked=True
+            ).filled(np.nan),
             dtype=np.float32
         )
-
-
-        # ----------------------------------------------------
-        # ORIGINAL FLI VALIDITY
-        # ----------------------------------------------------
 
         valid = (
             np.isfinite(values)
@@ -402,29 +502,31 @@ def main():
         )
 
         if not np.any(valid):
-
             raise ValueError(
                 "No valid FLI pixels found."
             )
 
-
         # ----------------------------------------------------
-        # BUILD FARS MASK
+        # FARS MASK
         # ----------------------------------------------------
 
-        fars_mask = build_fars_mask(
-            boundary_path,
-            src
+        boundary_geometries = (
+            load_boundary(
+                boundary_path,
+                src.crs
+            )
         )
 
-
-        # ----------------------------------------------------
-        # FINAL WEB VALIDITY
-        #
-        # ONLY FOR WEB DISPLAY.
-        #
-        # FLI CALCULATION IS NOT TOUCHED.
-        # ----------------------------------------------------
+        fars_mask = geometry_mask(
+            boundary_geometries,
+            out_shape=(
+                src.height,
+                src.width
+            ),
+            transform=src.transform,
+            invert=True,
+            all_touched=False
+        )
 
         web_valid = (
             valid
@@ -432,64 +534,33 @@ def main():
             fars_mask
         )
 
-
-        inside_count = int(
-            np.count_nonzero(
-                web_valid
-            )
-        )
-
-        original_count = int(
-            np.count_nonzero(
-                valid
-            )
-        )
-
-        removed_count = (
-            original_count
-            - inside_count
-        )
-
-
-        if inside_count == 0:
-
+        if not np.any(web_valid):
             raise RuntimeError(
-                "No valid FLI pixels remain inside "
-                "the Fars boundary."
+                "No valid FLI pixels remain inside Fars."
             )
 
+        # ----------------------------------------------------
+        # CLASS RASTER
+        # ----------------------------------------------------
+
+        class_raster = classify_fli(
+            values
+        )
 
         # ----------------------------------------------------
-        # FULL SOURCE GRID
+        # POLYGON GEOJSON
         # ----------------------------------------------------
 
-        width = int(
-            src.width
+        polygon_geojson = (
+            build_polygon_geojson(
+                class_raster,
+                src.transform,
+                fars_mask
+            )
         )
-
-        height = int(
-            src.height
-        )
-
-        left = float(
-            src.bounds.left
-        )
-
-        bottom = float(
-            src.bounds.bottom
-        )
-
-        right = float(
-            src.bounds.right
-        )
-
-        top = float(
-            src.bounds.top
-        )
-
 
         # ----------------------------------------------------
-        # CREATE TRANSPARENT WEB IMAGE
+        # PNG PREVIEW
         # ----------------------------------------------------
 
         rgba = colorize(
@@ -497,19 +568,16 @@ def main():
             web_valid
         )
 
-        image = Image.fromarray(
+        Image.fromarray(
             rgba,
             "RGBA"
-        )
-
-        image.save(
+        ).save(
             png_path,
             optimize=True
         )
 
-
         # ----------------------------------------------------
-        # STATISTICS ONLY INSIDE FARS
+        # STATISTICS
         # ----------------------------------------------------
 
         province_values = values[
@@ -543,13 +611,14 @@ def main():
                 ),
 
             "valid_pixels":
-                inside_count
+                int(
+                    province_values.size
+                )
         }
 
-
-        # ====================================================
-        # LIGHTWEIGHT GRID
-        # ====================================================
+        # ----------------------------------------------------
+        # GRID JSON
+        # ----------------------------------------------------
 
         max_dimension = 350
 
@@ -557,7 +626,7 @@ def main():
             1,
             int(
                 np.ceil(
-                    height /
+                    src.height /
                     max_dimension
                 )
             )
@@ -567,7 +636,7 @@ def main():
             1,
             int(
                 np.ceil(
-                    width /
+                    src.width /
                     max_dimension
                 )
             )
@@ -578,22 +647,37 @@ def main():
             ::col_step
         ]
 
-        sample_valid = web_valid[
+        sample_mask = web_valid[
             ::row_step,
             ::col_step
         ]
 
         sample = np.where(
             np.isfinite(sample)
-            & sample_valid,
+            &
+            sample_mask,
             sample,
             -9999
         )
 
+        left = float(
+            src.bounds.left
+        )
 
-        # ====================================================
-        # GRID JSON
-        # ====================================================
+        bottom = float(
+            src.bounds.bottom
+        )
+
+        right = float(
+            src.bounds.right
+        )
+
+        top = float(
+            src.bounds.top
+        )
+
+        transform = src.transform
+
 
         grid = {
 
@@ -621,14 +705,10 @@ def main():
                 ),
 
             "row_step":
-                int(
-                    row_step
-                ),
+                int(row_step),
 
             "col_step":
-                int(
-                    col_step
-                ),
+                int(col_step),
 
             "origin": {
 
@@ -642,9 +722,7 @@ def main():
             "cell_size": {
 
                 "x":
-                    float(
-                        src.res[0]
-                    ),
+                    float(src.res[0]),
 
                 "y":
                     float(
@@ -652,34 +730,19 @@ def main():
                     )
             },
 
-            "full_raster": {
-
-                "width":
-                    width,
-
-                "height":
-                    height
-            },
+            "values":
+                np.round(
+                    sample,
+                    2
+                ).tolist(),
 
             "boundary_masked":
                 True,
 
             "boundary_file":
-                str(boundary_path),
-
-            "values":
-                np.round(
-                    sample,
-                    2
-                ).tolist()
+                str(boundary_path)
         }
 
-
-        # ====================================================
-        # RASTER INFORMATION
-        # ====================================================
-
-        transform = src.transform
 
         raster_information = {
 
@@ -690,15 +753,13 @@ def main():
                 src.crs.to_epsg(),
 
             "width":
-                width,
+                int(src.width),
 
             "height":
-                height,
+                int(src.height),
 
             "cell_size_x":
-                float(
-                    src.res[0]
-                ),
+                float(src.res[0]),
 
             "cell_size_y":
                 float(
@@ -733,13 +794,46 @@ def main():
                 float(transform.e),
 
                 float(transform.f)
-
             ]
         }
 
 
     # ========================================================
-    # METADATA
+    # WRITE GEOJSON
+    # ========================================================
+
+    polygons_path.write_text(
+        json.dumps(
+            polygon_geojson,
+            ensure_ascii=False,
+            separators=(
+                ",",
+                ":"
+            )
+        ),
+        encoding="utf-8"
+    )
+
+
+    # ========================================================
+    # WRITE GRID JSON
+    # ========================================================
+
+    grid_path.write_text(
+        json.dumps(
+            grid,
+            ensure_ascii=False,
+            separators=(
+                ",",
+                ":"
+            )
+        ),
+        encoding="utf-8"
+    )
+
+
+    # ========================================================
+    # WRITE METADATA
     # ========================================================
 
     metadata = {
@@ -758,7 +852,10 @@ def main():
         "crs":
             "EPSG:4326",
 
-        "image":
+        "primary_web_layer":
+            "fli_polygons.geojson",
+
+        "preview_image":
             "fli_latest.png",
 
         "grid":
@@ -775,7 +872,6 @@ def main():
                 top,
                 right
             ]
-
         ],
 
         "raster":
@@ -795,47 +891,44 @@ def main():
             "mask_applied":
                 True,
 
-            "original_valid_pixels":
-                original_count,
-
             "valid_pixels_inside_fars":
-                inside_count,
+                int(
+                    np.count_nonzero(
+                        web_valid
+                    )
+                ),
 
-            "valid_pixels_removed_outside_fars":
-                removed_count
+            "valid_pixels_outside_fars_removed":
+                int(
+                    np.count_nonzero(
+                        valid
+                        &
+                        ~fars_mask
+                    )
+                )
         },
 
-        "spatial_policy": {
+        "web_display": {
 
-            "reference_grid":
-                "FLI source raster",
+            "method":
+                "classified GeoJSON polygons",
 
-            "web_boundary":
-                str(boundary_path),
+            "polygon_layer":
+                "fli_polygons.geojson",
 
-            "cropping":
+            "png_is_primary":
                 False,
 
-            "full_raster_extent_preserved":
-                True,
+            "outside_fars":
+                "excluded",
 
-            "outside_fars_transparent":
-                True,
-
-            "nodata_transparent":
-                True,
-
-            "coordinate_system":
-                "EPSG:4326"
+            "spatial_resampling":
+                False
         }
     }
 
 
-    # ========================================================
-    # WRITE JSON
-    # ========================================================
-
-    json_path.write_text(
+    metadata_path.write_text(
         json.dumps(
             metadata,
             ensure_ascii=False,
@@ -844,21 +937,9 @@ def main():
         encoding="utf-8"
     )
 
-    grid_path.write_text(
-        json.dumps(
-            grid,
-            ensure_ascii=False,
-            separators=(
-                ",",
-                ":"
-            )
-        ),
-        encoding="utf-8"
-    )
-
 
     # ========================================================
-    # REPORT
+    # FINAL LOG
     # ========================================================
 
     print("")
@@ -867,42 +948,78 @@ def main():
     print("=" * 70)
 
     print("")
-    print(f"Input : {input_path}")
-    print(f"PNG   : {png_path}")
-    print(f"JSON  : {json_path}")
-    print(f"GRID  : {grid_path}")
-
-    print("")
-    print("FULL RASTER GRID")
-    print(f"Width : {width}")
-    print(f"Height: {height}")
     print(
-        f"Cell  : "
-        f"{float(raster_information['cell_size_x'])}, "
-        f"{float(raster_information['cell_size_y'])}"
+        f"Input       : {input_path}"
+    )
+
+    print(
+        f"Polygon     : {polygons_path}"
+    )
+
+    print(
+        f"PNG         : {png_path}"
+    )
+
+    print(
+        f"Metadata    : {metadata_path}"
+    )
+
+    print(
+        f"Grid JSON   : {grid_path}"
     )
 
     print("")
-    print("FULL RASTER BOUNDS")
-    print(f"South: {bottom:.8f}")
-    print(f"West : {left:.8f}")
-    print(f"North: {top:.8f}")
-    print(f"East : {right:.8f}")
+    print("RASTER GRID")
+
+    print(
+        f"Width       : {raster_information['width']}"
+    )
+
+    print(
+        f"Height      : {raster_information['height']}"
+    )
+
+    print(
+        f"Resolution  : "
+        f"{raster_information['cell_size_x']}, "
+        f"{raster_information['cell_size_y']}"
+    )
+
+    print(
+        f"Bounds      : "
+        f"{raster_information['bounds']}"
+    )
 
     print("")
-    print("WEB MASK RESULTS")
-    print(f"Original valid pixels : {original_count:,}")
-    print(f"Valid inside Fars     : {inside_count:,}")
-    print(f"Removed outside Fars  : {removed_count:,}")
+    print("FARS MASK")
+
+    print(
+        f"Valid inside Fars : "
+        f"{statistics['valid_pixels']:,}"
+    )
+
+    print(
+        f"Removed outside   : "
+        f"{int(np.count_nonzero(valid & ~fars_mask)):,}"
+    )
 
     print("")
-    print(f"Stats : {statistics}")
+    print(
+        f"FLI statistics: {statistics}"
+    )
 
     print("")
-    print("Fars boundary mask : APPLIED")
-    print("Outside Fars       : TRANSPARENT")
-    print("Grid cropping      : DISABLED")
-    print("FLI calculation     : UNCHANGED")
+    print(
+        "Primary web layer : fli_polygons.geojson"
+    )
+
+    print(
+        "Boundary mask     : APPLIED"
+    )
+
+    print(
+        "FLI calculation   : UNCHANGED"
+    )
 
     print("=" * 70)
 
