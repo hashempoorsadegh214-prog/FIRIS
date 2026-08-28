@@ -1,35 +1,21 @@
-
 #!/usr/bin/env python3
 
 """
 FIRIS - Fars Integrated Fire Information System
 
-Fire Likelihood Index:
+FLI = 100 * (
+    0.45 * F_FWI
+    + 0.35 * F_Fuel
+    + 0.20 * F_Topo
+)
 
-    FLI = 100 * (
-        0.45 * F_FWI
-        + 0.35 * F_Fuel
-        + 0.20 * F_Topo
-    )
-
-Spatial rule
-------------
-FWI is the final reference grid.
-
-Fuel:
-    categorical raster
-    -> nearest-neighbour
-    -> FWI grid
-
-DEM:
-    native DEM
-    -> calculate slope on native resolution
-    -> metric cell spacing
-    -> bilinear resampling
-    -> FWI grid
-
-This prevents calculating slope after degrading
-the original DEM to the coarse FWI grid.
+Spatial rules:
+- FWI is the reference grid.
+- Fuel -> FWI grid using nearest neighbour.
+- Slope is calculated on native DEM first, then aligned to FWI.
+- All final calculations are restricted to fars.geojson.
+- NoData is never artificially filled.
+- Coverage inside Fars is explicitly reported.
 """
 
 from __future__ import annotations
@@ -45,12 +31,9 @@ import numpy as np
 import pandas as pd
 import rasterio
 from rasterio.enums import Resampling
-from rasterio.warp import reproject
+from rasterio.features import geometry_mask
+from rasterio.warp import reproject, transform_geom
 
-
-# ============================================================
-# MODEL
-# ============================================================
 
 FWI_WEIGHT = 0.45
 FUEL_WEIGHT = 0.35
@@ -58,71 +41,46 @@ TOPO_WEIGHT = 0.20
 
 FWI_MAX = 100.0
 SLOPE_REFERENCE = 45.0
-
 OUTPUT_NODATA = -9999.0
 
 
-# ============================================================
-# ARGUMENTS
-# ============================================================
-
 def parse_args():
-
     parser = argparse.ArgumentParser(
         description="Build FIRIS Fire Likelihood Index"
     )
 
-    parser.add_argument(
-        "--fwi-raster",
-        required=True,
-        type=Path,
-    )
-
-    parser.add_argument(
-        "--fuel-raster",
-        required=True,
-        type=Path,
-    )
-
-    parser.add_argument(
-        "--dem-raster",
-        required=True,
-        type=Path,
-    )
-
-    parser.add_argument(
-        "--fuel-excel",
-        required=True,
-        type=Path,
-    )
+    parser.add_argument("--fwi-raster", required=True, type=Path)
+    parser.add_argument("--fuel-raster", required=True, type=Path)
+    parser.add_argument("--dem-raster", required=True, type=Path)
+    parser.add_argument("--fuel-excel", required=True, type=Path)
 
     parser.add_argument(
         "--fuel-code-column",
-        default="JOIN_VALUE",
+        default="JOIN_VALUE"
+    )
+
+    parser.add_argument(
+        "--boundary",
+        type=Path,
+        default=Path("fars.geojson")
     )
 
     parser.add_argument(
         "--output-dir",
         required=True,
-        type=Path,
+        type=Path
     )
 
     parser.add_argument(
         "--run-date",
-        required=True,
+        required=True
     )
 
     return parser.parse_args()
 
 
-# ============================================================
-# GENERAL HELPERS
-# ============================================================
-
 def require_file(path: Path, label: str):
-
     if not path.is_file():
-
         raise FileNotFoundError(
             f"{label} not found: {path}"
         )
@@ -130,12 +88,12 @@ def require_file(path: Path, label: str):
 
 def clean_array(
     array: np.ndarray,
-    nodata: Any = None,
+    nodata: Any = None
 ) -> np.ndarray:
 
     result = np.asarray(
         array,
-        dtype=np.float32,
+        dtype=np.float32
     ).copy()
 
     if nodata is not None:
@@ -143,27 +101,20 @@ def clean_array(
         try:
 
             if np.isnan(nodata):
-
-                result[
-                    np.isnan(result)
-                ] = np.nan
+                result[np.isnan(result)] = np.nan
 
             else:
-
                 result[
                     np.isclose(
                         result,
-                        float(nodata),
+                        float(nodata)
                     )
                 ] = np.nan
 
         except (TypeError, ValueError):
-
             pass
 
-    result[
-        ~np.isfinite(result)
-    ] = np.nan
+    result[~np.isfinite(result)] = np.nan
 
     return result
 
@@ -181,7 +132,7 @@ def stats(array: np.ndarray):
             "min": None,
             "max": None,
             "mean": None,
-            "std": None,
+            "std": None
         }
 
     return {
@@ -189,44 +140,181 @@ def stats(array: np.ndarray):
         "min": round(float(np.min(valid)), 6),
         "max": round(float(np.max(valid)), 6),
         "mean": round(float(np.mean(valid)), 6),
-        "std": round(float(np.std(valid)), 6),
+        "std": round(float(np.std(valid)), 6)
     }
 
 
+def bounds_dict(bounds):
+
+    return {
+        "left": float(bounds.left),
+        "bottom": float(bounds.bottom),
+        "right": float(bounds.right),
+        "top": float(bounds.top)
+    }
+
+
+def raster_metadata(path: Path):
+
+    with rasterio.open(path) as src:
+
+        return {
+            "crs": str(src.crs) if src.crs else None,
+            "width": int(src.width),
+            "height": int(src.height),
+            "cell_size_x": float(src.res[0]),
+            "cell_size_y": float(src.res[1]),
+            "bounds": bounds_dict(src.bounds),
+            "nodata": (
+                None
+                if src.nodata is None
+                else float(src.nodata)
+            )
+        }
+
+
 # ============================================================
-# FWI REFERENCE
+# FARS BOUNDARY
 # ============================================================
 
-def read_fwi(
-    path: Path,
+def load_boundary_mask(
+    boundary_path: Path,
+    reference: dict
 ):
+
+    with boundary_path.open(
+        "r",
+        encoding="utf-8"
+    ) as f:
+
+        geojson = json.load(f)
+
+    features = geojson.get(
+        "features",
+        []
+    )
+
+    if not features:
+        raise ValueError(
+            f"Boundary contains no features: {boundary_path}"
+        )
+
+    geometries = []
+
+    for feature in features:
+
+        geometry = feature.get(
+            "geometry"
+        )
+
+        if geometry:
+            geometries.append(
+                geometry
+            )
+
+    if not geometries:
+        raise ValueError(
+            f"Boundary contains no geometries: {boundary_path}"
+        )
+
+    source_crs = "EPSG:4326"
+
+    crs_obj = geojson.get("crs")
+
+    if isinstance(crs_obj, dict):
+
+        props = crs_obj.get(
+            "properties",
+            {}
+        )
+
+        name = (
+            props.get("name")
+            or props.get("href")
+        )
+
+        if isinstance(name, str) and name:
+            source_crs = name
+
+    target_crs = reference["crs"]
+
+    if str(target_crs) != source_crs:
+
+        geometries = [
+            transform_geom(
+                source_crs,
+                target_crs,
+                geom,
+                precision=12
+            )
+            for geom in geometries
+        ]
+
+    mask = geometry_mask(
+        geometries,
+        out_shape=(
+            reference["height"],
+            reference["width"]
+        ),
+        transform=reference["transform"],
+        invert=True,
+        all_touched=False
+    )
+
+    count = int(
+        np.sum(mask)
+    )
+
+    if count == 0:
+        raise ValueError(
+            "Fars boundary does not overlap the FWI grid."
+        )
+
+    print()
+    print("FARS BOUNDARY")
+    print("-------------")
+    print(
+        f"Boundary file       : {boundary_path}"
+    )
+    print(
+        f"Boundary CRS        : {source_crs}"
+    )
+    print(
+        f"Pixels inside Fars  : {count:,}"
+    )
+
+    return mask
+
+
+# ============================================================
+# FWI
+# ============================================================
+
+def read_fwi(path: Path):
 
     with rasterio.open(path) as src:
 
         if src.crs is None:
-
             raise ValueError(
                 "FWI raster has no CRS."
             )
 
         data = clean_array(
             src.read(1),
-            src.nodata,
+            src.nodata
         )
-
-        profile = src.profile.copy()
 
         reference = {
             "crs": src.crs,
             "transform": src.transform,
             "width": src.width,
             "height": src.height,
-            "profile": profile,
+            "profile": src.profile.copy(),
             "bounds": src.bounds,
-            "res": src.res,
+            "res": src.res
         }
 
-    print("")
+    print()
     print("FWI REFERENCE GRID")
     print("------------------")
     print(f"CRS        : {reference['crs']}")
@@ -240,45 +328,54 @@ def read_fwi(
 
 
 # ============================================================
-# ALIGN RASTER TO FWI GRID
+# ALIGN RASTER
 # ============================================================
 
 def align_to_fwi(
     path: Path,
     reference: dict,
-    resampling: Resampling,
+    resampling: Resampling
 ):
 
     destination = np.full(
         (
             reference["height"],
-            reference["width"],
+            reference["width"]
         ),
         np.nan,
-        dtype=np.float32,
+        dtype=np.float32
     )
 
     with rasterio.open(path) as src:
 
         if src.crs is None:
-
             raise ValueError(
                 f"Raster has no CRS: {path}"
             )
 
         source = clean_array(
             src.read(1),
-            src.nodata,
+            src.nodata
         )
 
-        print("")
+        print()
         print(f"Aligning: {path}")
         print(f"Source CRS      : {src.crs}")
-        print(f"Source size     : {src.width} x {src.height}")
-        print(f"Source cell     : {src.res}")
-        print(f"Target CRS      : {reference['crs']}")
         print(
-            "Target size     : "
+            f"Source size     : "
+            f"{src.width} x {src.height}"
+        )
+        print(
+            f"Source cell     : {src.res}"
+        )
+        print(
+            f"Source bounds   : {src.bounds}"
+        )
+        print(
+            f"Target CRS      : {reference['crs']}"
+        )
+        print(
+            f"Target size     : "
             f"{reference['width']} x "
             f"{reference['height']}"
         )
@@ -289,16 +386,13 @@ def align_to_fwi(
         reproject(
             source=source,
             destination=destination,
-
             src_transform=src.transform,
             src_crs=src.crs,
             src_nodata=np.nan,
-
             dst_transform=reference["transform"],
             dst_crs=reference["crs"],
             dst_nodata=np.nan,
-
-            resampling=resampling,
+            resampling=resampling
         )
 
     destination[
@@ -314,60 +408,35 @@ def align_to_fwi(
 
 
 # ============================================================
-# DEM -> SLOPE
+# DEM / SLOPE
 # ============================================================
 
 def metric_cell_size(src):
 
     if src.crs is None:
-
         raise ValueError(
             "DEM CRS is missing."
         )
 
-    xres = abs(float(src.transform.a))
-    yres = abs(float(src.transform.e))
+    xres = abs(
+        float(src.transform.a)
+    )
 
-    # Projected CRS
+    yres = abs(
+        float(src.transform.e)
+    )
+
     if src.crs.is_projected:
 
-        factor = 1.0
+        return xres, yres
 
-        try:
-
-            units = [
-                axis.unit_name
-                for axis in src.crs.axis_info
-            ]
-
-            if units:
-
-                unit = (
-                    units[0] or ""
-                ).lower()
-
-                if "foot" in unit:
-
-                    factor = 0.3048
-
-        except Exception:
-
-            pass
-
-        return (
-            xres * factor,
-            yres * factor,
-        )
-
-    # Geographic CRS
     if src.crs.is_geographic:
 
         center_row = src.height / 2.0
 
         latitude = (
             src.transform.f
-            + center_row
-            * src.transform.e
+            + center_row * src.transform.e
         )
 
         lat = math.radians(
@@ -389,7 +458,7 @@ def metric_cell_size(src):
 
         return (
             xres * meters_lon,
-            yres * meters_lat,
+            yres * meters_lat
         )
 
     raise ValueError(
@@ -398,46 +467,53 @@ def metric_cell_size(src):
 
 
 def calculate_native_slope(
-    dem_path: Path,
+    dem_path: Path
 ):
 
-    print("")
-    print("CALCULATING SLOPE ON NATIVE DEM")
-    print("--------------------------------")
+    print()
+    print(
+        "CALCULATING SLOPE ON NATIVE DEM"
+    )
+    print(
+        "--------------------------------"
+    )
 
     with rasterio.open(dem_path) as src:
 
         if src.crs is None:
-
             raise ValueError(
                 "DEM raster has no CRS."
             )
 
         dem = clean_array(
             src.read(1),
-            src.nodata,
+            src.nodata
         )
 
         valid = np.isfinite(dem)
 
         if not np.any(valid):
-
             raise ValueError(
                 "DEM contains no valid pixels."
             )
 
         dx, dy = metric_cell_size(src)
 
-        print(f"DEM CRS       : {src.crs}")
-        print(f"DEM size      : {src.width} x {src.height}")
-        print(f"DEM cell      : {src.res}")
+        print(
+            f"DEM CRS       : {src.crs}"
+        )
+        print(
+            f"DEM size      : "
+            f"{src.width} x {src.height}"
+        )
+        print(
+            f"DEM cell      : {src.res}"
+        )
         print(
             f"Metric spacing: "
             f"X={dx:.3f} m, Y={dy:.3f} m"
         )
 
-        # Fill only for numerical gradient calculation.
-        # Original NoData pixels are restored afterwards.
         fill_value = float(
             np.nanmedian(dem)
         )
@@ -445,13 +521,13 @@ def calculate_native_slope(
         working = np.where(
             valid,
             dem,
-            fill_value,
+            fill_value
         ).astype(np.float32)
 
         gradient_y, gradient_x = np.gradient(
             working,
             dy,
-            dx,
+            dx
         )
 
         slope_rad = np.arctan(
@@ -466,22 +542,23 @@ def calculate_native_slope(
         ).astype(np.float32)
 
         slope[~valid] = np.nan
-
-        slope[
-            ~np.isfinite(slope)
-        ] = np.nan
+        slope[~np.isfinite(slope)] = np.nan
 
         print(
             f"Native slope statistics: "
             f"{stats(slope)}"
         )
 
-        return slope, src.transform, src.crs
+        return (
+            slope,
+            src.transform,
+            src.crs
+        )
 
 
 def align_slope_to_fwi(
     dem_path: Path,
-    reference: dict,
+    reference: dict
 ):
 
     slope, dem_transform, dem_crs = (
@@ -493,29 +570,30 @@ def align_slope_to_fwi(
     destination = np.full(
         (
             reference["height"],
-            reference["width"],
+            reference["width"]
         ),
         np.nan,
-        dtype=np.float32,
+        dtype=np.float32
     )
 
-    print("")
-    print("ALIGNING SLOPE TO FWI GRID")
-    print("--------------------------")
+    print()
+    print(
+        "ALIGNING SLOPE TO FWI GRID"
+    )
+    print(
+        "--------------------------"
+    )
 
     reproject(
         source=slope,
         destination=destination,
-
         src_transform=dem_transform,
         src_crs=dem_crs,
         src_nodata=np.nan,
-
         dst_transform=reference["transform"],
         dst_crs=reference["crs"],
         dst_nodata=np.nan,
-
-        resampling=Resampling.bilinear,
+        resampling=Resampling.bilinear
     )
 
     destination[
@@ -531,12 +609,12 @@ def align_slope_to_fwi(
 
 
 # ============================================================
-# FUEL EXCEL
+# FUEL
 # ============================================================
 
 def find_column(
     dataframe,
-    candidates,
+    candidates
 ):
 
     lookup = {
@@ -549,7 +627,6 @@ def find_column(
         key = candidate.strip().lower()
 
         if key in lookup:
-
             return lookup[key]
 
     return None
@@ -557,13 +634,13 @@ def find_column(
 
 def normalize_column(series):
 
-    values = pd.to_numeric(
-        series,
-        errors="coerce",
-    ).fillna(0.0)
-
-    values = values.clip(
-        lower=0.0
+    values = (
+        pd.to_numeric(
+            series,
+            errors="coerce"
+        )
+        .fillna(0.0)
+        .clip(lower=0.0)
     )
 
     minimum = float(
@@ -576,15 +653,15 @@ def normalize_column(series):
 
     if math.isclose(
         minimum,
-        maximum,
+        maximum
     ):
 
         return pd.Series(
             np.zeros(
                 len(values),
-                dtype=np.float64,
+                dtype=np.float64
             ),
-            index=values.index,
+            index=values.index
         )
 
     return (
@@ -595,10 +672,10 @@ def normalize_column(series):
 
 def load_fuel_mapping(
     excel_path: Path,
-    requested_code_column: str,
+    requested_code_column: str
 ):
 
-    print("")
+    print()
     print("LOADING FUEL TABLE")
     print("------------------")
 
@@ -606,60 +683,46 @@ def load_fuel_mapping(
         excel_path
     )
 
-    if "Fuelbeds_metric" not in (
-        workbook.sheet_names
-    ):
+    if "Fuelbeds_metric" not in workbook.sheet_names:
 
         raise ValueError(
-            "Sheet 'Fuelbeds_metric' "
-            "not found. Available sheets: "
-            f"{workbook.sheet_names}"
+            "Sheet 'Fuelbeds_metric' not found. "
+            f"Available sheets: {workbook.sheet_names}"
         )
 
     df = pd.read_excel(
         excel_path,
-        sheet_name="Fuelbeds_metric",
+        sheet_name="Fuelbeds_metric"
     )
 
-    print(
-        "Fuel columns:"
-    )
+    print("Fuel columns:")
 
     for column in df.columns:
-
-        print(
-            f"  - {column}"
-        )
+        print(f"  - {column}")
 
     code_col = find_column(
         df,
         [
             requested_code_column,
             "JOIN_VALUE",
-            "Join_Value",
             "FUELBED",
-            "Fuelbed",
             "FUELBED_ID",
-            "Fuelbed_ID",
-            "FUEL_CODE",
-            "Fuel_Code",
-        ],
+            "FUEL_CODE"
+        ]
     )
 
     if code_col is None:
 
         raise ValueError(
-            "Could not identify the fuel-code "
-            "column in Fuelbeds_metric."
+            "Could not identify fuel-code column."
         )
 
     woody_col = find_column(
         df,
         [
             "Woody Cover (%)",
-            "Woody Cover",
-            "Woody_Cover",
-        ],
+            "Woody Cover"
+        ]
     )
 
     w1_col = find_column(
@@ -667,8 +730,8 @@ def load_fuel_mapping(
         [
             "W_1hLoad (Mg/ha)",
             "W_1h Load (Mg/ha)",
-            "W_1hLoad",
-        ],
+            "W_1hLoad"
+        ]
     )
 
     w10_col = find_column(
@@ -676,8 +739,8 @@ def load_fuel_mapping(
         [
             "W_10hLoad (Mg/ha)",
             "W_10h Load (Mg/ha)",
-            "W_10hLoad",
-        ],
+            "W_10hLoad"
+        ]
     )
 
     w100_col = find_column(
@@ -685,8 +748,8 @@ def load_fuel_mapping(
         [
             "W_100hLoad (Mg/ha)",
             "W_100h Load (Mg/ha)",
-            "W_100hLoad",
-        ],
+            "W_100hLoad"
+        ]
     )
 
     w1000_col = find_column(
@@ -694,26 +757,24 @@ def load_fuel_mapping(
         [
             "W_1000hLoad (Mg/ha)",
             "W_1000h Load (Mg/ha)",
-            "W_1000hLoad",
-        ],
+            "W_1000hLoad"
+        ]
     )
 
     litter_cover_col = find_column(
         df,
         [
             "Litter Cover (%)",
-            "Litter Cover",
-            "Litter_Cover",
-        ],
+            "Litter Cover"
+        ]
     )
 
     litter_depth_col = find_column(
         df,
         [
             "L_depth (cm)",
-            "L_depth",
-            "Litter Depth (cm)",
-        ],
+            "L_depth"
+        ]
     )
 
     if w1_col is None:
@@ -724,7 +785,7 @@ def load_fuel_mapping(
 
     df[code_col] = pd.to_numeric(
         df[code_col],
-        errors="coerce",
+        errors="coerce"
     )
 
     fine = normalize_column(
@@ -740,7 +801,7 @@ def load_fuel_mapping(
                 0.50,
                 normalize_column(
                     df[w10_col]
-                ),
+                )
             )
         )
 
@@ -751,7 +812,7 @@ def load_fuel_mapping(
                 0.30,
                 normalize_column(
                     df[w100_col]
-                ),
+                )
             )
         )
 
@@ -762,38 +823,38 @@ def load_fuel_mapping(
                 0.20,
                 normalize_column(
                     df[w1000_col]
-                ),
+                )
             )
         )
 
     dead = pd.Series(
         0.0,
-        index=df.index,
+        index=df.index
     )
 
     total_weight = 0.0
 
     for weight, values in dead_parts:
 
-        dead += weight * values
+        dead += (
+            weight * values
+        )
+
         total_weight += weight
 
     if total_weight > 0:
-
         dead /= total_weight
 
-    if woody_col is not None:
-
-        woody = normalize_column(
+    woody = (
+        normalize_column(
             df[woody_col]
         )
-
-    else:
-
-        woody = pd.Series(
+        if woody_col is not None
+        else pd.Series(
             0.0,
-            index=df.index,
+            index=df.index
         )
+    )
 
     litter_parts = []
 
@@ -824,39 +885,33 @@ def load_fuel_mapping(
 
         litter = pd.Series(
             0.0,
-            index=df.index,
+            index=df.index
         )
 
     fuel_score = (
-
         0.35 * fine
         + 0.30 * dead
         + 0.15 * woody
         + 0.10 * litter
         + 0.10 * woody
-    )
-
-    fuel_score = fuel_score.clip(
-        0.0,
-        1.0,
-    )
+    ).clip(0.0, 1.0)
 
     df["_F_Fuel"] = fuel_score
 
-    df = df.dropna(
-        subset=[code_col]
-    )
-
-    df = df.drop_duplicates(
-        subset=[code_col],
-        keep="last",
+    df = (
+        df
+        .dropna(subset=[code_col])
+        .drop_duplicates(
+            subset=[code_col],
+            keep="last"
+        )
     )
 
     mapping = {}
 
     for code, score in zip(
         df[code_col],
-        df["_F_Fuel"],
+        df["_F_Fuel"]
     ):
 
         try:
@@ -875,9 +930,8 @@ def load_fuel_mapping(
 
         except (
             TypeError,
-            ValueError,
+            ValueError
         ):
-
             continue
 
     if not mapping:
@@ -898,19 +952,15 @@ def load_fuel_mapping(
     return mapping
 
 
-# ============================================================
-# FUEL RASTER -> SCORE
-# ============================================================
-
 def fuel_to_score(
     fuel_codes,
-    mapping,
+    mapping
 ):
 
     output = np.full(
         fuel_codes.shape,
         np.nan,
-        dtype=np.float32,
+        dtype=np.float32
     )
 
     valid = np.isfinite(
@@ -920,8 +970,7 @@ def fuel_to_score(
     if not np.any(valid):
 
         raise ValueError(
-            "Aligned Fuel raster contains "
-            "no valid pixels."
+            "Aligned Fuel raster contains no valid pixels."
         )
 
     unique_codes = np.unique(
@@ -950,19 +999,17 @@ def fuel_to_score(
                 code_float
             )
 
-    print("")
+    print()
     print("FUEL MAPPING")
     print("------------")
     print(
         f"Unique raster codes : "
         f"{len(unique_codes)}"
     )
-
     print(
         f"Mapped codes        : "
         f"{len(unique_codes) - len(unmapped)}"
     )
-
     print(
         f"Unmapped codes      : "
         f"{len(unmapped)}"
@@ -975,7 +1022,6 @@ def fuel_to_score(
         )
 
         for code in unmapped[:20]:
-
             print(
                 f"  - {code}"
             )
@@ -989,13 +1035,13 @@ def fuel_to_score(
 
 
 # ============================================================
-# WRITE RASTER
+# OUTPUT
 # ============================================================
 
 def write_raster(
     path: Path,
     array: np.ndarray,
-    reference: dict,
+    reference: dict
 ):
 
     profile = reference[
@@ -1012,24 +1058,24 @@ def write_raster(
         transform=reference["transform"],
         nodata=OUTPUT_NODATA,
         compress="deflate",
-        predictor=3,
+        predictor=3
     )
 
     output = np.where(
         np.isfinite(array),
         array,
-        OUTPUT_NODATA,
+        OUTPUT_NODATA
     ).astype(np.float32)
 
     with rasterio.open(
         path,
         "w",
-        **profile,
+        **profile
     ) as dst:
 
         dst.write(
             output,
-            1,
+            1
         )
 
 
@@ -1043,36 +1089,41 @@ def main():
 
     require_file(
         args.fwi_raster,
-        "FWI raster",
+        "FWI raster"
     )
 
     require_file(
         args.fuel_raster,
-        "Fuel raster",
+        "Fuel raster"
     )
 
     require_file(
         args.dem_raster,
-        "DEM raster",
+        "DEM raster"
     )
 
     require_file(
         args.fuel_excel,
-        "Fuel Excel",
+        "Fuel Excel"
+    )
+
+    require_file(
+        args.boundary,
+        "Fars boundary"
     )
 
     args.output_dir.mkdir(
         parents=True,
-        exist_ok=True,
+        exist_ok=True
     )
 
-    print("")
+    print()
     print("=" * 70)
     print("FIRIS BUILD START")
     print("=" * 70)
 
     # --------------------------------------------------------
-    # 1. FWI
+    # FWI reference
     # --------------------------------------------------------
 
     fwi, reference = read_fwi(
@@ -1080,52 +1131,55 @@ def main():
     )
 
     # --------------------------------------------------------
-    # 2. Fuel -> FWI grid
+    # Fars mask
+    # --------------------------------------------------------
+
+    fars_mask = load_boundary_mask(
+        args.boundary,
+        reference
+    )
+
+    # --------------------------------------------------------
+    # Fuel alignment
     # --------------------------------------------------------
 
     fuel_codes = align_to_fwi(
         args.fuel_raster,
         reference,
-        Resampling.nearest,
+        Resampling.nearest
     )
 
     # --------------------------------------------------------
-    # 3. DEM native slope -> FWI grid
+    # Native DEM slope
     # --------------------------------------------------------
 
     slope = align_slope_to_fwi(
         args.dem_raster,
-        reference,
+        reference
     )
 
     # --------------------------------------------------------
-    # 4. Fuel Excel
+    # Fuel mapping
     # --------------------------------------------------------
 
     fuel_mapping = load_fuel_mapping(
         args.fuel_excel,
-        args.fuel_code_column,
+        args.fuel_code_column
+    )
+
+    f_fuel, unmapped_codes = fuel_to_score(
+        fuel_codes,
+        fuel_mapping
     )
 
     # --------------------------------------------------------
-    # 5. Fuel score
-    # --------------------------------------------------------
-
-    f_fuel, unmapped_codes = (
-        fuel_to_score(
-            fuel_codes,
-            fuel_mapping,
-        )
-    )
-
-    # --------------------------------------------------------
-    # 6. FWI normalization
+    # FWI normalization
     # --------------------------------------------------------
 
     f_fwi = np.full(
         fwi.shape,
         np.nan,
-        dtype=np.float32,
+        dtype=np.float32
     )
 
     fwi_valid = np.isfinite(
@@ -1133,20 +1187,19 @@ def main():
     )
 
     f_fwi[fwi_valid] = np.clip(
-        fwi[fwi_valid]
-        / FWI_MAX,
+        fwi[fwi_valid] / FWI_MAX,
         0.0,
-        1.0,
+        1.0
     )
 
     # --------------------------------------------------------
-    # 7. Topography normalization
+    # Topography normalization
     # --------------------------------------------------------
 
     f_topo = np.full(
         slope.shape,
         np.nan,
-        dtype=np.float32,
+        dtype=np.float32
     )
 
     slope_valid = np.isfinite(
@@ -1157,92 +1210,149 @@ def main():
         slope[slope_valid]
         / SLOPE_REFERENCE,
         0.0,
-        1.0,
+        1.0
     )
 
     # --------------------------------------------------------
-    # 8. Common valid pixels
+    # Coverage inside Fars
     # --------------------------------------------------------
 
-    valid = (
-        np.isfinite(f_fwi)
+    province_pixels = int(
+        np.sum(fars_mask)
+    )
+
+    fwi_inside = (
+        fars_mask
+        & np.isfinite(fwi)
+    )
+
+    fuel_inside = (
+        fars_mask
         & np.isfinite(f_fuel)
+    )
+
+    topo_inside = (
+        fars_mask
         & np.isfinite(f_topo)
     )
 
-    valid_count = int(
-        np.sum(valid)
+    common = (
+        fwi_inside
+        & fuel_inside
+        & topo_inside
     )
 
-    total_count = int(
-        fwi.size
+    fwi_count = int(
+        np.sum(fwi_inside)
     )
 
-    print("")
-    print("COMMON GRID VALIDATION")
-    print("----------------------")
+    fuel_count = int(
+        np.sum(fuel_inside)
+    )
+
+    topo_count = int(
+        np.sum(topo_inside)
+    )
+
+    common_count = int(
+        np.sum(common)
+    )
+
+    print()
     print(
-        f"Total target pixels : "
-        f"{total_count:,}"
+        "FARS COVERAGE VALIDATION"
+    )
+    print(
+        "------------------------"
     )
 
     print(
-        f"Valid common pixels : "
-        f"{valid_count:,}"
+        f"Province pixels      : "
+        f"{province_pixels:,}"
     )
 
     print(
-        f"Valid percentage    : "
-        f"{100.0 * valid_count / total_count:.2f}%"
+        f"FWI valid in Fars    : "
+        f"{fwi_count:,} "
+        f"({100*fwi_count/province_pixels:.2f}%)"
     )
 
-    if valid_count == 0:
+    print(
+        f"Fuel valid in Fars   : "
+        f"{fuel_count:,} "
+        f"({100*fuel_count/province_pixels:.2f}%)"
+    )
+
+    print(
+        f"Topo valid in Fars   : "
+        f"{topo_count:,} "
+        f"({100*topo_count/province_pixels:.2f}%)"
+    )
+
+    print(
+        f"Common valid in Fars : "
+        f"{common_count:,} "
+        f"({100*common_count/province_pixels:.2f}%)"
+    )
+
+    if fuel_count < province_pixels:
+
+        print()
+        print(
+            "WARNING: Fuel does not cover all "
+            "of Fars."
+        )
+
+        print(
+            f"Missing Fuel pixels: "
+            f"{province_pixels-fuel_count:,}"
+        )
+
+        print(
+            "NoData will remain NoData."
+        )
+
+    if common_count == 0:
 
         raise RuntimeError(
-            "There are no common valid pixels "
-            "between FWI, Fuel and Topography."
+            "No common valid pixels exist inside Fars."
         )
 
     # --------------------------------------------------------
-    # 9. Final FLI
+    # FLI
     # --------------------------------------------------------
 
     fli = np.full(
         fwi.shape,
         np.nan,
-        dtype=np.float32,
+        dtype=np.float32
     )
 
-    fli[valid] = (
-
+    fli[common] = (
         100.0
         * (
-            FWI_WEIGHT
-            * f_fwi[valid]
-
-            + FUEL_WEIGHT
-            * f_fuel[valid]
-
-            + TOPO_WEIGHT
-            * f_topo[valid]
+            FWI_WEIGHT * f_fwi[common]
+            + FUEL_WEIGHT * f_fuel[common]
+            + TOPO_WEIGHT * f_topo[common]
         )
     )
 
     fli = np.clip(
         fli,
         0.0,
-        100.0,
+        100.0
     )
 
-    print("")
+    print()
     print("FINAL FLI")
     print("---------")
     print(
-        f"Statistics: {stats(fli)}"
+        f"Statistics: "
+        f"{stats(fli)}"
     )
 
     # --------------------------------------------------------
-    # 10. Output paths
+    # Outputs
     # --------------------------------------------------------
 
     date = args.run_date
@@ -1272,51 +1382,94 @@ def main():
         / f"fli_fars_{date}.tif"
     )
 
+    coverage_path = (
+        args.output_dir
+        / f"fuel_coverage_fars_{date}.tif"
+    )
+
     report_path = (
         args.output_dir
         / f"firis_report_{date}.json"
     )
 
-    # --------------------------------------------------------
-    # 11. Write rasters
-    # --------------------------------------------------------
+    f_fwi_out = np.where(
+        fars_mask,
+        f_fwi,
+        np.nan
+    )
 
-    print("")
+    f_fuel_out = np.where(
+        fars_mask,
+        f_fuel,
+        np.nan
+    )
+
+    slope_out = np.where(
+        fars_mask,
+        slope,
+        np.nan
+    )
+
+    f_topo_out = np.where(
+        fars_mask,
+        f_topo,
+        np.nan
+    )
+
+    coverage = np.full(
+        fwi.shape,
+        np.nan,
+        dtype=np.float32
+    )
+
+    coverage[fars_mask] = np.where(
+        fuel_inside[fars_mask],
+        1.0,
+        0.0
+    )
+
+    print()
     print("WRITING OUTPUTS")
     print("----------------")
 
     write_raster(
         f_fwi_path,
-        f_fwi,
-        reference,
+        f_fwi_out,
+        reference
     )
 
     write_raster(
         f_fuel_path,
-        f_fuel,
-        reference,
+        f_fuel_out,
+        reference
     )
 
     write_raster(
         slope_path,
-        slope,
-        reference,
+        slope_out,
+        reference
     )
 
     write_raster(
         f_topo_path,
-        f_topo,
-        reference,
+        f_topo_out,
+        reference
     )
 
     write_raster(
         fli_path,
         fli,
-        reference,
+        reference
+    )
+
+    write_raster(
+        coverage_path,
+        coverage,
+        reference
     )
 
     # --------------------------------------------------------
-    # 12. Report
+    # Report
     # --------------------------------------------------------
 
     report = {
@@ -1332,6 +1485,9 @@ def main():
         "run_date":
             date,
 
+        "boundary":
+            str(args.boundary),
+
         "formula":
             "FLI = 100 * "
             "(0.45 * F_FWI + "
@@ -1341,7 +1497,7 @@ def main():
         "weights": {
             "F_FWI": FWI_WEIGHT,
             "F_Fuel": FUEL_WEIGHT,
-            "F_Topo": TOPO_WEIGHT,
+            "F_Topo": TOPO_WEIGHT
         },
 
         "target_grid": {
@@ -1363,6 +1519,29 @@ def main():
 
             "cell_size_y":
                 float(reference["res"][1]),
+
+            "bounds":
+                bounds_dict(
+                    reference["bounds"]
+                )
+        },
+
+        "input_metadata": {
+
+            "FWI":
+                raster_metadata(
+                    args.fwi_raster
+                ),
+
+            "Fuel":
+                raster_metadata(
+                    args.fuel_raster
+                ),
+
+            "DEM":
+                raster_metadata(
+                    args.dem_raster
+                )
         },
 
         "alignment": {
@@ -1375,7 +1554,7 @@ def main():
 
             "DEM":
                 "native slope calculation "
-                "then bilinear to FWI",
+                "then bilinear to FWI"
         },
 
         "normalization": {
@@ -1387,42 +1566,81 @@ def main():
                 "Fuelbeds_metric weighted score",
 
             "F_Topo":
-                "clip(slope_degrees / 45, 0, 1)",
+                "clip(slope_degrees / 45, 0, 1)"
+        },
+
+        "coverage_inside_fars": {
+
+            "province_pixels":
+                province_pixels,
+
+            "FWI_valid_pixels":
+                fwi_count,
+
+            "FWI_valid_percent":
+                round(
+                    100 * fwi_count
+                    / province_pixels,
+                    4
+                ),
+
+            "Fuel_valid_pixels":
+                fuel_count,
+
+            "Fuel_valid_percent":
+                round(
+                    100 * fuel_count
+                    / province_pixels,
+                    4
+                ),
+
+            "Topo_valid_pixels":
+                topo_count,
+
+            "Topo_valid_percent":
+                round(
+                    100 * topo_count
+                    / province_pixels,
+                    4
+                ),
+
+            "common_valid_pixels":
+                common_count,
+
+            "common_valid_percent":
+                round(
+                    100 * common_count
+                    / province_pixels,
+                    4
+                ),
+
+            "common_valid_percent_of_FWI":
+                round(
+                    100 * common_count
+                    / max(fwi_count, 1),
+                    4
+                )
         },
 
         "statistics": {
 
             "FWI":
-                stats(fwi),
+                stats(f_fwi_out),
 
             "F_FWI":
-                stats(f_fwi),
+                stats(f_fwi_out),
 
             "F_Fuel":
-                stats(f_fuel),
+                stats(f_fuel_out),
 
             "Slope_degrees":
-                stats(slope),
+                stats(slope_out),
 
             "F_Topo":
-                stats(f_topo),
+                stats(f_topo_out),
 
             "FLI":
-                stats(fli),
-
-            "total_pixels":
-                total_count,
-
-            "common_valid_pixels":
-                valid_count,
-
-            "common_valid_percent":
-                round(
-                    100.0
-                    * valid_count
-                    / total_count,
-                    4,
-                ),
+                stats(fli)
         },
 
         "fuel": {
@@ -1431,7 +1649,7 @@ def main():
                 len(unmapped_codes),
 
             "unmapped_codes":
-                unmapped_codes[:100],
+                unmapped_codes[:100]
         },
 
         "inputs": {
@@ -1447,6 +1665,9 @@ def main():
 
             "FuelExcel":
                 str(args.fuel_excel),
+
+            "Boundary":
+                str(args.boundary)
         },
 
         "outputs": {
@@ -1465,12 +1686,29 @@ def main():
 
             "FLI":
                 str(fli_path),
+
+            "FuelCoverage":
+                str(coverage_path)
         },
+
+        "interpretation": {
+
+            "NoData_policy":
+                "NoData is preserved; "
+                "missing source coverage "
+                "is never extrapolated.",
+
+            "coverage_warning":
+                bool(
+                    fuel_count
+                    < province_pixels
+                )
+        }
     }
 
     with report_path.open(
         "w",
-        encoding="utf-8",
+        encoding="utf-8"
     ) as file:
 
         json.dump(
@@ -1478,25 +1716,30 @@ def main():
             file,
             ensure_ascii=False,
             indent=2,
-            allow_nan=False,
+            allow_nan=False
         )
 
         file.write("\n")
 
-    print("")
+    print()
     print("=" * 70)
-    print("FIRIS BUILD COMPLETED SUCCESSFULLY")
+    print(
+        "FIRIS BUILD COMPLETED SUCCESSFULLY"
+    )
     print("=" * 70)
 
     print(
-        f"FLI output: {fli_path}"
+        f"FLI output    : {fli_path}"
     )
 
     print(
-        f"Report: {report_path}"
+        f"Fuel coverage : {coverage_path}"
+    )
+
+    print(
+        f"Report        : {report_path}"
     )
 
 
 if __name__ == "__main__":
-
     main()
