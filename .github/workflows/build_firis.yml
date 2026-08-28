@@ -1,71 +1,52 @@
 
-name: Build FIRIS Fire Risk Map
+name: Build FIRIS
 
 on:
   workflow_dispatch:
 
-  schedule:
-    - cron: "30 5 * * *"
-
   push:
-    branches:
-      - main
     paths:
       - "scripts/**"
       - "data/raw/**"
-      - ".github/workflows/build_firis.yml"
+      - "fars.geojson"
+      - ".github/workflows/build-firis.yml"
 
 permissions:
   contents: write
 
-concurrency:
-  group: firis-build-main
-  cancel-in-progress: false
-
 jobs:
-
   build-firis:
-
-    name: Build FIRIS FLI
 
     runs-on: ubuntu-latest
 
     steps:
 
-      # =====================================================
+      # ============================================================
       # CHECKOUT
-      # =====================================================
+      # ============================================================
 
       - name: Checkout repository
-
         uses: actions/checkout@v4
-
         with:
           fetch-depth: 0
 
 
-      # =====================================================
+      # ============================================================
       # PYTHON
-      # =====================================================
+      # ============================================================
 
-      - name: Set up Python
-
+      - name: Setup Python
         uses: actions/setup-python@v5
-
         with:
           python-version: "3.11"
 
 
-      # =====================================================
-      # DEPENDENCIES
-      # =====================================================
+      # ============================================================
+      # INSTALL DEPENDENCIES
+      # ============================================================
 
       - name: Install dependencies
-
-        shell: bash
-
         run: |
-
           set -euo pipefail
 
           python -m pip install --upgrade pip
@@ -73,566 +54,269 @@ jobs:
           pip install \
             numpy \
             pandas \
-            rasterio \
             openpyxl \
+            rasterio \
+            shapely \
+            pyproj \
             pillow
 
 
-      # =====================================================
-      # SHOW INPUT FILES
-      # =====================================================
+      # ============================================================
+      # RUN DATE
+      # ============================================================
 
-      - name: Show available input files
-
+      - name: Set run date
         shell: bash
-
         run: |
+          set -euo pipefail
 
+          RUN_DATE="$(date -u +%Y-%m-%d)"
+
+          echo "RUN_DATE=${RUN_DATE}" >> "${GITHUB_ENV}"
+
+          echo "============================================================"
+          echo "RUNNING FIRIS"
+          echo "============================================================"
+          echo "Run date: ${RUN_DATE}"
+
+
+      # ============================================================
+      # INPUT FILES
+      # ============================================================
+
+      - name: Locate input rasters
+        shell: bash
+        run: |
           set -euo pipefail
 
           echo "============================================================"
-          echo "AVAILABLE RASTER INPUTS"
+          echo "INPUT FILES"
           echo "============================================================"
 
-          find data/raw \
-            -type f \
-            \( -iname "*.tif" -o -iname "*.tiff" \) \
-            | sort
+          FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
 
-          echo ""
-
-          echo "============================================================"
-          echo "AVAILABLE EXCEL INPUTS"
-          echo "============================================================"
-
-          find data/raw \
-            -type f \
-            \( -iname "*.xlsx" -o -iname "*.xls" \) \
-            | sort
-
-
-      # =====================================================
-      # SELECT INPUTS
-      # =====================================================
-
-      - name: Locate FIRIS input files
-
-        shell: bash
-
-        run: |
-
-          set -euo pipefail
-
-          echo "============================================================"
-          echo "SELECTING FIRIS INPUTS"
-          echo "============================================================"
-
-
-          # ---------------------------------------------------
-          # FWI
-          # ---------------------------------------------------
-
-          mapfile -t FWI_FILES < <(
-            find data/raw/fwi \
-              -maxdepth 1 \
-              -type f \
-              \( -iname "*.tif" -o -iname "*.tiff" \) \
-              -iname "*fwi*" \
-              | sort
-          )
-
-
-          if [ "${#FWI_FILES[@]}" -eq 0 ]; then
-
-            echo "ERROR: No FWI raster found."
-
-            exit 1
-
-          fi
-
-
-          FWI_RASTER="${FWI_FILES[${#FWI_FILES[@]}-1]}"
-
-
-          echo "Selected newest FWI:"
-          echo "${FWI_RASTER}"
-
-
-          # ---------------------------------------------------
-          # FUEL
-          # ---------------------------------------------------
-
-          FUEL_RASTER="data/raw/fuel/fars_fuel.tif"
-
-
-          if [ ! -f "${FUEL_RASTER}" ]; then
-
-            echo "ERROR: Fuel raster not found:"
-            echo "${FUEL_RASTER}"
-
-            exit 1
-
-          fi
-
-
-          # ---------------------------------------------------
-          # FUEL EXCEL
-          # ---------------------------------------------------
-
-          FUEL_EXCEL="data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
-
-
-          if [ ! -f "${FUEL_EXCEL}" ]; then
-
-            echo "ERROR: Fuel Excel not found:"
-            echo "${FUEL_EXCEL}"
-
-            exit 1
-
-          fi
-
-
-          # ---------------------------------------------------
-          # DEM
-          # ---------------------------------------------------
+          FUEL_RASTER="data/raw/fuel/fars_fuel_aligned.tif"
 
           DEM_RASTER="data/raw/topography/dem_fars.tif"
 
+          FUEL_EXCEL="data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
 
-          if [ ! -f "${DEM_RASTER}" ]; then
+          echo "FWI_RASTER  = ${FWI_RASTER}"
+          echo "FUEL_RASTER = ${FUEL_RASTER}"
+          echo "DEM_RASTER  = ${DEM_RASTER}"
+          echo "FUEL_EXCEL  = ${FUEL_EXCEL}"
 
-            echo "ERROR: DEM raster not found:"
-            echo "${DEM_RASTER}"
-
+          if [ ! -f "${FWI_RASTER}" ]; then
+            echo ""
+            echo "ERROR: FWI raster not found:"
+            echo "${FWI_RASTER}"
             exit 1
-
           fi
 
+          if [ ! -f "${FUEL_RASTER}" ]; then
+            echo ""
+            echo "ERROR: ALIGNED fuel raster not found:"
+            echo "${FUEL_RASTER}"
+            echo ""
+            echo "Expected file:"
+            echo "data/raw/fuel/fars_fuel_aligned.tif"
+            exit 1
+          fi
 
-          # ---------------------------------------------------
-          # EXPORT VARIABLES
-          # ---------------------------------------------------
+          if [ ! -f "${DEM_RASTER}" ]; then
+            echo ""
+            echo "ERROR: DEM raster not found:"
+            echo "${DEM_RASTER}"
+            exit 1
+          fi
+
+          if [ ! -f "${FUEL_EXCEL}" ]; then
+            echo ""
+            echo "ERROR: Fuel Excel not found:"
+            echo "${FUEL_EXCEL}"
+            exit 1
+          fi
 
           echo ""
-          echo "============================================================"
-          echo "FINAL INPUT SELECTION"
-          echo "============================================================"
-
-          echo "FWI  : ${FWI_RASTER}"
-          echo "Fuel : ${FUEL_RASTER}"
-          echo "Excel: ${FUEL_EXCEL}"
-          echo "DEM  : ${DEM_RASTER}"
+          echo "All input files found."
 
 
-          echo "FWI_RASTER=${FWI_RASTER}" >> "${GITHUB_ENV}"
-          echo "FUEL_RASTER=${FUEL_RASTER}" >> "${GITHUB_ENV}"
-          echo "FUEL_EXCEL=${FUEL_EXCEL}" >> "${GITHUB_ENV}"
-          echo "DEM_RASTER=${DEM_RASTER}" >> "${GITHUB_ENV}"
+      # ============================================================
+      # VERIFY RASTER GEOMETRY
+      # ============================================================
 
-
-      # =====================================================
-      # INSPECT INPUT RASTERS
-      # =====================================================
-
-      - name: Inspect input raster metadata
-
+      - name: Verify raster alignment
         shell: bash
-
         run: |
-
           set -euo pipefail
 
           python - <<'PY'
-
-          import os
           import rasterio
 
-
-          files = {
-              "FWI": os.environ["FWI_RASTER"],
-              "Fuel": os.environ["FUEL_RASTER"],
-              "DEM": os.environ["DEM_RASTER"],
-          }
-
+          fwi = "data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
+          fuel = "data/raw/fuel/fars_fuel_aligned.tif"
 
           print("")
-          print("=" * 70)
-          print("INPUT RASTER METADATA")
-          print("=" * 70)
+          print("============================================================")
+          print("VERIFYING FWI / FUEL GRID")
+          print("============================================================")
 
-
-          for name, path in files.items():
-
+          with rasterio.open(fwi) as a:
               print("")
-              print(f"[{name}]")
-              print(f"Path       : {path}")
+              print("FWI")
+              print("CRS      :", a.crs)
+              print("SIZE     :", a.width, "x", a.height)
+              print("CELL     :", a.res)
+              print("BOUNDS   :", a.bounds)
+              print("TRANSFORM:", a.transform)
 
-              with rasterio.open(path) as src:
+          with rasterio.open(fuel) as b:
+              print("")
+              print("FUEL")
+              print("CRS      :", b.crs)
+              print("SIZE     :", b.width, "x", b.height)
+              print("CELL     :", b.res)
+              print("BOUNDS   :", b.bounds)
+              print("TRANSFORM:", b.transform)
 
-                  print(f"CRS        : {src.crs}")
-                  print(f"Width      : {src.width}")
-                  print(f"Height     : {src.height}")
-                  print(f"Cell Size  : {src.res}")
-                  print(f"Bounds     : {src.bounds}")
-                  print(f"NoData     : {src.nodata}")
-                  print(f"Data Type  : {src.dtypes[0]}")
+          with rasterio.open(fwi) as a, rasterio.open(fuel) as b:
 
+              if a.crs != b.crs:
+                  raise RuntimeError(
+                      "ERROR: FWI and Fuel CRS are different."
+                  )
+
+              if a.width != b.width or a.height != b.height:
+                  raise RuntimeError(
+                      "ERROR: FWI and Fuel dimensions are different."
+                  )
+
+              if abs(a.res[0] - b.res[0]) > 1e-9:
+                  raise RuntimeError(
+                      "ERROR: FWI and Fuel cell sizes are different."
+                  )
+
+              if abs(a.res[1] - b.res[1]) > 1e-9:
+                  raise RuntimeError(
+                      "ERROR: FWI and Fuel cell sizes are different."
+                  )
+
+              if not a.transform.almost_equals(
+                  b.transform,
+                  precision=7
+              ):
+                  raise RuntimeError(
+                      "ERROR: FWI and Fuel grids are not aligned."
+                  )
+
+          print("")
+          print("FWI and Fuel grids are aligned.")
           PY
 
 
-      # =====================================================
-      # BUILD FIRIS
-      # =====================================================
+      # ============================================================
+      # RUN FIRIS
+      # ============================================================
 
-      - name: Build FIRIS FLI
-
+      - name: Run FIRIS
         shell: bash
-
         run: |
-
           set -euo pipefail
-
-          mkdir -p data/outputs
-
-          RUN_DATE="$(date -u +'%Y-%m-%d')"
 
           echo ""
           echo "============================================================"
           echo "RUNNING FIRIS"
           echo "============================================================"
 
-          echo "Run date: ${RUN_DATE}"
-
-          echo ""
-          echo "FWI_RASTER  = ${FWI_RASTER}"
-          echo "FUEL_RASTER = ${FUEL_RASTER}"
-          echo "FUEL_EXCEL  = ${FUEL_EXCEL}"
-          echo "DEM_RASTER  = ${DEM_RASTER}"
-
           python scripts/build_firis.py \
-            --fwi-raster "${FWI_RASTER}" \
-            --fuel-raster "${FUEL_RASTER}" \
-            --dem-raster "${DEM_RASTER}" \
-            --fuel-excel "${FUEL_EXCEL}" \
-            --fuel-code-column "JOIN_VALUE" \
+            --fwi-raster "data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif" \
+            --fuel-raster "data/raw/fuel/fars_fuel_aligned.tif" \
+            --dem-raster "data/raw/topography/dem_fars.tif" \
+            --fuel-excel "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx" \
             --output-dir "data/outputs" \
             --run-date "${RUN_DATE}"
 
 
-      # =====================================================
-      # CHECK FIRIS OUTPUT
-      # =====================================================
-
-      - name: Check FIRIS output
-
-        shell: bash
-
-        run: |
-
-          set -euo pipefail
-
-          RUN_DATE="$(date -u +'%Y-%m-%d')"
-
-          FLI_OUTPUT="data/outputs/fli_fars_${RUN_DATE}.tif"
-          REPORT_OUTPUT="data/outputs/firis_report_${RUN_DATE}.json"
-
-
-          echo ""
-          echo "============================================================"
-          echo "CHECKING FIRIS OUTPUT"
-          echo "============================================================"
-
-
-          if [ ! -f "${FLI_OUTPUT}" ]; then
-
-            echo "ERROR: FLI output was not created:"
-            echo "${FLI_OUTPUT}"
-
-            exit 1
-
-          fi
-
-
-          if [ ! -f "${REPORT_OUTPUT}" ]; then
-
-            echo "ERROR: FIRIS report was not created:"
-            echo "${REPORT_OUTPUT}"
-
-            exit 1
-
-          fi
-
-
-          echo "FLI output:"
-          echo "${FLI_OUTPUT}"
-
-          echo ""
-
-          echo "Report:"
-          echo "${REPORT_OUTPUT}"
-
-
-      # =====================================================
-      # BUILD WEB MAP
-      # =====================================================
+      # ============================================================
+      # BUILD WEB OUTPUT
+      # ============================================================
 
       - name: Build web map
-
         shell: bash
-
         run: |
-
           set -euo pipefail
+
+          FLI_RASTER="data/outputs/fli_fars_${RUN_DATE}.tif"
+
+          if [ ! -f "${FLI_RASTER}" ]; then
+            echo "ERROR: FLI output not found:"
+            echo "${FLI_RASTER}"
+            exit 1
+          fi
 
           mkdir -p data/web
 
-          RUN_DATE="$(date -u +'%Y-%m-%d')"
-
-          INPUT_FLI="data/outputs/fli_fars_${RUN_DATE}.tif"
-
-
-          if [ ! -f "${INPUT_FLI}" ]; then
-
-            echo "ERROR: FLI output not found:"
-            echo "${INPUT_FLI}"
-
-            exit 1
-
-          fi
-
-
           python scripts/build_web_map.py \
-            --input "${INPUT_FLI}" \
+            --input "${FLI_RASTER}" \
             --output-dir "data/web"
 
 
-      # =====================================================
-      # SHOW RESULTS
-      # =====================================================
+      # ============================================================
+      # SHOW OUTPUTS
+      # ============================================================
 
-      - name: Show generated files
-
+      - name: Check outputs
         shell: bash
-
         run: |
-
           set -euo pipefail
 
           echo ""
           echo "============================================================"
-          echo "FIRIS OUTPUT FILES"
+          echo "OUTPUT FILES"
           echo "============================================================"
 
-          find data/outputs \
-            -maxdepth 1 \
-            -type f \
-            -printf "%f %k KB\n" \
-            | sort
-
+          find data/outputs -maxdepth 1 -type f -print | sort
 
           echo ""
-          echo "============================================================"
-          echo "WEB OUTPUT FILES"
-          echo "============================================================"
+          echo "WEB FILES"
 
-          find data/web \
-            -maxdepth 1 \
-            -type f \
-            -printf "%f %k KB\n" \
-            | sort
+          find data/web -maxdepth 1 -type f -print | sort
 
 
-          echo ""
-          echo "============================================================"
-          echo "FIRIS REPORT"
-          echo "============================================================"
+      # ============================================================
+      # COMMIT
+      # ============================================================
 
-          RUN_DATE="$(date -u +'%Y-%m-%d')"
-
-          REPORT="data/outputs/firis_report_${RUN_DATE}.json"
-
-
-          if [ -f "${REPORT}" ]; then
-
-            cat "${REPORT}"
-
-          fi
-
-
-      # =====================================================
-      # COMMIT AND PUSH
-      # =====================================================
-
-      - name: Commit and push generated outputs
-
+      - name: Commit outputs
         shell: bash
-
         run: |
-
           set -euo pipefail
 
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # ---------------------------------------------------
-          # Git identity
-          # ---------------------------------------------------
-
-          git config \
-            user.name \
-            "github-actions[bot]"
-
-          git config \
-            user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
-
-
-          # ---------------------------------------------------
-          # Stage generated files
-          # ---------------------------------------------------
-
-          git add \
-            data/outputs/ \
-            data/web/
-
-
-          # ---------------------------------------------------
-          # Stop if nothing changed
-          # ---------------------------------------------------
+          git add data/outputs data/web
 
           if git diff --cached --quiet; then
-
-            echo "No generated-file changes."
-
+            echo "No output changes to commit."
             exit 0
-
           fi
-
-
-          # ---------------------------------------------------
-          # Create local commit
-          # ---------------------------------------------------
 
           git commit \
             -m "chore(firis): update FLI outputs [skip ci]"
 
 
-          # ---------------------------------------------------
-          # Get latest remote main
-          # ---------------------------------------------------
+      # ============================================================
+      # SAFE PUSH
+      # ============================================================
+
+      - name: Push outputs
+        shell: bash
+        run: |
+          set -euo pipefail
 
           git fetch origin main
 
-
-          # ---------------------------------------------------
-          # Merge remote changes
-          # ---------------------------------------------------
-
-          echo ""
-          echo "============================================================"
-          echo "SYNCHRONIZING WITH REMOTE MAIN"
-          echo "============================================================"
-
-
-          if git merge origin/main --no-edit; then
-
-            echo "Remote main merged without conflicts."
-
-          else
-
-            echo ""
-            echo "Merge conflict detected."
-            echo "Resolving generated FIRIS outputs in favor of this run."
-
-
-            # -------------------------------------------------
-            # These files are generated by this workflow.
-            # The current successful FIRIS run must win.
-            # -------------------------------------------------
-
-            GENERATED_FILES=(
-
-              "data/outputs/f_fuel_fars_${RUN_DATE}.tif"
-
-              "data/outputs/f_fwi_fars_${RUN_DATE}.tif"
-
-              "data/outputs/f_topo_fars_${RUN_DATE}.tif"
-
-              "data/outputs/firis_report_${RUN_DATE}.json"
-
-              "data/outputs/fli_fars_${RUN_DATE}.tif"
-
-              "data/outputs/slope_fars_${RUN_DATE}.tif"
-
-              "data/web/fli_latest.json"
-
-              "data/web/fli_latest.png"
-
-            )
-
-
-            for FILE in "${GENERATED_FILES[@]}"; do
-
-              if git ls-files --error-unmatch "${FILE}" >/dev/null 2>&1; then
-
-                if git status --porcelain --untracked-files=all \
-                  | grep -Fq "${FILE}"; then
-
-                  git checkout --ours -- "${FILE}" || true
-
-                  git add "${FILE}"
-
-                fi
-
-              fi
-
-            done
-
-
-            # -------------------------------------------------
-            # Check for unresolved conflicts
-            # -------------------------------------------------
-
-            if git diff --name-only --diff-filter=U | grep -q .; then
-
-              echo ""
-              echo "ERROR: Unresolved merge conflicts remain."
-
-              git diff --name-only --diff-filter=U
-
-              git merge --abort || true
-
-              exit 1
-
-            fi
-
-
-            # -------------------------------------------------
-            # Finish merge
-            # -------------------------------------------------
-
-            git add -A
-
-            git commit \
-              -m "chore(firis): resolve generated output conflicts [skip ci]" \
-              || true
-
-          fi
-
-
-          # ---------------------------------------------------
-          # Final push
-          # ---------------------------------------------------
-
-          echo ""
-          echo "============================================================"
-          echo "PUSHING FIRIS OUTPUTS"
-          echo "============================================================"
-
+          git rebase origin/main
 
           git push origin HEAD:main
-
-
-          echo ""
-          echo "============================================================"
-          echo "FIRIS PUSH SUCCESSFUL"
-          echo "============================================================"
-
