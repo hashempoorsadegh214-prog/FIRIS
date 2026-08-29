@@ -14,13 +14,12 @@
       font-display: swap;
     }
 
+    * { box-sizing: border-box; }
+
     :root {
       --font-main: "B Nazanin", Tahoma, Arial, sans-serif;
-      --header-height: 104px;
-      --toolbar-height: 56px;
-      --footer-height: 36px;
+      --header-height: 80px;
       --red-main: #b40000;
-      --red-light: #e52b2b;
       --green: #176b2c;
       --text: #222;
       --muted: #66717b;
@@ -28,23 +27,20 @@
       --panel: rgba(255,255,255,.97);
     }
 
-    * { box-sizing: border-box; }
-
     html, body {
       width: 100%;
       height: 100%;
       margin: 0;
       padding: 0;
       font-family: var(--font-main);
-    }
-
-    body {
       background: #eef1f4;
       color: var(--text);
       overflow: hidden;
     }
 
-    button, select, a { font-family: var(--font-main); }
+    button, select, a {
+      font-family: var(--font-main);
+    }
 
     #app {
       width: 100%;
@@ -60,7 +56,7 @@
       flex: 0 0 var(--header-height);
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
       padding: 10px 20px;
       color: white;
       background: linear-gradient(180deg, #e52e2e 0%, #c31313 42%, #8c0505 100%);
@@ -84,8 +80,8 @@
       left: 20px;
       top: 50%;
       transform: translateY(-50%);
-      width: 72px;
-      height: 72px;
+      width: 60px;
+      height: 60px;
       object-fit: contain;
       filter: brightness(0) invert(1) drop-shadow(0 2px 3px rgba(0,0,0,.25));
       z-index: 2;
@@ -94,89 +90,36 @@
     .header-center {
       position: relative;
       z-index: 2;
-      width: 100%;
-      max-width: 1100px;
-      padding: 0 85px;
+      flex: 1;
       text-align: center;
+      margin: 0 20px;
     }
 
     .header-title {
-      margin: 0 0 5px;
-      font-size: 27px;
+      margin: 0;
+      font-size: 20px;
       font-weight: 800;
-      line-height: 1.3;
+      line-height: 1.2;
     }
 
     .header-subtitle {
-      margin: 0 0 5px;
-      font-size: 15px;
-      font-weight: 700;
-    }
-
-    .forecast-text {
-      display: inline-block;
-      padding: 4px 13px;
-      border: 1px solid rgba(255,255,255,.30);
-      border-radius: 8px;
-      background: rgba(255,255,255,.12);
+      margin: 2px 0 0;
       font-size: 13px;
       font-weight: 700;
     }
 
-    /* TOOLBAR */
-    .toolbar {
-      min-height: var(--toolbar-height);
-      flex: 0 0 var(--toolbar-height);
+    .header-buttons {
+      position: relative;
+      z-index: 2;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 7px 14px;
-      background: #fff;
-      border-bottom: 1px solid var(--border);
-      box-shadow: 0 1px 5px rgba(0,0,0,.06);
-      z-index: 2900;
-    }
-
-    .toolbar-group {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      flex-wrap: wrap;
-    }
-
-    .toolbar-right { justify-content: flex-start; }
-    .toolbar-left { direction: ltr; justify-content: flex-end; }
-
-    .toolbar-label {
-      color: var(--muted);
-      font-size: 13px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-
-    .toolbar-select {
-      height: 36px;
-      min-width: 235px;
-      padding: 0 10px;
-      border: 1px solid #c9d0d6;
-      border-radius: 8px;
-      background: white;
-      color: #26313a;
-      font-size: 13px;
-      cursor: pointer;
-      outline: none;
-    }
-
-    .toolbar-select:focus {
-      border-color: var(--red-main);
-      box-shadow: 0 0 0 2px rgba(180,0,0,.10);
+      gap: 8px;
     }
 
     /* BUTTONS */
     .header-btn {
-      width: 42px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -186,7 +129,7 @@
       color: #27323a;
       cursor: pointer;
       text-decoration: none;
-      font-size: 20px;
+      font-size: 18px;
       line-height: 1;
       transition: .15s ease;
     }
@@ -209,6 +152,55 @@
       border-color: #28333b;
     }
 
+    /* DROPDOWN */
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: 100%;
+      right: 0;
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+      min-width: 220px;
+      z-index: 4000;
+      display: none;
+      padding: 8px 0;
+      margin-top: 4px;
+    }
+
+    .dropdown-menu.show {
+      display: block;
+    }
+
+    .dropdown-item {
+      display: block;
+      width: 100%;
+      padding: 10px 16px;
+      border: none;
+      background: white;
+      color: var(--text);
+      cursor: pointer;
+      text-align: right;
+      font-size: 13px;
+      font-weight: 600;
+      transition: .1s ease;
+    }
+
+    .dropdown-item:hover {
+      background: #f3f5f6;
+    }
+
+    .dropdown-item.active {
+      background: #e8f5e9;
+      color: var(--green);
+      font-weight: 700;
+    }
+
     /* MAP */
     #map-wrap {
       position: relative;
@@ -216,14 +208,19 @@
       min-height: 0;
     }
 
-    #map { width: 100%; height: 100%; }
+    #map {
+      width: 100%;
+      height: 100%;
+    }
 
     .leaflet-container {
       background: #dfe6ea;
       font-family: var(--font-main);
     }
 
-    .leaflet-control-zoom { display: none; }
+    .leaflet-control-zoom {
+      display: none;
+    }
 
     /* NIGHT MODE */
     #nightOverlay {
@@ -235,12 +232,14 @@
       background: rgba(25,30,38,.14);
     }
 
-    body.night #nightOverlay { display: block; }
+    body.night #nightOverlay {
+      display: block;
+    }
 
     /* LEGEND */
     .legend {
       position: absolute;
-      top: 14px;
+      bottom: 20px;
       left: 14px;
       width: 175px;
       padding: 11px 12px;
@@ -275,7 +274,7 @@
     /* GAUGE */
     .gauge-panel {
       position: absolute;
-      top: 14px;
+      bottom: 20px;
       right: 14px;
       width: 230px;
       background: var(--panel);
@@ -294,8 +293,8 @@
     }
 
     .gauge {
-      width: 135px;
-      height: 135px;
+      width: 120px;
+      height: 120px;
       margin: 0 auto 8px;
       border-radius: 50%;
       background: conic-gradient(#2e7d32 0deg 72deg, #fdd835 72deg 144deg, #fb8c00 144deg 216deg, #e53935 216deg 288deg, #880e4f 288deg 360deg);
@@ -308,8 +307,8 @@
     .gauge::before {
       content: "";
       position: absolute;
-      width: 104px;
-      height: 104px;
+      width: 90px;
+      height: 90px;
       border-radius: 50%;
       background: #fff;
     }
@@ -320,21 +319,21 @@
     }
 
     .gauge-value {
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 900;
       line-height: 1;
     }
 
     .gauge-label {
-      margin-top: 5px;
-      font-size: 12px;
+      margin-top: 3px;
+      font-size: 11px;
       font-weight: 800;
     }
 
     .gauge-location {
-      font-size: 11px;
+      font-size: 10px;
       color: var(--muted);
-      line-height: 1.7;
+      line-height: 1.6;
     }
 
     /* POPUPS */
@@ -383,7 +382,9 @@
       z-index: 5000;
     }
 
-    .about-overlay.open { display: flex; }
+    .about-overlay.open {
+      display: flex;
+    }
 
     .about-box {
       width: min(700px, 96vw);
@@ -452,43 +453,78 @@
       line-height: 1.9;
     }
 
-    /* STATUS */
-    .status-bar {
-      height: var(--footer-height);
-      flex: 0 0 var(--footer-height);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #fff;
-      border-top: 1px solid var(--border);
-      font-size: 11px;
-      color: var(--muted);
-      z-index: 2500;
-    }
-
-    .status-ok { color: var(--green); font-weight: 700; }
-    .status-error { color: #b71c1c; font-weight: 700; }
-
     /* MOBILE */
-    @media (max-width: 950px) {
-      :root { --header-height: 94px; }
-      .header-logo { left: 8px; width: 55px; height: 55px; }
-      .header-center { max-width: calc(100% - 65px); padding: 0 4px; }
-      .header-title { font-size: 19px; }
-      .header-subtitle { font-size: 11px; }
-      .forecast-text { font-size: 10px; }
-      .toolbar { min-height: 92px; flex: 0 0 92px; height: auto; flex-direction: column; align-items: stretch; padding: 6px 7px; }
-      .toolbar-group { width: 100%; justify-content: center; }
-      .toolbar-select { min-width: 0; flex: 1 1 auto; }
-      .gauge-panel { width: 165px; top: 8px; right: 8px; padding: 8px; }
-      .gauge { width: 100px; height: 100px; }
-      .gauge::before { width: 76px; height: 76px; }
-      .gauge-value { font-size: 21px; }
-      .gauge-title { font-size: 11px; }
-      .gauge-location { font-size: 9px; }
-      .legend { width: 145px; top: 8px; left: 8px; padding: 8px 9px; }
-      .legend-title { font-size: 12px; }
-      .legend-item { font-size: 10px; }
+    @media (max-width: 768px) {
+      :root {
+        --header-height: 70px;
+      }
+
+      .header {
+        flex-wrap: wrap;
+      }
+
+      .header-logo {
+        width: 50px;
+        height: 50px;
+      }
+
+      .header-center {
+        margin: 0 10px;
+      }
+
+      .header-title {
+        font-size: 16px;
+      }
+
+      .header-subtitle {
+        font-size: 11px;
+      }
+
+      .header-buttons {
+        gap: 4px;
+      }
+
+      .header-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+      }
+
+      .gauge-panel {
+        width: 180px;
+        padding: 10px;
+      }
+
+      .gauge {
+        width: 100px;
+        height: 100px;
+      }
+
+      .gauge::before {
+        width: 75px;
+        height: 75px;
+      }
+
+      .gauge-value {
+        font-size: 20px;
+      }
+
+      .gauge-title {
+        font-size: 12px;
+      }
+
+      .legend {
+        width: 150px;
+        padding: 10px;
+      }
+
+      .legend-title {
+        font-size: 12px;
+      }
+
+      .legend-item {
+        font-size: 10px;
+      }
     }
   </style>
 </head>
@@ -498,32 +534,37 @@
     <!-- HEADER -->
     <header class="header">
       <img src="logo.webp" alt="لوگوی سامانه" class="header-logo">
+      
       <div class="header-center">
-        <div class="header-title">سامانه پیش‌بینی و پهنه‌بندی حریق در عرصه‌های طبیعی</div>
+        <div class="header-title">سامانه پیش‌بینی و پهنه‌بندی حریق</div>
         <div class="header-subtitle">استان فارس</div>
-        <div id="forecastText" class="forecast-text">در حال دریافت تاریخ پیش‌بینی...</div>
-      </div>
-    </header>
-
-    <!-- TOOLBAR -->
-    <div class="toolbar">
-      <div class="toolbar-group toolbar-right">
-        <span class="toolbar-label">لایه‌ها:</span>
-        <select id="layerSelect" class="toolbar-select">
-          <option value="fli">شاخص خطر حریق</option>
-          <option value="protected">مناطق چهارگانه</option>
-          <option value="hunting">مناطق شکار ممنوع</option>
-          <option value="all">نمایش همه لایه‌ها</option>
-        </select>
       </div>
 
-      <div class="toolbar-group toolbar-left">
-        <button id="aboutButton" class="header-btn" title="معرفی سامانه" aria-label="معرفی سامانه">ℹ</button>
+      <div class="header-buttons">
+        <!-- LAYERS DROPDOWN -->
+        <div class="dropdown">
+          <button id="layersBtn" class="header-btn" title="انتخاب لایه" aria-label="انتخاب لایه">🗺️</button>
+          <div id="layersMenu" class="dropdown-menu">
+            <button class="dropdown-item active" data-layer="fli">شاخص خطر حریق</button>
+            <button class="dropdown-item" data-layer="protected">مناطق چهارگانه</button>
+            <button class="dropdown-item" data-layer="hunting">مناطق شکار ممنوع</button>
+            <button class="dropdown-item" data-layer="all">همه لایه‌ها</button>
+          </div>
+        </div>
+
+        <!-- FIT -->
         <button id="fitButton" class="header-btn primary" title="نمایش کامل استان فارس" aria-label="نمایش کامل استان فارس">🌐</button>
+
+        <!-- NIGHT MODE -->
         <button id="modeButton" class="header-btn" title="حالت شب" aria-label="تغییر حالت روز و شب">☀️</button>
+
+        <!-- ABOUT -->
+        <button id="aboutButton" class="header-btn" title="معرفی سامانه" aria-label="معرفی سامانه">ℹ️</button>
+
+        <!-- EXCEL -->
         <a href="data/report/firis_report.xlsx" target="_blank" rel="noopener" class="header-btn primary" title="خروجی Excel" aria-label="خروجی Excel">📊</a>
       </div>
-    </div>
+    </header>
 
     <!-- MAP -->
     <div id="map-wrap">
@@ -546,17 +587,14 @@
         <div class="gauge">
           <div class="gauge-content">
             <div id="gaugeValue" class="gauge-value">—</div>
-            <div id="gaugeLabel" class="gauge-label">یک نقطه یا منطقه را انتخاب کنید</div>
+            <div id="gaugeLabel" class="gauge-label">انتخاب کنید</div>
           </div>
         </div>
         <div id="gaugeLocation" class="gauge-location">—</div>
       </div>
     </div>
 
-    <!-- STATUS -->
-    <div id="status" class="status-bar">در حال بارگذاری سامانه...</div>
-
-    <!-- ABOUT -->
+    <!-- ABOUT MODAL -->
     <div id="aboutOverlay" class="about-overlay">
       <div class="about-box" role="dialog" aria-modal="true">
         <div class="about-header">
@@ -578,29 +616,25 @@
               <tr>
                 <td>FWI</td>
                 <td>هواشناسی حریق</td>
-                <td>شرایط جوی مؤثر بر خطر حریق</td>
+                <td>شرایط جوی</td>
               </tr>
               <tr>
                 <td>Fuel</td>
                 <td>سوخت</td>
-                <td>مقدار و ویژگی مواد قابل اشتعال</td>
+                <td>مواد قابل اشتعال</td>
               </tr>
               <tr>
                 <td>Topography</td>
                 <td>توپوگرافی</td>
-                <td>اثر شیب بر خطر حریق</td>
+                <td>اثر شیب</td>
               </tr>
               <tr>
                 <td>FLI</td>
-                <td>شاخص ترکیبی خطر</td>
-                <td>ترکیب مؤلفه‌های استانداردشده</td>
+                <td>شاخص ترکیبی</td>
+                <td>ترکیب مؤلفه‌ها</td>
               </tr>
             </tbody>
           </table>
-          <div class="about-note">
-            با کلیک روی هر نقطه داخل استان، مقدار شاخص خطر آن نقطه نمایش داده می‌شود.
-            همچنین با انتخاب مناطق چهارگانه یا مناطق شکار ممنوع، میانگین شاخص داخل هر منطقه قابل مشاهده است.
-          </div>
         </div>
       </div>
     </div>
@@ -629,7 +663,8 @@
       },
       ui: {
         nightMode: false,
-        currentPopup: null
+        currentPopup: null,
+        activeLayer: "fli"
       }
     };
 
@@ -640,42 +675,14 @@
      */
 
     /**
-     * تنظیم وضعیت نوار پایین
-     * @param {string} text - متن وضعیت
-     * @param {boolean} ok - وضعیت موفقیت یا خطا
-     */
-    function setStatus(text, ok = true) {
-      const element = document.getElementById("status");
-      element.textContent = text;
-      element.className = ok ? "status-bar status-ok" : "status-bar status-error";
-    }
-
-    /**
-     * تاخیر اجرای تابع (Debounce)
-     * @param {Function} func - تابع مورد نظر
-     * @param {number} delay - تاخیر بر حسب میلی‌ثانیه
-     */
-    function debounce(func, delay = 300) {
-      let timeout;
-      return function(...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), delay);
-      };
-    }
-
-    /**
      * Fetch با Error Handling و Timeout
-     * @param {string} url - آدرس درخواست
-     * @param {object} options - تنظیمات
      */
-    async function fetchWithTimeout(url, options = {}) {
-      const timeout = options.timeout || 5000;
+    async function fetchWithTimeout(url, timeout = 5000) {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), timeout);
 
       try {
         const response = await fetch(url, {
-          ...options,
           signal: controller.signal,
           cache: "no-store"
         });
@@ -698,7 +705,6 @@
 
     /**
      * تبدیل اعداد به فرمت فارسی
-     * @param {number} value - مقدار
      */
     function formatNumber(value) {
       const number = Number(value);
@@ -708,7 +714,6 @@
 
     /**
      * دریافت سطح خطر و رنگ
-     * @param {number} value - مقدار شاخص
      */
     function getRisk(value) {
       const num = Number(value);
@@ -729,7 +734,6 @@
 
     /**
      * تحلیل مرز نقشه
-     * @param {array} bounds - مرز [min, max]
      */
     function parseBounds(bounds) {
       if (!Array.isArray(bounds) || bounds.length < 2) return null;
@@ -743,8 +747,6 @@
 
     /**
      * اعتبار سنجی مختصات
-     * @param {number} lat - عرض جغرافیایی
-     * @param {number} lon - طول جغرافیایی
      */
     function validateCoords(lat, lon) {
       return (
@@ -765,9 +767,6 @@
 
     /**
      * بروزرسانی نمایشگر گیج
-     * @param {number} value - مقدار
-     * @param {string} title - عنوان
-     * @param {string} subtitle - زیر‌عنوان
      */
     function updateGauge(value, title, subtitle) {
       const valueElement = document.getElementById("gaugeValue");
@@ -795,9 +794,6 @@
      * ============================================================
      */
 
-    /**
-     * مقداردهی اولیه نقشه
-     */
     function initMap() {
       APP_STATE.map = L.map("map", {
         zoomControl: false,
@@ -816,9 +812,6 @@
      * ============================================================
      */
 
-    /**
-     * بارگذاری مرز استان فارس
-     */
     async function loadFars() {
       try {
         const response = await fetchWithTimeout("fars.geojson");
@@ -836,19 +829,17 @@
 
         return geojson;
       } catch (error) {
-        throw new Error(`مرز استان فارس: ${error.message}`);
+        console.error("خطا در بارگذاری مرز:", error);
+        throw error;
       }
     }
 
-    /**
-     * بارگذاری لایه FLI
-     */
     async function loadFLI() {
       try {
         const response = await fetchWithTimeout("data/web/fli_polygons.geojson");
         const geojson = await response.json();
 
-        if (geojson.type !== "FeatureCollection" || !Array.isArray(geojson.features) || geojson.features.length === 0) {
+        if (geojson.type !== "FeatureCollection" || !Array.isArray(geojson.features)) {
           throw new Error("فرمت فایل نامعتبر است");
         }
 
@@ -865,48 +856,20 @@
 
         return APP_STATE.layers.fli;
       } catch (error) {
-        throw new Error(`لایه FLI: ${error.message}`);
+        console.error("خطا در بارگذاری FLI:", error);
+        throw error;
       }
     }
 
-    /**
-     * بارگذاری متادیتای FLI
-     */
     async function loadFLIData() {
       try {
         const response = await fetchWithTimeout("data/web/fli_latest.json");
         APP_STATE.data.fliMetadata = await response.json();
-
-        const forecastDate = APP_STATE.data.fliMetadata.forecast_date || APP_STATE.data.fliMetadata.target_date;
-        const forecastElement = document.getElementById("forecastText");
-
-        if (!forecastDate) {
-          forecastElement.textContent = "تاریخ پیش‌بینی در دسترس نیست";
-          return;
-        }
-
-        const parts = String(forecastDate).split("-");
-        if (parts.length !== 3) {
-          forecastElement.textContent = `پیش‌بینی خطر حریق برای ${forecastDate}`;
-          return;
-        }
-
-        const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]), 12, 0, 0);
-        const shamsi = date.toLocaleDateString("fa-IR-u-ca-persian", {
-          year: "numeric",
-          month: "long",
-          day: "numeric"
-        });
-
-        forecastElement.textContent = `پیش‌بینی خطر حریق برای ${shamsi}`;
       } catch (error) {
         console.warn("خطای بارگذاری متادیتا:", error);
       }
     }
 
-    /**
-     * بارگذاری شبکه داده FLI
-     */
     async function loadGrid() {
       try {
         const response = await fetchWithTimeout("data/web/fli_latest_grid.json");
@@ -920,9 +883,6 @@
       }
     }
 
-    /**
-     * بارگذاری مناطق محافظت‌شده
-     */
     async function loadProtected() {
       try {
         const response = await fetchWithTimeout("protected_areas.geojson");
@@ -941,13 +901,11 @@
 
         return APP_STATE.layers.protected;
       } catch (error) {
-        throw new Error(`مناطق محافظت‌شده: ${error.message}`);
+        console.error("خطا در بارگذاری مناطق محافظت‌شده:", error);
+        throw error;
       }
     }
 
-    /**
-     * بارگذاری مناطق شکار ممنوع
-     */
     async function loadHunting() {
       try {
         const response = await fetchWithTimeout("hunting_banned.geojson");
@@ -966,7 +924,8 @@
 
         return APP_STATE.layers.hunting;
       } catch (error) {
-        throw new Error(`مناطق شکار ممنوع: ${error.message}`);
+        console.error("خطا در بارگذاری مناطق شکار ممنوع:", error);
+        throw error;
       }
     }
 
@@ -976,11 +935,6 @@
      * ============================================================
      */
 
-    /**
-     * دریافت مقدار خطر برای یک نقطه
-     * @param {number} lat - عرض جغرافیایی
-     * @param {number} lon - طول جغرافیایی
-     */
     function getPointValue(lat, lon) {
       if (!validateCoords(lat, lon) || !APP_STATE.data.fliGrid) return null;
 
@@ -1004,11 +958,6 @@
       return Number.isFinite(value) && value >= 0 && value <= 100 ? value : null;
     }
 
-    /**
-     * بررسی نقطه درون استان فارس
-     * @param {number} lat - عرض جغرافیایی
-     * @param {number} lon - طول جغرافیایی
-     */
     function pointInsideFars(lat, lon) {
       if (!APP_STATE.layers.fars || !validateCoords(lat, lon)) return false;
 
@@ -1027,10 +976,6 @@
       return false;
     }
 
-    /**
-     * محاسبه میانگین خطر برای منطقه
-     * @param {object} feature - ویژگی GeoJSON
-     */
     function regionMean(feature) {
       if (!APP_STATE.data.fliGrid) return null;
 
@@ -1077,12 +1022,6 @@
      * ============================================================
      */
 
-    /**
-     * اتصال Popup به منطقه
-     * @param {object} feature - ویژگی GeoJSON
-     * @param {object} layer - لایه Leaflet
-     * @param {string} regionType - نوع منطقه
-     */
     function bindRegion(feature, layer, regionType) {
       const properties = feature.properties || {};
       const regionLabel = regionType === "protected" ? "مناطق چهارگانه" : "مناطق شکار ممنوع";
@@ -1102,7 +1041,9 @@
       `;
 
       layer.bindPopup(popup, { maxWidth: 280 });
-      layer.on("click", () => updateGauge(mean, name, regionLabel));
+      layer.on("click", () => {
+        updateGauge(mean, name, regionLabel);
+      });
     }
 
     /**
@@ -1111,11 +1052,8 @@
      * ============================================================
      */
 
-    /**
-     * رویداد کلیک روی نقشه
-     */
     function setupMapClick() {
-      const handleMapClick = (event) => {
+      APP_STATE.map.on("click", (event) => {
         const { lat, lng: lon } = event.latlng;
 
         if (!pointInsideFars(lat, lon)) return;
@@ -1144,9 +1082,7 @@
           .setLatLng(event.latlng)
           .setContent(popup)
           .openOn(APP_STATE.map);
-      };
-
-      APP_STATE.map.on("click", debounce(handleMapClick, 200));
+      });
     }
 
     /**
@@ -1155,11 +1091,6 @@
      * ============================================================
      */
 
-    /**
-     * تنظیم نمایش لایه
-     * @param {object} layer - لایه
-     * @param {boolean} visible - نمایشی یا نه
-     */
     function setLayerVisible(layer, visible) {
       if (!layer) return;
 
@@ -1175,26 +1106,62 @@
     }
 
     /**
-     * فیلتر لایه‌ها
+     * ============================================================
+     * DROPDOWN MENU
+     * ============================================================
      */
-    function setupLayerFilter() {
-      document.getElementById("layerSelect").addEventListener("change", (event) => {
-        const value = event.target.value;
 
-        const layerConfig = {
-          fli: { fli: true, protected: false, hunting: false, status: "شاخص خطر حریق فعال است." },
-          protected: { fli: true, protected: true, hunting: false, status: "مناطق چهارگانه فعال است." },
-          hunting: { fli: true, protected: false, hunting: true, status: "مناطق شکار ممنوع فعال است." },
-          all: { fli: true, protected: true, hunting: true, status: "همه لایه‌ها فعال هستند." }
-        };
+    function setupDropdown() {
+      const btn = document.getElementById("layersBtn");
+      const menu = document.getElementById("layersMenu");
+      const items = menu.querySelectorAll(".dropdown-item");
 
-        const config = layerConfig[value] || layerConfig.fli;
+      btn.addEventListener("click", () => {
+        menu.classList.toggle("show");
+      });
 
-        setLayerVisible(APP_STATE.layers.fli, config.fli);
-        setLayerVisible(APP_STATE.layers.protected, config.protected);
-        setLayerVisible(APP_STATE.layers.hunting, config.hunting);
+      document.addEventListener("click", (e) => {
+        if (!btn.contains(e.target) && !menu.contains(e.target)) {
+          menu.classList.remove("show");
+        }
+      });
 
-        setStatus(config.status, true);
+      items.forEach(item => {
+        item.addEventListener("click", () => {
+          const layer = item.dataset.layer;
+          APP_STATE.ui.activeLayer = layer;
+
+          items.forEach(i => i.classList.remove("active"));
+          item.classList.add("active");
+
+          const layerConfig = {
+            fli: { fli: true, protected: false, hunting: false },
+            protected: { fli: true, protected: true, hunting: false },
+            hunting: { fli: true, protected: false, hunting: true },
+            all: { fli: true, protected: true, hunting: true }
+          };
+
+          const config = layerConfig[layer] || layerConfig.fli;
+
+          setLayerVisible(APP_STATE.layers.fli, config.fli);
+          setLayerVisible(APP_STATE.layers.protected, config.protected);
+          setLayerVisible(APP_STATE.layers.hunting, config.hunting);
+
+          menu.classList.remove("show");
+
+          // Zoom to region اگر منطقه انتخاب شود
+          if (layer === "protected" && APP_STATE.layers.protected) {
+            const bounds = APP_STATE.layers.protected.getBounds();
+            if (bounds.isValid()) {
+              APP_STATE.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+            }
+          } else if (layer === "hunting" && APP_STATE.layers.hunting) {
+            const bounds = APP_STATE.layers.hunting.getBounds();
+            if (bounds.isValid()) {
+              APP_STATE.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+            }
+          }
+        });
       });
     }
 
@@ -1204,9 +1171,6 @@
      * ============================================================
      */
 
-    /**
-     * حالت روز و شب
-     */
     function setupNightMode() {
       document.getElementById("modeButton").addEventListener("click", function() {
         APP_STATE.ui.nightMode = !APP_STATE.ui.nightMode;
@@ -1214,15 +1178,9 @@
 
         this.textContent = APP_STATE.ui.nightMode ? "🌙" : "☀️";
         this.title = APP_STATE.ui.nightMode ? "حالت روز" : "حالت شب";
-        this.setAttribute("aria-label", APP_STATE.ui.nightMode ? "حالت روز" : "حالت شب");
-
-        setStatus(APP_STATE.ui.nightMode ? "حالت شب فعال است." : "حالت روز فعال است.", true);
       });
     }
 
-    /**
-     * تناسب نمای استان فارس
-     */
     function fitFars() {
       if (!APP_STATE.layers.fars) return;
 
@@ -1230,21 +1188,17 @@
       if (!bounds.isValid()) return;
 
       APP_STATE.map.fitBounds(bounds, {
-        padding: [24, 24],
+        padding: [50, 50],
         maxZoom: 8,
-        animate: false
+        animate: true
       });
 
       setTimeout(() => APP_STATE.map.invalidateSize(), 100);
     }
 
-    /**
-     * دکمه تناسب
-     */
     function setupFitButton() {
       document.getElementById("fitButton").addEventListener("click", () => {
         fitFars();
-        setStatus("نمای کامل استان فارس", true);
       });
     }
 
@@ -1254,9 +1208,6 @@
      * ============================================================
      */
 
-    /**
-     * تنظیم مودال معرفی سامانه
-     */
     function setupAbout() {
       const aboutOverlay = document.getElementById("aboutOverlay");
 
@@ -1281,40 +1232,28 @@
      * ============================================================
      */
 
-    /**
-     * شروع برنامه
-     */
     async function startApp() {
       try {
-        setStatus("در حال بارگذاری سامانه...");
-
         initMap();
 
-        // بارگذاری موازی برای فایل‌های مستقل
         await Promise.all([loadFLIData(), loadGrid()]);
-
-        // بارگذاری متوالی برای وابسته‌ها
         await loadFars();
         await loadFLI();
 
-        // بارگذاری لایه‌های اختیاری
         try {
           await Promise.all([loadProtected(), loadHunting()]);
         } catch (error) {
           console.warn("خطا در بارگذاری لایه‌های اختیاری:", error);
         }
 
-        // تنظیم نمایش پیش‌فرض
         setLayerVisible(APP_STATE.layers.fli, true);
         setLayerVisible(APP_STATE.layers.protected, false);
         setLayerVisible(APP_STATE.layers.hunting, false);
 
-        // تنظیم view اولیه
         fitFars();
 
-        // راه‌اندازی رویدادها
         setupMapClick();
-        setupLayerFilter();
+        setupDropdown();
         setupNightMode();
         setupFitButton();
         setupAbout();
@@ -1324,14 +1263,11 @@
           fitFars();
         }, 400);
 
-        setStatus("سامانه با موفقیت بارگذاری شد.", true);
       } catch (error) {
-        console.error("خطای راه‌اندازی سامانه:", error);
-        setStatus(`خطا: ${error.message}`, false);
+        console.error("خطای راه‌اندازی:", error);
       }
     }
 
-    // شروع برنامه
     document.addEventListener("DOMContentLoaded", startApp);
   </script>
 </body>
