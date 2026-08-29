@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>سامانه پیش‌بینی و پهنه‌بندی خطر حریق در استان فارس</title>
+  <title>سامانه پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
 
@@ -18,17 +18,20 @@
 
     :root {
       --font-main: "B Nazanin", Tahoma, Arial, sans-serif;
-      --header-height: 110px;
+      --header-height: 105px;
       --red-main: #b40000;
+      --red-light: #e52b2b;
       --green: #176b2c;
       --text: #222;
       --text-light: #555;
       --muted: #66717b;
       --border: #d6dce1;
       --border-light: #e8ebed;
-      --panel: rgba(255, 255, 255, 0.98);
-      --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.16);
-      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --panel: rgba(255,255,255,.98);
+      --shadow-sm: 0 2px 8px rgba(0,0,0,.08);
+      --shadow-md: 0 4px 16px rgba(0,0,0,.12);
+      --shadow-lg: 0 8px 24px rgba(0,0,0,.16);
+      --transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     html, body {
@@ -42,7 +45,7 @@
       overflow: hidden;
     }
 
-    button, a {
+    button, select, a {
       font-family: var(--font-main);
     }
 
@@ -62,12 +65,23 @@
       flex: 0 0 var(--header-height);
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 12px 24px;
+      justify-content: center;
+      padding: 12px 20px;
       color: white;
       background: linear-gradient(135deg, #e52e2e 0%, #c31313 50%, #8c0505 100%);
-      box-shadow: var(--shadow-lg);
+      box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,.15);
       z-index: 3000;
+    }
+
+    .header::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 50%;
+      background: linear-gradient(to bottom, rgba(255,255,255,.12), rgba(255,255,255,0));
+      pointer-events: none;
     }
 
     /* CENTER CONTENT */
@@ -76,57 +90,66 @@
       z-index: 2;
       flex: 1;
       text-align: center;
-      padding: 0 40px;
     }
 
     .header-title {
       margin: 0;
-      font-size: 24px;
+      font-size: 26px;
       font-weight: 900;
-      line-height: 1.3;
-      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+      line-height: 1.2;
+      text-shadow: 0 2px 4px rgba(0,0,0,.3);
       letter-spacing: -0.5px;
+    }
+
+    .header-subtitle {
+      margin: 4px 0 0;
+      font-size: 13px;
+      font-weight: 600;
+      opacity: 0.95;
     }
 
     .header-subtitle-badge {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       margin-top: 6px;
-      padding: 5px 16px;
+      padding: 3px 12px;
       background: rgba(0, 0, 0, 0.28);
       border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 20px;
-      font-size: 13px;
+      border-radius: 18px;
+      font-size: 11px;
       font-weight: 600;
       color: #fff;
     }
 
     .header-subtitle-badge .bullet {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       background-color: #4ade80;
       border-radius: 50%;
-      box-shadow: 0 0 8px #4ade80;
+      box-shadow: 0 0 6px #4ade80;
     }
 
     /* LEFT SIDE BUTTONS */
     .header-buttons-group {
-      position: relative;
-      z-index: 2;
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
       display: flex;
       align-items: center;
-      gap: 10px;
-      background: rgba(255, 255, 255, 0.12);
-      padding: 6px 12px;
-      border-radius: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      flex-shrink: 0;
+      gap: 8px;
+      background: rgba(255,255,255,.08);
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.15);
+      z-index: 2;
     }
 
+    /* BUTTON BASE */
     .header-btn {
-      width: 40px;
-      height: 40px;
+      width: 38px;
+      height: 38px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -136,16 +159,37 @@
       color: var(--text);
       cursor: pointer;
       text-decoration: none;
-      font-size: 18px;
+      font-size: 16px;
+      line-height: 1;
       transition: var(--transition);
       flex-shrink: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header-btn::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(0,0,0,.05);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width .6s, height .6s;
+    }
+
+    .header-btn:hover::before {
+      width: 100%;
+      height: 100%;
     }
 
     .header-btn:hover {
       background: #f8f9fa;
       border-color: var(--border-light);
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      box-shadow: var(--shadow-md);
     }
 
     .header-btn:active {
@@ -156,12 +200,13 @@
       background: linear-gradient(135deg, var(--green) 0%, #1a5a2a 100%);
       color: white;
       border-color: var(--green);
+      font-weight: 600;
     }
 
     .header-btn.primary:hover {
       background: linear-gradient(135deg, #145a24 0%, #0f3d1a 100%);
       border-color: #145a24;
-      box-shadow: 0 4px 12px rgba(23, 107, 44, 0.3);
+      box-shadow: 0 4px 12px rgba(23, 107, 44, .3);
     }
 
     /* ============================================================
@@ -180,13 +225,14 @@
       border: 1px solid var(--border-light);
       border-radius: 10px;
       box-shadow: var(--shadow-lg);
-      min-width: 280px;
+      min-width: 260px;
       z-index: 4000;
       display: none;
       padding: 8px 0;
       margin: 0;
       list-style: none;
-      animation: slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      overflow: hidden;
+      animation: slideDown .25s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     @keyframes slideDown {
@@ -216,12 +262,24 @@
       text-align: right;
       font-size: 13px;
       font-weight: 600;
+      transition: var(--transition);
       font-family: var(--font-main);
+      gap: 12px;
+    }
+
+    .dropdown-item::before {
+      content: "";
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: transparent;
       transition: var(--transition);
     }
 
     .dropdown-item:hover {
       background: #f8f9fa;
+      padding-right: 14px;
     }
 
     .dropdown-item.active {
@@ -232,12 +290,17 @@
       padding-right: 12px;
     }
 
+    .dropdown-item.active::before {
+      background: var(--green);
+    }
+
     /* ============================================================
        MAP
        ============================================================ */
     #map-wrap {
       position: relative;
       flex: 1 1 auto;
+      min-height: 0;
     }
 
     #map {
@@ -254,15 +317,17 @@
       display: none;
     }
 
-    /* NIGHT MODE */
+    /* ============================================================
+       NIGHT MODE
+       ============================================================ */
     #nightOverlay {
       position: absolute;
       inset: 0;
       z-index: 1000;
       pointer-events: none;
       display: none;
-      background: rgba(15, 23, 42, 0.25);
-      transition: background 0.4s ease;
+      background: rgba(20,25,35,.18);
+      transition: background .4s ease;
     }
 
     body.night #nightOverlay {
@@ -270,18 +335,18 @@
     }
 
     /* ============================================================
-       GAUGE PANEL
+       GAUGE
        ============================================================ */
     .gauge-panel {
       position: absolute;
       top: 20px;
       right: 20px;
-      width: 290px;
+      width: 280px;
       background: var(--panel);
       border: 1px solid var(--border-light);
       border-radius: 14px;
       box-shadow: var(--shadow-lg);
-      padding: 18px;
+      padding: 20px;
       z-index: 1400;
       text-align: center;
       backdrop-filter: blur(8px);
@@ -292,6 +357,8 @@
       font-weight: 800;
       margin-bottom: 14px;
       color: var(--text);
+      text-transform: capitalize;
+      letter-spacing: 0.5px;
     }
 
     .gauge {
@@ -310,7 +377,7 @@
       align-items: center;
       justify-content: center;
       position: relative;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1), inset 0 2px 8px rgba(255, 255, 255, 0.2);
+      box-shadow: 0 4px 12px rgba(0,0,0,.1), inset 0 2px 8px rgba(255,255,255,.2);
     }
 
     .gauge::before {
@@ -320,7 +387,7 @@
       height: 115px;
       border-radius: 50%;
       background: var(--panel);
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
+      box-shadow: inset 0 1px 3px rgba(0,0,0,.05);
     }
 
     .gauge-content {
@@ -328,26 +395,35 @@
       z-index: 2;
     }
 
-    .gauge-label {
-      font-size: 18px;
+    .gauge-value {
+      font-size: 32px;
       font-weight: 900;
+      line-height: 1;
+      color: var(--text);
+      letter-spacing: -1px;
+    }
+
+    .gauge-label {
+      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 800;
       text-transform: capitalize;
       letter-spacing: 0.5px;
     }
 
     .gauge-location {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--muted);
+      line-height: 1.6;
       margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid var(--border-light);
-      line-height: 1.6;
     }
 
     /* LEGEND ON GAUGE */
     .gauge-legend-bar {
-      margin-top: 14px;
-      padding-top: 12px;
+      margin-top: 12px;
+      padding-top: 10px;
       border-top: 1px solid var(--border-light);
     }
 
@@ -359,7 +435,7 @@
 
     .gauge-legend-chip {
       flex: 1;
-      font-size: 10px;
+      font-size: 9px;
       font-weight: 700;
       padding: 4px 2px;
       border-radius: 4px;
@@ -374,32 +450,35 @@
        ============================================================ */
     .leaflet-popup-content {
       margin: 0 !important;
-      padding: 12px 16px !important;
+      padding: 0 !important;
+      direction: rtl;
+      text-align: center;
     }
 
     .fli-popup, .region-popup {
       direction: rtl;
       text-align: center;
-      min-width: 200px;
+      min-width: 240px;
+      padding: 12px 16px;
     }
 
     .popup-title {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 800;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       color: var(--text);
     }
 
-    .popup-risk-badge {
+    .popup-risk {
       display: inline-block;
-      padding: 6px 16px;
-      border-radius: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
       color: white;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 800;
       text-transform: capitalize;
       letter-spacing: 0.5px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 2px 8px rgba(0,0,0,.2);
       margin: 4px 0 6px 0;
     }
 
@@ -420,10 +499,10 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
-      background: rgba(0, 0, 0, 0.5);
+      background: rgba(0,0,0,.5);
       backdrop-filter: blur(4px);
       z-index: 5000;
-      animation: fadeIn 0.3s ease;
+      animation: fadeIn .3s ease;
     }
 
     @keyframes fadeIn {
@@ -436,16 +515,16 @@
     }
 
     .about-box {
-      width: min(550px, 92vw);
+      width: min(700px, 96vw);
       max-height: 88vh;
       overflow-y: auto;
       background: var(--panel);
-      border-radius: 14px;
+      border-radius: 16px;
       box-shadow: var(--shadow-lg);
-      padding: 24px;
+      padding: 28px;
       direction: rtl;
       text-align: right;
-      animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      animation: slideUp .3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     @keyframes slideUp {
@@ -463,23 +542,24 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border-light);
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 2px solid var(--border-light);
     }
 
     .about-title {
       margin: 0;
       color: var(--red-main);
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 900;
+      letter-spacing: -0.5px;
     }
 
     .about-close {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       border: 1px solid var(--border-light);
-      border-radius: 8px;
+      border-radius: 10px;
       background: #f8f9fa;
       cursor: pointer;
       font-size: 20px;
@@ -489,6 +569,7 @@
       justify-content: center;
       transition: var(--transition);
       color: var(--muted);
+      font-weight: 700;
     }
 
     .about-close:hover {
@@ -506,36 +587,98 @@
       margin: 12px 0;
     }
 
+    .about-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 13px;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .about-table th, .about-table td {
+      border: 1px solid var(--border-light);
+      padding: 12px;
+      text-align: right;
+    }
+
+    .about-table th {
+      background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f5 100%);
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .about-table tr:hover {
+      background: #f8f9fa;
+    }
+
+    .about-note {
+      margin-top: 16px;
+      padding: 14px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+      border: 1px solid #c8e6c9;
+      font-size: 13px;
+      line-height: 1.8;
+      color: #2e7d32;
+    }
+
+    /* ============================================================
+       SCROLLBAR
+       ============================================================ */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f5f7fa;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd2d8;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a0aab5;
+    }
+
     /* ============================================================
        MOBILE
        ============================================================ */
     @media (max-width: 768px) {
-      :root { --header-height: 120px; }
-      
+      :root {
+        --header-height: 100px;
+      }
+
       .header {
         flex-wrap: wrap;
-        padding: 8px 12px;
-        gap: 8px;
+        padding: 8px 10px;
       }
 
       .header-center {
         width: 100%;
         flex-basis: 100%;
-        order: 2;
-        padding: 0 8px;
-        margin-top: 8px;
+        order: 1;
       }
 
       .header-title {
         font-size: 16px;
       }
 
-      .header-subtitle-badge {
+      .header-subtitle {
         font-size: 11px;
-        padding: 3px 10px;
+      }
+
+      .header-subtitle-badge {
+        font-size: 10px;
+        padding: 2px 10px;
       }
 
       .header-buttons-group {
+        position: static;
+        transform: none;
         gap: 6px;
         padding: 4px 8px;
       }
@@ -543,14 +686,14 @@
       .header-btn {
         width: 36px;
         height: 36px;
-        font-size: 16px;
+        font-size: 14px;
       }
 
       .gauge-panel {
         width: 240px;
         padding: 14px;
-        top: 12px;
-        right: 12px;
+        top: 16px;
+        right: 16px;
       }
 
       .gauge {
@@ -563,20 +706,20 @@
         height: 100px;
       }
 
-      .gauge-label {
-        font-size: 16px;
+      .gauge-value {
+        font-size: 26px;
       }
 
       .gauge-legend-chip {
-        font-size: 9px;
+        font-size: 8px;
       }
 
       .about-box {
-        padding: 16px;
+        padding: 20px;
       }
 
       .about-title {
-        font-size: 18px;
+        font-size: 20px;
       }
     }
   </style>
@@ -586,29 +729,38 @@
   <div id="app">
     <!-- HEADER -->
     <header class="header">
+      <div class="header-buttons-group">
+        <!-- LAYERS DROPDOWN -->
+        <div class="dropdown">
+          <button id="layersBtn" class="header-btn" title="انتخاب لایه" aria-label="انتخاب لایه">🗺️</button>
+          <ul id="layersMenu" class="dropdown-menu">
+            <li><button class="dropdown-item active" data-layer="fli">شاخص خطر حریق</button></li>
+            <li><button class="dropdown-item" data-layer="protected">مناطق محافظت‌شده</button></li>
+            <li><button class="dropdown-item" data-layer="hunting">مناطق شکار ممنوع</button></li>
+            <li><button class="dropdown-item" data-layer="all">همه لایه‌ها</button></li>
+          </ul>
+        </div>
+
+        <!-- FIT -->
+        <button id="fitButton" class="header-btn primary" title="نمایش کامل استان فارس" aria-label="نمایش کامل استان فارس">🌐</button>
+
+        <!-- NIGHT MODE -->
+        <button id="modeButton" class="header-btn" title="حالت شب" aria-label="تغییر حالت روز و شب">☀️</button>
+
+        <!-- ABOUT -->
+        <button id="aboutButton" class="header-btn" title="معرفی سامانه" aria-label="معرفی سامانه">ℹ️</button>
+
+        <!-- EXCEL -->
+        <a href="data/report/firis_report.xlsx" target="_blank" rel="noopener" class="header-btn primary" title="خروجی Excel" aria-label="خروجی Excel">📊</a>
+      </div>
+
       <div class="header-center">
-        <div class="header-title">سامانه پیش‌بینی و پهنه‌بندی خطر حریق در استان فارس</div>
+        <div class="header-title">سامانه پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی</div>
+        <div class="header-subtitle">استان فارس</div>
         <div class="header-subtitle-badge">
           <span class="bullet"></span>
           <span id="forecastDateBadge">پیش‌بینی برای تاریخ: فردا</span>
         </div>
-      </div>
-
-      <div class="header-buttons-group">
-        <div class="dropdown">
-          <button id="layersBtn" class="header-btn" title="انتخاب لایه">🗺️</button>
-          <ul id="layersMenu" class="dropdown-menu">
-            <li><button class="dropdown-item active" data-layer="fli">شاخص خطر حریق (FLI)</button></li>
-            <li><button class="dropdown-item" data-layer="protected">مناطق محافظت‌شده</button></li>
-            <li><button class="dropdown-item" data-layer="hunting">مناطق شکار ممنوع</button></li>
-            <li><button class="dropdown-item" data-layer="all">نمایش همه لایه‌ها</button></li>
-          </ul>
-        </div>
-
-        <button id="fitButton" class="header-btn primary" title="نمایش کامل استان فارس">🌐</button>
-        <button id="modeButton" class="header-btn" title="حالت شب">☀️</button>
-        <button id="aboutButton" class="header-btn" title="معرفی سامانه">ℹ️</button>
-        <a href="data/report/firis_report.xlsx" target="_blank" rel="noopener" class="header-btn primary" title="خروجی Excel">📊</a>
       </div>
     </header>
 
@@ -617,15 +769,16 @@
       <div id="map"></div>
       <div id="nightOverlay"></div>
 
-      <!-- GAUGE PANEL -->
+      <!-- GAUGE -->
       <div class="gauge-panel">
-        <div class="gauge-title">وضعیت محدوده انتخاب‌شده</div>
+        <div class="gauge-title">وضعیت انتخاب‌شده</div>
         <div class="gauge">
           <div class="gauge-content">
-            <div id="gaugeLabel" class="gauge-label" style="color: #777;">انتخاب کنید</div>
+            <div id="gaugeValue" class="gauge-value">—</div>
+            <div id="gaugeLabel" class="gauge-label">انتخاب کنید</div>
           </div>
         </div>
-        <div id="gaugeLocation" class="gauge-location">روی نقشه یا مناطق کلیک کنید</div>
+        <div id="gaugeLocation" class="gauge-location">—</div>
 
         <div class="gauge-legend-bar">
           <div class="gauge-legend-items">
@@ -641,14 +794,48 @@
 
     <!-- ABOUT MODAL -->
     <div id="aboutOverlay" class="about-overlay">
-      <div class="about-box" role="dialog">
+      <div class="about-box" role="dialog" aria-modal="true">
         <div class="about-header">
           <h2 class="about-title">معرفی سامانه</h2>
-          <button id="aboutClose" class="about-close">×</button>
+          <button id="aboutClose" class="about-close" title="بستن" aria-label="بستن">×</button>
         </div>
         <div class="about-text">
-          <p>این سامانه به‌منظور پیش‌بینی و پهنه‌بندی خطر وقوع حریق در عرصه‌های طبیعی استان فارس توسعه یافته است.</p>
-          <p>شاخص خطر ترکیبی (FLI) بر پایه داده‌های ماهواره‌ای و اقلیمی برای روز بعد محاسبه و به‌روزرسانی می‌گردد.</p>
+          <p>این سامانه برای پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی استان فارس طراحی شده است.</p>
+          <p>شاخص خطر حریق از ترکیب سه مؤلفه اصلی هواشناسی، سوخت و توپوگرافی تولید می‌شود.</p>
+          <table class="about-table">
+            <thead>
+              <tr>
+                <th>مؤلفه</th>
+                <th>نقش</th>
+                <th>منطق</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>FWI</td>
+                <td>هواشناسی حریق</td>
+                <td>شرایط جوی</td>
+              </tr>
+              <tr>
+                <td>Fuel</td>
+                <td>سوخت</td>
+                <td>مواد قابل اشتعال</td>
+              </tr>
+              <tr>
+                <td>Topography</td>
+                <td>توپوگرافی</td>
+                <td>اثر شیب</td>
+              </tr>
+              <tr>
+                <td>FLI</td>
+                <td>شاخص ترکیبی</td>
+                <td>ترکیب مؤلفه‌ها</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="about-note">
+            💡 با کلیک روی نقاط داخل نقشه، مقدار خطر آن نقطه نمایش داده می‌شود.
+          </div>
         </div>
       </div>
     </div>
@@ -677,7 +864,7 @@
       }
     }
 
-    async function fetchWithTimeout(url, timeout = 7000) {
+    async function fetchWithTimeout(url, timeout = 5000) {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), timeout);
       try {
@@ -687,31 +874,31 @@
         return response;
       } catch (error) {
         clearTimeout(id);
-        throw error;
+        throw error.name === "AbortError" ? new Error(`Timeout`) : error;
       }
+    }
+
+    function formatNumber(value) {
+      const number = Number(value);
+      return !Number.isFinite(number) ? "—" : number.toLocaleString("fa-IR", { maximumFractionDigits: 2 });
     }
 
     function getRisk(value) {
       const num = Number(value);
-      if (!Number.isFinite(num) || num < 0) return { label: "بدون داده", color: "#777" };
+      if (!Number.isFinite(num)) return { label: "بدون داده", color: "#777" };
       const risks = [
         { min: 0, max: 20, label: "کم", color: "#2e7d32" },
         { min: 20, max: 40, label: "متوسط", color: "#c7a900" },
         { min: 40, max: 60, label: "زیاد", color: "#fb8c00" },
         { min: 60, max: 80, label: "خیلی زیاد", color: "#e53935" },
-        { min: 80, max: 101, label: "بحرانی", color: "#880e4f" }
+        { min: 80, max: 100, label: "بحرانی", color: "#880e4f" }
       ];
       return risks.find(r => num >= r.min && num < r.max) || risks[risks.length - 1];
     }
 
     function parseBounds(bounds) {
       if (!Array.isArray(bounds) || bounds.length < 2) return null;
-      return { 
-        south: Number(bounds[0][0]), 
-        west: Number(bounds[0][1]), 
-        north: Number(bounds[1][0]), 
-        east: Number(bounds[1][1]) 
-      };
+      return { south: Number(bounds[0][0]), west: Number(bounds[0][1]), north: Number(bounds[1][0]), east: Number(bounds[1][1]) };
     }
 
     function validateCoords(lat, lon) {
@@ -719,15 +906,18 @@
     }
 
     function updateGauge(value, title, subtitle) {
+      const valueElement = document.getElementById("gaugeValue");
       const labelElement = document.getElementById("gaugeLabel");
       const locationElement = document.getElementById("gaugeLocation");
       if (!Number.isFinite(Number(value))) {
+        valueElement.textContent = "—";
         labelElement.textContent = "بدون داده";
         labelElement.style.color = "#777";
         locationElement.textContent = subtitle || "—";
         return;
       }
       const risk = getRisk(value);
+      valueElement.textContent = formatNumber(value);
       labelElement.textContent = risk.label;
       labelElement.style.color = risk.color;
       locationElement.textContent = `${title || ""}${subtitle ? " | " + subtitle : ""}`;
@@ -735,10 +925,7 @@
 
     function initMap() {
       APP_STATE.map = L.map("map", { zoomControl: false, preferCanvas: true });
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { 
-        maxZoom: 18, 
-        attribution: "&copy; OpenStreetMap" 
-      }).addTo(APP_STATE.map);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "&copy; OpenStreetMap contributors" }).addTo(APP_STATE.map);
     }
 
     async function loadFars() {
@@ -790,7 +977,7 @@
       const response = await fetchWithTimeout("protected_areas.geojson");
       const geojson = await response.json();
       APP_STATE.layers.protected = L.geoJSON(geojson, {
-        style: { color: "#1565c0", weight: 1.8, opacity: 0.95, fillColor: "#42a5f5", fillOpacity: 0.15 },
+        style: { color: "#1565c0", weight: 1.7, opacity: 0.95, fillColor: "#42a5f5", fillOpacity: 0.1 },
         onEachFeature: (feature, layer) => bindRegion(feature, layer, "protected")
       });
       return APP_STATE.layers.protected;
@@ -800,7 +987,7 @@
       const response = await fetchWithTimeout("hunting_banned.geojson");
       const geojson = await response.json();
       APP_STATE.layers.hunting = L.geoJSON(geojson, {
-        style: { color: "#7b1fa2", weight: 1.8, opacity: 0.95, fillColor: "#ab47bc", fillOpacity: 0.15 },
+        style: { color: "#7b1fa2", weight: 1.7, opacity: 0.95, fillColor: "#ab47bc", fillOpacity: 0.1 },
         onEachFeature: (feature, layer) => bindRegion(feature, layer, "hunting")
       });
       return APP_STATE.layers.hunting;
@@ -829,7 +1016,9 @@
       for (const layer of APP_STATE.layers.fars.getLayers()) {
         try {
           if (turf.booleanPointInPolygon(point, layer.toGeoJSON())) return true;
-        } catch (error) {}
+        } catch (error) {
+          console.warn("Point check error:", error);
+        }
       }
       return false;
     }
@@ -855,7 +1044,9 @@
               sum += value;
               count++;
             }
-          } catch (error) {}
+          } catch (error) {
+            console.warn("Region mean error:", error);
+          }
         }
       }
       return count === 0 ? null : sum / count;
@@ -865,22 +1056,13 @@
       const properties = feature.properties || {};
       const regionLabel = regionType === "protected" ? "مناطق محافظت‌شده" : "مناطق شکار ممنوع";
       const fallbackName = regionType === "protected" ? "منطقه محافظت‌شده" : "منطقه شکار ممنوع";
-      const nameKeys = ["name", "NAME", "Name", "shapeName", "ShapeName", "NAME_1", "NAME_FA"];
+      const nameKeys = ["name", "NAME", "Name", "shapeName", "ShapeName", "NAME_1", "NAME_FA", "name_fa", "title", "TITLE"];
       const name = nameKeys.map(k => properties[k]).find(v => v && String(v).trim()) || fallbackName;
       const mean = regionMean(feature);
       const risk = getRisk(mean);
-      const popup = `
-        <div class="region-popup">
-          <div class="popup-title">${name}</div>
-          <div class="popup-risk-badge" style="background:${risk.color}">${risk.label}</div>
-          <div class="popup-coord">(${regionLabel})</div>
-        </div>
-      `;
+      const popup = `<div class="region-popup"><div class="popup-title">${name}</div><div class="popup-risk" style="background:${risk.color}">${risk.label}</div></div>`;
       layer.bindPopup(popup, { maxWidth: 260 });
-      layer.on("click", (e) => {
-        L.DomEvent.stopPropagation(e);
-        updateGauge(mean, name, regionLabel);
-      });
+      layer.on("click", () => updateGauge(mean, name, regionLabel));
     }
 
     function setupMapClick() {
@@ -888,16 +1070,10 @@
         const { lat, lng: lon } = event.latlng;
         if (!pointInsideFars(lat, lon)) return;
         const value = getPointValue(lat, lon);
-        updateGauge(value, "استان فارس", `عرض: ${lat.toFixed(3)} | طول: ${lon.toFixed(3)}`);
-        
+        updateGauge(value, "استان فارس", `${lat.toFixed(4)}° ، ${lon.toFixed(4)}°`);
+        if (!Number.isFinite(Number(value))) return;
         const risk = getRisk(value);
-        const popup = `
-          <div class="fli-popup">
-            <div class="popup-title">شاخص خطر حریق</div>
-            <div class="popup-risk-badge" style="background:${risk.color}">${risk.label}</div>
-            <div class="popup-coord">عرض: ${lat.toFixed(4)}° | طول: ${lon.toFixed(4)}°</div>
-          </div>
-        `;
+        const popup = `<div class="fli-popup"><div class="popup-title">شاخص خطر حریق</div><div class="popup-risk" style="background:${risk.color}">${risk.label}</div><div class="popup-coord">عرض: ${lat.toFixed(5)} | طول: ${lon.toFixed(5)}</div></div>`;
         if (APP_STATE.ui.currentPopup) APP_STATE.map.removeLayer(APP_STATE.ui.currentPopup);
         APP_STATE.ui.currentPopup = L.popup({ maxWidth: 260 }).setLatLng(event.latlng).setContent(popup).openOn(APP_STATE.map);
       });
@@ -916,16 +1092,10 @@
       const btn = document.getElementById("layersBtn");
       const menu = document.getElementById("layersMenu");
       const items = menu.querySelectorAll(".dropdown-item");
-
-      btn.addEventListener("click", (e) => { 
-        e.stopPropagation(); 
-        menu.classList.toggle("show"); 
-      });
-
+      btn.addEventListener("click", (e) => { e.stopPropagation(); menu.classList.toggle("show"); });
       document.addEventListener("click", (e) => {
         if (!btn.contains(e.target) && !menu.contains(e.target)) menu.classList.remove("show");
       });
-
       items.forEach(item => {
         item.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -933,7 +1103,6 @@
           APP_STATE.ui.activeLayer = layer;
           items.forEach(i => i.classList.remove("active"));
           item.classList.add("active");
-
           const layerConfig = {
             fli: { fli: true, protected: false, hunting: false },
             protected: { fli: true, protected: true, hunting: false },
@@ -945,13 +1114,12 @@
           setLayerVisible(APP_STATE.layers.protected, config.protected);
           setLayerVisible(APP_STATE.layers.hunting, config.hunting);
           menu.classList.remove("show");
-
           if (layer === "protected" && APP_STATE.layers.protected) {
             const bounds = APP_STATE.layers.protected.getBounds();
-            if (bounds.isValid()) setTimeout(() => APP_STATE.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 10 }), 100);
+            if (bounds.isValid()) setTimeout(() => APP_STATE.map.fitBounds(bounds, { padding: [80, 80], maxZoom: 10 }), 100);
           } else if (layer === "hunting" && APP_STATE.layers.hunting) {
             const bounds = APP_STATE.layers.hunting.getBounds();
-            if (bounds.isValid()) setTimeout(() => APP_STATE.map.fitBounds(bounds, { padding: [60, 60], maxZoom: 10 }), 100);
+            if (bounds.isValid()) setTimeout(() => APP_STATE.map.fitBounds(bounds, { padding: [80, 80], maxZoom: 10 }), 100);
           }
         });
       });
@@ -962,6 +1130,7 @@
         APP_STATE.ui.nightMode = !APP_STATE.ui.nightMode;
         document.body.classList.toggle("night", APP_STATE.ui.nightMode);
         this.textContent = APP_STATE.ui.nightMode ? "🌙" : "☀️";
+        this.title = APP_STATE.ui.nightMode ? "حالت روز" : "حالت شب";
       });
     }
 
@@ -969,7 +1138,7 @@
       if (!APP_STATE.layers.fars) return;
       const bounds = APP_STATE.layers.fars.getBounds();
       if (!bounds.isValid()) return;
-      APP_STATE.map.fitBounds(bounds, { padding: [40, 40], maxZoom: 8, animate: true });
+      APP_STATE.map.fitBounds(bounds, { padding: [80, 80], maxZoom: 8, animate: true });
       setTimeout(() => APP_STATE.map.invalidateSize(), 100);
     }
 
@@ -996,7 +1165,7 @@
         try {
           await Promise.all([loadProtected(), loadHunting()]);
         } catch (error) {
-          console.warn("Optional layers warning:", error);
+          console.warn("Optional layers error:", error);
         }
         setLayerVisible(APP_STATE.layers.fli, true);
         setLayerVisible(APP_STATE.layers.protected, false);
