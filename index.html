@@ -56,9 +56,8 @@
       flex: 0 0 var(--header-height);
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 30px;
-      padding: 15px 20px;
+      justify-content: space-between;
+      padding: 10px 20px;
       color: white;
       background: linear-gradient(180deg, #e52e2e 0%, #c31313 42%, #8c0505 100%);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 -15px 30px rgba(70,0,0,.20), 0 2px 12px rgba(0,0,0,.22);
@@ -76,52 +75,62 @@
       pointer-events: none;
     }
 
-    .header-buttons {
+    .header-logo {
       position: absolute;
       left: 20px;
       top: 50%;
       transform: translateY(-50%);
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      width: 70px;
+      height: 70px;
+      object-fit: contain;
+      filter: brightness(0) invert(1) drop-shadow(0 2px 3px rgba(0,0,0,.25));
       z-index: 2;
     }
 
     .header-center {
       position: relative;
       z-index: 2;
-      text-align: center;
       flex: 1;
+      text-align: center;
+      margin: 0 20px;
     }
 
     .header-title {
       margin: 0;
-      font-size: 32px;
+      font-size: 28px;
       font-weight: 900;
       line-height: 1.2;
       text-shadow: 0 2px 4px rgba(0,0,0,.2);
     }
 
     .header-subtitle {
-      margin: 5px 0 0;
-      font-size: 16px;
+      margin: 3px 0 0;
+      font-size: 15px;
       font-weight: 700;
+    }
+
+    .header-buttons-group {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     /* BUTTONS */
     .header-btn {
-      width: 45px;
-      height: 45px;
+      width: 38px;
+      height: 38px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       border: 1px solid #cbd2d8;
-      border-radius: 8px;
+      border-radius: 6px;
       background: #fff;
       color: #27323a;
       cursor: pointer;
       text-decoration: none;
-      font-size: 22px;
+      font-size: 18px;
       line-height: 1;
       transition: .2s ease;
       flex-shrink: 0;
@@ -131,7 +140,11 @@
       background: #f3f5f6;
       border-color: #aeb8bf;
       transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+      box-shadow: 0 3px 10px rgba(0,0,0,.12);
+    }
+
+    .header-btn:active {
+      transform: translateY(0);
     }
 
     .header-btn.primary {
@@ -145,12 +158,6 @@
       border-color: #145a24;
     }
 
-    .header-btn.active {
-      background: #28333b;
-      color: white;
-      border-color: #28333b;
-    }
-
     /* DROPDOWN */
     .dropdown {
       position: relative;
@@ -159,8 +166,8 @@
 
     .dropdown-menu {
       position: absolute;
-      top: 100%;
-      left: 0;
+      top: calc(100% + 6px);
+      right: 0;
       background: white;
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -169,7 +176,8 @@
       z-index: 4000;
       display: none;
       padding: 8px 0;
-      margin-top: 8px;
+      margin: 0;
+      list-style: none;
     }
 
     .dropdown-menu.show {
@@ -200,6 +208,7 @@
       font-size: 14px;
       font-weight: 600;
       transition: .1s ease;
+      font-family: var(--font-main);
     }
 
     .dropdown-item:hover {
@@ -211,6 +220,7 @@
       color: var(--green);
       font-weight: 700;
       border-right: 4px solid var(--green);
+      padding-right: 12px;
     }
 
     /* MAP */
@@ -437,6 +447,7 @@
       background: white;
       cursor: pointer;
       font-size: 20px;
+      font-family: var(--font-main);
     }
 
     .about-text {
@@ -477,25 +488,30 @@
       }
 
       .header {
-        gap: 15px;
+        gap: 10px;
+      }
+
+      .header-logo {
+        width: 55px;
+        height: 55px;
       }
 
       .header-title {
-        font-size: 22px;
+        font-size: 20px;
       }
 
       .header-subtitle {
-        font-size: 14px;
+        font-size: 13px;
       }
 
-      .header-buttons {
+      .header-buttons-group {
         gap: 6px;
       }
 
       .header-btn {
-        width: 40px;
-        height: 40px;
-        font-size: 18px;
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
       }
 
       .gauge-panel {
@@ -529,17 +545,27 @@
   <div id="app">
     <!-- HEADER -->
     <header class="header">
-      <div class="header-buttons">
+      <img src="logo.webp" alt="لوگوی سامانه" class="header-logo">
+      
+      <div class="header-center">
+        <div class="header-title">سامانه پیش‌بینی و پهنه‌بندی حریق در عرصه‌های طبیعی</div>
+        <div class="header-subtitle">استان فارس</div>
+      </div>
+
+      <div class="header-buttons-group">
         <!-- LAYERS DROPDOWN -->
         <div class="dropdown">
           <button id="layersBtn" class="header-btn" title="انتخاب لایه" aria-label="انتخاب لایه">🗺️</button>
-          <div id="layersMenu" class="dropdown-menu">
-            <button class="dropdown-item active" data-layer="fli">شاخص خطر حریق</button>
-            <button class="dropdown-item" data-layer="protected">مناطق چهارگانه</button>
-            <button class="dropdown-item" data-layer="hunting">مناطق شکار ممنوع</button>
-            <button class="dropdown-item" data-layer="all">همه لایه‌ها</button>
-          </div>
+          <ul id="layersMenu" class="dropdown-menu">
+            <li><button class="dropdown-item active" data-layer="fli">شاخص خطر حریق</button></li>
+            <li><button class="dropdown-item" data-layer="protected">مناطق محافظت‌شده</button></li>
+            <li><button class="dropdown-item" data-layer="hunting">مناطق شکار ممنوع</button></li>
+            <li><button class="dropdown-item" data-layer="all">همه لایه‌ها</button></li>
+          </ul>
         </div>
+
+        <!-- FIT -->
+        <button id="fitButton" class="header-btn primary" title="نمایش کامل استان فارس" aria-label="نمایش کامل استان فارس">🌐</button>
 
         <!-- NIGHT MODE -->
         <button id="modeButton" class="header-btn" title="حالت شب" aria-label="تغییر حالت روز و شب">☀️</button>
@@ -549,16 +575,6 @@
 
         <!-- EXCEL -->
         <a href="data/report/firis_report.xlsx" target="_blank" rel="noopener" class="header-btn primary" title="خروجی Excel" aria-label="خروجی Excel">📊</a>
-      </div>
-
-      <div class="header-center">
-        <div class="header-title">سامانه پیش‌بینی و پهنه‌بندی حریق در عرصه‌های طبیعی</div>
-        <div class="header-subtitle">استان فارس</div>
-      </div>
-
-      <!-- FIT -->
-      <div class="header-buttons" style="position: absolute; right: 20px; left: auto; gap: 10px;">
-        <button id="fitButton" class="header-btn primary" title="نمایش کامل استان فارس" aria-label="نمایش کامل استان فارس">🌐</button>
       </div>
     </header>
 
@@ -670,9 +686,6 @@
      * ============================================================
      */
 
-    /**
-     * Fetch با Error Handling و Timeout
-     */
     async function fetchWithTimeout(url, timeout = 5000) {
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), timeout);
@@ -699,18 +712,12 @@
       }
     }
 
-    /**
-     * تبدیل اعداد به فرمت فارسی
-     */
     function formatNumber(value) {
       const number = Number(value);
       if (!Number.isFinite(number)) return "—";
       return number.toLocaleString("fa-IR", { maximumFractionDigits: 2 });
     }
 
-    /**
-     * دریافت سطح خطر و رنگ
-     */
     function getRisk(value) {
       const num = Number(value);
       if (!Number.isFinite(num)) {
@@ -728,9 +735,6 @@
       return risks.find(r => num >= r.min && num < r.max) || risks[risks.length - 1];
     }
 
-    /**
-     * تحلیل مرز نقشه
-     */
     function parseBounds(bounds) {
       if (!Array.isArray(bounds) || bounds.length < 2) return null;
       return {
@@ -741,9 +745,6 @@
       };
     }
 
-    /**
-     * اعتبار سنجی مختصات
-     */
     function validateCoords(lat, lon) {
       return (
         Number.isFinite(lat) &&
@@ -761,9 +762,6 @@
      * ============================================================
      */
 
-    /**
-     * بروزرسانی نمایشگر گیج
-     */
     function updateGauge(value, title, subtitle) {
       const valueElement = document.getElementById("gaugeValue");
       const labelElement = document.getElementById("gaugeLabel");
@@ -1020,8 +1018,8 @@
 
     function bindRegion(feature, layer, regionType) {
       const properties = feature.properties || {};
-      const regionLabel = regionType === "protected" ? "مناطق چهارگانه" : "مناطق شکار ممنوع";
-      const fallbackName = regionType === "protected" ? "منطقه چهارگانه" : "منطقه شکار ممنوع";
+      const regionLabel = regionType === "protected" ? "مناطق محافظت‌شده" : "مناطق شکار ممنوع";
+      const fallbackName = regionType === "protected" ? "منطقه محافظت‌شده" : "منطقه شکار ممنوع";
 
       const nameKeys = ["name", "NAME", "Name", "shapeName", "ShapeName", "NAME_1", "NAME_FA", "name_fa", "title", "TITLE", "نام", "نام منطقه"];
       const name = nameKeys.map(k => properties[k]).find(v => v && String(v).trim()) || fallbackName;
@@ -1124,7 +1122,9 @@
       });
 
       items.forEach(item => {
-        item.addEventListener("click", () => {
+        item.addEventListener("click", (e) => {
+          e.stopPropagation();
+          
           const layer = item.dataset.layer;
           APP_STATE.ui.activeLayer = layer;
 
