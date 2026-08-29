@@ -18,7 +18,7 @@
 
     :root {
       --font-main: "B Nazanin", Tahoma, Arial, sans-serif;
-      --header-height: 80px;
+      --header-height: 100px;
       --red-main: #b40000;
       --green: #176b2c;
       --text: #222;
@@ -56,8 +56,9 @@
       flex: 0 0 var(--header-height);
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 10px 20px;
+      justify-content: center;
+      gap: 30px;
+      padding: 15px 20px;
       color: white;
       background: linear-gradient(180deg, #e52e2e 0%, #c31313 42%, #8c0505 100%);
       box-shadow: inset 0 1px 0 rgba(255,255,255,.42), inset 0 -15px 30px rgba(70,0,0,.20), 0 2px 12px rgba(0,0,0,.22);
@@ -75,51 +76,42 @@
       pointer-events: none;
     }
 
-    .header-logo {
+    .header-buttons {
       position: absolute;
       left: 20px;
       top: 50%;
       transform: translateY(-50%);
-      width: 60px;
-      height: 60px;
-      object-fit: contain;
-      filter: brightness(0) invert(1) drop-shadow(0 2px 3px rgba(0,0,0,.25));
+      display: flex;
+      align-items: center;
+      gap: 10px;
       z-index: 2;
     }
 
     .header-center {
       position: relative;
       z-index: 2;
-      flex: 1;
       text-align: center;
-      margin: 0 20px;
+      flex: 1;
     }
 
     .header-title {
       margin: 0;
-      font-size: 20px;
-      font-weight: 800;
+      font-size: 32px;
+      font-weight: 900;
       line-height: 1.2;
+      text-shadow: 0 2px 4px rgba(0,0,0,.2);
     }
 
     .header-subtitle {
-      margin: 2px 0 0;
-      font-size: 13px;
+      margin: 5px 0 0;
+      font-size: 16px;
       font-weight: 700;
-    }
-
-    .header-buttons {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      align-items: center;
-      gap: 8px;
     }
 
     /* BUTTONS */
     .header-btn {
-      width: 40px;
-      height: 40px;
+      width: 45px;
+      height: 45px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -129,21 +121,28 @@
       color: #27323a;
       cursor: pointer;
       text-decoration: none;
-      font-size: 18px;
+      font-size: 22px;
       line-height: 1;
-      transition: .15s ease;
+      transition: .2s ease;
+      flex-shrink: 0;
     }
 
     .header-btn:hover {
       background: #f3f5f6;
       border-color: #aeb8bf;
-      transform: translateY(-1px);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
     }
 
     .header-btn.primary {
       background: var(--green);
       color: white;
       border-color: var(--green);
+    }
+
+    .header-btn.primary:hover {
+      background: #145a24;
+      border-color: #145a24;
     }
 
     .header-btn.active {
@@ -161,32 +160,44 @@
     .dropdown-menu {
       position: absolute;
       top: 100%;
-      right: 0;
+      left: 0;
       background: white;
       border: 1px solid var(--border);
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,.15);
-      min-width: 220px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.2);
+      min-width: 240px;
       z-index: 4000;
       display: none;
       padding: 8px 0;
-      margin-top: 4px;
+      margin-top: 8px;
     }
 
     .dropdown-menu.show {
       display: block;
+      animation: slideDown .2s ease;
+    }
+
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .dropdown-item {
       display: block;
       width: 100%;
-      padding: 10px 16px;
+      padding: 12px 16px;
       border: none;
       background: white;
       color: var(--text);
       cursor: pointer;
       text-align: right;
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 600;
       transition: .1s ease;
     }
@@ -199,6 +210,7 @@
       background: #e8f5e9;
       color: var(--green);
       font-weight: 700;
+      border-right: 4px solid var(--green);
     }
 
     /* MAP */
@@ -241,8 +253,8 @@
       position: absolute;
       bottom: 20px;
       left: 14px;
-      width: 175px;
-      padding: 11px 12px;
+      width: 180px;
+      padding: 14px;
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -253,49 +265,52 @@
     .legend-title {
       font-size: 14px;
       font-weight: 800;
-      margin-bottom: 7px;
+      margin-bottom: 10px;
+      color: var(--text);
     }
 
     .legend-item {
       display: flex;
       align-items: center;
-      gap: 7px;
-      font-size: 11px;
-      margin: 4px 0;
+      gap: 8px;
+      font-size: 12px;
+      margin: 6px 0;
     }
 
     .legend-color {
-      width: 18px;
-      height: 12px;
+      width: 20px;
+      height: 14px;
       border-radius: 3px;
       border: 1px solid rgba(0,0,0,.12);
+      flex-shrink: 0;
     }
 
     /* GAUGE */
     .gauge-panel {
       position: absolute;
-      bottom: 20px;
+      top: 20px;
       right: 14px;
-      width: 230px;
+      width: 250px;
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: 14px;
       box-shadow: 0 5px 20px rgba(0,0,0,.16);
-      padding: 12px;
+      padding: 16px;
       z-index: 1400;
       text-align: center;
     }
 
     .gauge-title {
-      font-size: 14px;
+      font-size: 15px;
       font-weight: 800;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
+      color: var(--text);
     }
 
     .gauge {
-      width: 120px;
-      height: 120px;
-      margin: 0 auto 8px;
+      width: 140px;
+      height: 140px;
+      margin: 0 auto 12px;
       border-radius: 50%;
       background: conic-gradient(#2e7d32 0deg 72deg, #fdd835 72deg 144deg, #fb8c00 144deg 216deg, #e53935 216deg 288deg, #880e4f 288deg 360deg);
       display: flex;
@@ -307,8 +322,8 @@
     .gauge::before {
       content: "";
       position: absolute;
-      width: 90px;
-      height: 90px;
+      width: 108px;
+      height: 108px;
       border-radius: 50%;
       background: #fff;
     }
@@ -319,21 +334,23 @@
     }
 
     .gauge-value {
-      font-size: 24px;
+      font-size: 28px;
       font-weight: 900;
       line-height: 1;
+      color: var(--text);
     }
 
     .gauge-label {
-      margin-top: 3px;
-      font-size: 11px;
+      margin-top: 4px;
+      font-size: 12px;
       font-weight: 800;
     }
 
     .gauge-location {
-      font-size: 10px;
+      font-size: 11px;
       color: var(--muted);
       line-height: 1.6;
+      margin-top: 8px;
     }
 
     /* POPUPS */
@@ -456,74 +473,53 @@
     /* MOBILE */
     @media (max-width: 768px) {
       :root {
-        --header-height: 70px;
+        --header-height: 90px;
       }
 
       .header {
-        flex-wrap: wrap;
-      }
-
-      .header-logo {
-        width: 50px;
-        height: 50px;
-      }
-
-      .header-center {
-        margin: 0 10px;
+        gap: 15px;
       }
 
       .header-title {
-        font-size: 16px;
+        font-size: 22px;
       }
 
       .header-subtitle {
-        font-size: 11px;
+        font-size: 14px;
       }
 
       .header-buttons {
-        gap: 4px;
+        gap: 6px;
       }
 
       .header-btn {
-        width: 36px;
-        height: 36px;
-        font-size: 16px;
+        width: 40px;
+        height: 40px;
+        font-size: 18px;
       }
 
       .gauge-panel {
-        width: 180px;
-        padding: 10px;
+        width: 220px;
+        padding: 12px;
       }
 
       .gauge {
-        width: 100px;
-        height: 100px;
+        width: 120px;
+        height: 120px;
       }
 
       .gauge::before {
-        width: 75px;
-        height: 75px;
+        width: 92px;
+        height: 92px;
       }
 
       .gauge-value {
-        font-size: 20px;
-      }
-
-      .gauge-title {
-        font-size: 12px;
+        font-size: 24px;
       }
 
       .legend {
-        width: 150px;
-        padding: 10px;
-      }
-
-      .legend-title {
-        font-size: 12px;
-      }
-
-      .legend-item {
-        font-size: 10px;
+        width: 160px;
+        padding: 12px;
       }
     }
   </style>
@@ -533,13 +529,6 @@
   <div id="app">
     <!-- HEADER -->
     <header class="header">
-      <img src="logo.webp" alt="لوگوی سامانه" class="header-logo">
-      
-      <div class="header-center">
-        <div class="header-title">سامانه پیش‌بینی و پهنه‌بندی حریق</div>
-        <div class="header-subtitle">استان فارس</div>
-      </div>
-
       <div class="header-buttons">
         <!-- LAYERS DROPDOWN -->
         <div class="dropdown">
@@ -552,9 +541,6 @@
           </div>
         </div>
 
-        <!-- FIT -->
-        <button id="fitButton" class="header-btn primary" title="نمایش کامل استان فارس" aria-label="نمایش کامل استان فارس">🌐</button>
-
         <!-- NIGHT MODE -->
         <button id="modeButton" class="header-btn" title="حالت شب" aria-label="تغییر حالت روز و شب">☀️</button>
 
@@ -563,6 +549,16 @@
 
         <!-- EXCEL -->
         <a href="data/report/firis_report.xlsx" target="_blank" rel="noopener" class="header-btn primary" title="خروجی Excel" aria-label="خروجی Excel">📊</a>
+      </div>
+
+      <div class="header-center">
+        <div class="header-title">سامانه پیش‌بینی و پهنه‌بندی حریق در عرصه‌های طبیعی</div>
+        <div class="header-subtitle">استان فارس</div>
+      </div>
+
+      <!-- FIT -->
+      <div class="header-buttons" style="position: absolute; right: 20px; left: auto; gap: 10px;">
+        <button id="fitButton" class="header-btn primary" title="نمایش کامل استان فارس" aria-label="نمایش کامل استان فارس">🌐</button>
       </div>
     </header>
 
@@ -1116,7 +1112,8 @@
       const menu = document.getElementById("layersMenu");
       const items = menu.querySelectorAll(".dropdown-item");
 
-      btn.addEventListener("click", () => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
         menu.classList.toggle("show");
       });
 
@@ -1153,12 +1150,16 @@
           if (layer === "protected" && APP_STATE.layers.protected) {
             const bounds = APP_STATE.layers.protected.getBounds();
             if (bounds.isValid()) {
-              APP_STATE.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+              setTimeout(() => {
+                APP_STATE.map.fitBounds(bounds, { padding: [80, 80], maxZoom: 10 });
+              }, 100);
             }
           } else if (layer === "hunting" && APP_STATE.layers.hunting) {
             const bounds = APP_STATE.layers.hunting.getBounds();
             if (bounds.isValid()) {
-              APP_STATE.map.fitBounds(bounds, { padding: [50, 50], maxZoom: 10 });
+              setTimeout(() => {
+                APP_STATE.map.fitBounds(bounds, { padding: [80, 80], maxZoom: 10 });
+              }, 100);
             }
           }
         });
@@ -1188,7 +1189,7 @@
       if (!bounds.isValid()) return;
 
       APP_STATE.map.fitBounds(bounds, {
-        padding: [50, 50],
+        padding: [80, 80],
         maxZoom: 8,
         animate: true
       });
