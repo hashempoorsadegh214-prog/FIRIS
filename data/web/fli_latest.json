@@ -2,10 +2,10 @@
   "title": "FIRIS - Fars Fire Risk Index",
   "project": "FIRIS",
   "indicator": "Fire Likelihood Index (FLI)",
-  "source_file": "fli_fars_2026-08-29.tif",
-  "forecast_date": "2026-08-29",
+  "source_file": "fli_fars_2026-08-30.tif",
+  "forecast_date": "2026-08-30",
   "forecast_definition": "Forecast target date encoded in the FLI filename.",
-  "generated_at_utc": "2026-08-29T12:04:19.553595+00:00",
+  "generated_at_utc": "2026-08-29T12:56:08.044152+00:00",
   "crs": "EPSG:4326",
   "primary_web_layer": "fli_polygons.geojson",
   "preview_image": "fli_latest.png",
@@ -44,8 +44,8 @@
   },
   "statistics": {
     "min": 0.0,
-    "max": 67.27,
-    "mean": 36.05,
+    "max": 68.22,
+    "mean": 36.28,
     "valid_pixels": 904755
   },
   "legend": [

@@ -1,0 +1,99 @@
+{
+  "raster": "data/raw/fwi/fwi_ecmwf_fars_2026-08-30.tif",
+  "boundary": "fars.geojson",
+  "crs": "EPSG:4326",
+  "raster_bounds": {
+    "west": 50.5031831,
+    "east": 55.68006520000001,
+    "south": 26.945617,
+    "north": 31.7695989
+  },
+  "boundary_bounds": {
+    "west": 50.603183099720354,
+    "east": 55.58006519994905,
+    "south": 27.04561700022441,
+    "north": 31.669598899969287
+  },
+  "control_points": [
+    {
+      "name": "WEST_EXTREME",
+      "longitude": 50.603183099720354,
+      "latitude": 29.943728199596762,
+      "row": 756,
+      "col": 38,
+      "pixel_center_longitude": 50.602838080425,
+      "pixel_center_latitude": 29.944927746325,
+      "inside_raster": true
+    },
+    {
+      "name": "EAST_EXTREME",
+      "longitude": 55.58006519994905,
+      "latitude": 27.80869059979142,
+      "row": 1642,
+      "col": 1961,
+      "pixel_center_longitude": 55.58041021957501,
+      "pixel_center_latitude": 27.807903764625,
+      "inside_raster": true
+    },
+    {
+      "name": "SOUTH_EXTREME",
+      "longitude": 53.78526669969847,
+      "latitude": 27.04561700022441,
+      "row": 1958,
+      "col": 1267,
+      "pixel_center_longitude": 53.784032130875005,
+      "pixel_center_latitude": 27.045714624425,
+      "inside_raster": true
+    },
+    {
+      "name": "NORTH_EXTREME",
+      "longitude": 52.20186149960858,
+      "latitude": 31.669598899969287,
+      "row": 41,
+      "col": 656,
+      "pixel_center_longitude": 52.202494649325004,
+      "pixel_center_latitude": 31.669501275574998,
+      "inside_raster": true
+    },
+    {
+      "name": "WEST_INTERMEDIATE",
+      "longitude": 51.38266240004975,
+      "latitude": 29.46900240024064,
+      "row": 953,
+      "col": 339,
+      "pixel_center_longitude": 51.381958836475,
+      "pixel_center_latitude": 29.469765529175,
+      "inside_raster": true
+    },
+    {
+      "name": "EAST_INTERMEDIATE",
+      "longitude": 54.16722750014907,
+      "latitude": 29.71539399953349,
+      "row": 851,
+      "col": 1415,
+      "pixel_center_longitude": 54.16712140627501,
+      "pixel_center_latitude": 29.715788606074998,
+      "inside_raster": true
+    },
+    {
+      "name": "SOUTH_INTERMEDIATE",
+      "longitude": 52.37826190016659,
+      "latitude": 28.00368919969685,
+      "row": 1561,
+      "col": 724,
+      "pixel_center_longitude": 52.378508640725,
+      "pixel_center_latitude": 28.003275031575,
+      "inside_raster": true
+    },
+    {
+      "name": "NORTH_INTERMEDIATE",
+      "longitude": 51.2609897003145,
+      "latitude": 30.35402049984623,
+      "row": 586,
+      "col": 292,
+      "pixel_center_longitude": 51.260302107125,
+      "pixel_center_latitude": 30.354966207824997,
+      "inside_raster": true
+    }
+  ]
+}
