@@ -613,16 +613,23 @@
 
     <div class="toolbar-group toolbar-left">
       <button id="aboutButton" class="header-btn" title="معرفی سامانه" aria-label="معرفی سامانه">ℹ</button>
-      <button id="fitButton" class="header-btn primary" title="نمایش کامل استان فارس" aria-label="نمایش کامل استان فارس">🌐</button>
-      <button id="modeButton" class="header-btn" title="حالت شب" aria-label="تغییر حالت روز و شب">☀️</button>
-      <a href="data/report/firis_report.xlsx" target="_blank" rel="noopener" class="header-btn primary" title="خروجی Excel" aria-label="خروجی Excel">📊</a>
+      <<div class="gauge-panel">
+      <div class="gauge-title">وضعیت انتخاب‌شده</div>
+      <div class="gauge">
+        <div class="gauge-content">
+          <div id="gaugeValue" class="gauge-value">—</div>
+          <div id="gaugeLabel" class="gauge-label">یک نقطه یا منطقه را انتخاب کنید</div>
+        </div>
+      </div>
+      <div id="gaugeLocation" class="gauge-location">—</div>
     </div>
   </div>
 
-  <!-- MAP -->
-  <div id="map-wrap">
-    <div id="map"></div>
-    <div id="nightOverlay"></div>
+  <!-- STATUS -->
+  <div id="status" class="status-bar">در حال بارگذاری سامانه...</div>
+
+  <!-- ABOUT DIALOG -->
+Overlay"></div>
 
     <!-- LEGEND -->
     <div class="legend">
@@ -794,6 +801,30 @@ function getRegionName(properties, fallback) {
   for (const key of candidates) {
     const value = properties[key];
     if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value).trim();;
+  }
+
+  const number = Number(value);
+  const risk = getRisk(number);
+
+  valueElement.textContent = formatNumber(number);
+  labelElement.textContent = risk.label;
+  labelElement.style.color = risk.color;
+  locationElement.textContent = `${title || ""}${subtitle ? " | " + subtitle : ""}`;
+}
+
+/* REGION NAME EXTRACTION */
+function getRegionName(properties, fallback) {
+  properties = properties || {};
+  const candidates = [
+    "name", "NAME", "Name", "shapeName", "ShapeName",
+    "NAME_1", "NAME_FA", "name_fa", "title", "TITLE",
+    "نام", "نام منطقه", "نام_منطقه"
+  ];
+
+  for (const key of candidates) {
+    const value = properties[key];
+    if (value !== undefined && value !== null && String(value).trim()) {
       return String(value).trim();
     }
   }
@@ -839,29 +870,7 @@ function fitFars() {
 
 /* LOAD FLI POLYGONS */
 async function loadFLI() {
-  const response = await fetch("data/web/fli_polygons.geojson", { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`لایه FLI: HTTP ${response.status}`);
-  }
-
-  const geojson = await response.json();
-  if (!geojson || geojson.type !== "FeatureCollection" || !Array.isArray(geojson.features) || geojson.features.length === 0) {
-    throw new Error("داده‌های fli_polygons.geojson معتبر یا کامل نیست.");
-  }
-
-  fliLayer = L.geoJSON(geojson, {
-    style: function(feature) {
-      const properties = feature.properties || {};
-      const color = properties.color || "#777";
-      return {
-        color: color,
-        weight: 0.15,
-        opacity: 0.85,
-        fillColor: color,
-        fillOpacity: 0.72
-      };
-    },
-    interactive: false
+  const response = await fetch("data/web/fli_polygons.geojson", { cache: "no-store"interactive: false
   });
 
   fliLayer.addTo(map);
@@ -1214,9 +1223,4 @@ document.getElementById("fitButton").addEventListener("click", function() {
 /* ABOUT MODAL CONTROLS */
 const aboutOverlay = document.getElementById("aboutOverlay");
 
-document.getElementById("aboutButton").addEventListener("click", function() {
-  aboutOverlay.classList.add("open");
-});
-
-document.getElementById("aboutClose").addEventListener("click", function() {
-  aboutOverlay
+document.ge
