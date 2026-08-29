@@ -5,16 +5,25 @@ on:
 
   workflow_dispatch:
 
+  schedule:
+
+    # Every day at 21:00 UTC
+    # = 00:30 Iran time on the next day during DST-like offsets
+    # The actual target date is ALWAYS calculated
+    # inside update_fwi.py using Asia/Tehran.
+    - cron: "0 21 * * *"
+
   push:
+
     paths:
 
-      - "scripts/**"
+      - "scripts/update_fwi.py"
       - "fars.geojson"
-      - "data/raw/fwi/**"
       - ".github/workflows/update_fwi.yml"
 
 
 permissions:
+
   contents: write
 
 
@@ -49,7 +58,7 @@ jobs:
 
 
       # ========================================================
-      # PYTHON
+      # SETUP PYTHON
       # ========================================================
 
       - name: Setup Python
@@ -62,7 +71,7 @@ jobs:
 
 
       # ========================================================
-      # DEPENDENCIES
+      # INSTALL DEPENDENCIES
       # ========================================================
 
       - name: Install dependencies
@@ -77,30 +86,101 @@ jobs:
 
           pip install \
             numpy \
-            pandas \
-            openpyxl \
             rasterio \
+            requests \
             shapely \
             pyproj
 
 
       # ========================================================
-      # CHECK FWI METADATA
+      # CHECK REQUIRED FILES
+      # ========================================================
+
+      - name: Check required files
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+
+          required_files=(
+
+            "scripts/update_fwi.py"
+
+            "fars.geojson"
+
+          )
+
+
+          echo ""
+          echo "============================================================"
+          echo "CHECKING REQUIRED FILES"
+          echo "============================================================"
+
+
+          for file in "${required_files[@]}"; do
+
+            if [ ! -f "${file}" ]; then
+
+              echo ""
+              echo "ERROR: Required file not found:"
+              echo "${file}"
+
+              exit 1
+
+            fi
+
+
+            echo "✓ ${file}"
+
+          done
+
+
+      # ========================================================
+      # RUN AUTOMATIC FWI DOWNLOAD
       #
       # IMPORTANT:
       #
-      # Metadata may contain:
+      # update_fwi.py itself calculates:
       #
-      # target_date
+      # TODAY IN IRAN + 1 DAY
       #
-      # or:
+      # Therefore:
       #
-      # forecast_date
+      # 2026-08-29
+      #       ↓
+      # 2026-08-30
       #
-      # We accept BOTH.
+      # We do NOT manually choose the date here.
       # ========================================================
 
-      - name: Detect forecast FWI
+      - name: Download FWI for tomorrow
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+
+          echo ""
+          echo "============================================================"
+          echo "DOWNLOADING TOMORROW FWI"
+          echo "============================================================"
+
+
+          python scripts/update_fwi.py \
+            --boundary "fars.geojson" \
+            --overwrite
+
+
+      # ========================================================
+      # DETECT CURRENT IRAN DATE AND EXPECTED TARGET DATE
+      # ========================================================
+
+      - name: Calculate expected forecast date
 
         shell: bash
 
@@ -111,232 +191,56 @@ jobs:
 
           python - <<'PY'
 
-          import json
           import os
-          from datetime import datetime
-          from pathlib import Path
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
 
 
-          directory = Path(
-              "data/raw/fwi"
+          iran = ZoneInfo(
+              "Asia/Tehran"
           )
 
 
-          if not directory.exists():
-
-              raise SystemExit(
-                  "ERROR: data/raw/fwi does not exist."
-              )
-
-
-          metadata_files = sorted(
-              directory.glob(
-                  "fwi_ecmwf_fars_*.json"
-              )
+          now = datetime.now(
+              iran
           )
 
 
-          if not metadata_files:
+          expected = (
+              now.date()
+              +
+              timedelta(days=1)
+          )
 
-              raise SystemExit(
-                  "ERROR: No FWI metadata files found."
-              )
+
+          expected_date = (
+              expected.isoformat()
+          )
 
 
           print("")
           print("=" * 70)
-          print("SEARCHING FWI METADATA")
+          print("EXPECTED FORECAST DATE")
           print("=" * 70)
 
 
-          candidates = []
-
-
-          for metadata_path in metadata_files:
-
-              print(
-                  f"Checking: {metadata_path}"
-              )
-
-
-              try:
-
-                  with metadata_path.open(
-                      "r",
-                      encoding="utf-8"
-                  ) as file:
-
-                      metadata = json.load(
-                          file
-                      )
-
-
-                  # ------------------------------------------------
-                  # ACCEPT BOTH DATE FIELDS
-                  # ------------------------------------------------
-
-                  forecast_date = (
-                      metadata.get(
-                          "target_date"
-                      )
-                      or
-                      metadata.get(
-                          "forecast_date"
-                      )
-                  )
-
-
-                  if not forecast_date:
-
-                      print(
-                          "  -> skipped: "
-                          "no target_date/forecast_date"
-                      )
-
-                      continue
-
-
-                  # ------------------------------------------------
-                  # VALIDATE DATE
-                  # ------------------------------------------------
-
-                  try:
-
-                      datetime.strptime(
-                          str(
-                              forecast_date
-                          ),
-                          "%Y-%m-%d"
-                      )
-
-                  except ValueError:
-
-                      print(
-                          "  -> skipped: "
-                          f"invalid date {forecast_date}"
-                      )
-
-                      continue
-
-
-                  # ------------------------------------------------
-                  # FIND RASTER NAME
-                  # ------------------------------------------------
-
-                  raster_name = (
-                      metadata.get(
-                          "output_file"
-                      )
-                  )
-
-
-                  if not raster_name:
-
-                      raster_name = (
-                          metadata_path.stem
-                          +
-                          ".tif"
-                      )
-
-
-                  raster_name = str(
-                      raster_name
-                  )
-
-
-                  # ------------------------------------------------
-                  # RESOLVE RASTER PATH
-                  # ------------------------------------------------
-
-                  raster_path = (
-                      directory
-                      /
-                      raster_name
-                  )
-
-
-                  if not raster_path.is_file():
-
-                      alternative = Path(
-                          raster_name
-                      )
-
-
-                      if alternative.is_file():
-
-                          raster_path = alternative
-
-                      else:
-
-                          print(
-                              "  -> skipped: "
-                              f"raster not found: "
-                              f"{raster_path}"
-                          )
-
-                          continue
-
-
-                  candidates.append(
-                      (
-                          str(
-                              forecast_date
-                          ),
-                          raster_path,
-                          metadata_path
-                      )
-                  )
-
-
-                  print(
-                      "  -> valid:"
-                  )
-
-                  print(
-                      f"     date = {forecast_date}"
-                  )
-
-                  print(
-                      f"     raster = {raster_path}"
-                  )
-
-
-              except Exception as error:
-
-                  print(
-                      "  -> skipped because of error:"
-                  )
-
-                  print(
-                      f"     {error}"
-                  )
-
-
-          # ========================================================
-          # SELECT LATEST FORECAST
-          # ========================================================
-
-          if not candidates:
-
-              raise SystemExit(
-                  "ERROR: No valid FWI metadata with "
-                  "target_date or forecast_date found."
-              )
-
-
-          candidates.sort(
-              key=lambda item: item[0]
+          print(
+              "Iran current datetime:",
+              now.isoformat()
           )
 
 
-          forecast_date, raster_path, metadata_path = (
-              candidates[-1]
+          print(
+              "Iran current date:",
+              now.date().isoformat()
           )
 
 
-          # ========================================================
-          # EXPORT ENVIRONMENT VARIABLES
-          # ========================================================
+          print(
+              "Expected tomorrow:",
+              expected_date
+          )
+
 
           with open(
               os.environ["GITHUB_ENV"],
@@ -345,48 +249,18 @@ jobs:
           ) as env:
 
               env.write(
-                  f"FWI_DATE={forecast_date}\n"
+                  f"EXPECTED_DATE={expected_date}\n"
               )
 
-              env.write(
-                  f"FWI_RASTER={raster_path}\n"
-              )
-
-              env.write(
-                  f"FWI_METADATA={metadata_path}\n"
-              )
-
-
-          print("")
-          print("=" * 70)
-          print("SELECTED FORECAST FWI")
-          print("=" * 70)
-
-          print(
-              f"Forecast date : {forecast_date}"
-          )
-
-          print(
-              f"FWI raster    : {raster_path}"
-          )
-
-          print(
-              f"Metadata      : {metadata_path}"
-          )
-
-          print("")
-          print(
-              "✓ Forecast FWI selected successfully."
-          )
 
           PY
 
 
       # ========================================================
-      # CHECK SELECTED FWI RASTER
+      # VERIFY DOWNLOADED FWI
       # ========================================================
 
-      - name: Validate selected FWI raster
+      - name: Verify downloaded FWI
 
         shell: bash
 
@@ -395,169 +269,74 @@ jobs:
           set -euo pipefail
 
 
-          if [ ! -f "${FWI_RASTER}" ]; then
+          if [ -z "${EXPECTED_DATE:-}" ]; then
 
             echo ""
-            echo "ERROR: Selected FWI raster not found:"
-            echo "${FWI_RASTER}"
+            echo "ERROR: EXPECTED_DATE is not defined."
 
             exit 1
 
           fi
 
 
-          python - <<'PY'
+          FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${EXPECTED_DATE}.tif"
 
-          import os
-          import rasterio
-
-
-          path = os.environ[
-              "FWI_RASTER"
-          ]
+          FWI_METADATA="data/raw/fwi/fwi_ecmwf_fars_${EXPECTED_DATE}.json"
 
 
-          print("")
-          print("=" * 70)
-          print("VALIDATING SELECTED FWI")
-          print("=" * 70)
+          echo ""
+          echo "============================================================"
+          echo "VERIFYING TOMORROW FWI"
+          echo "============================================================"
 
 
-          with rasterio.open(
-              path
-          ) as src:
-
-              print(
-                  "File       :",
-                  path
-              )
-
-              print(
-                  "CRS        :",
-                  src.crs
-              )
-
-              print(
-                  "Size       :",
-                  src.width,
-                  "x",
-                  src.height
-              )
-
-              print(
-                  "Resolution :",
-                  src.res
-              )
-
-              print(
-                  "Bounds     :",
-                  src.bounds
-              )
-
-              if src.crs is None:
-
-                  raise SystemExit(
-                      "ERROR: FWI raster has no CRS."
-                  )
+          echo ""
+          echo "Expected forecast date:"
+          echo "${EXPECTED_DATE}"
 
 
-              if src.crs.to_epsg() != 4326:
-
-                  raise SystemExit(
-                      "ERROR: FWI raster must use EPSG:4326."
-                  )
+          echo ""
+          echo "Expected raster:"
+          echo "${FWI_FILE}"
 
 
-          print("")
-          print(
-              "✓ Selected FWI raster is valid."
-          )
-
-          PY
+          echo ""
+          echo "Expected metadata:"
+          echo "${FWI_METADATA}"
 
 
-      # ========================================================
-      # VERIFY BOUNDARY
-      # ========================================================
-
-      - name: Verify Fars boundary
-
-        shell: bash
-
-        run: |
-
-          set -euo pipefail
-
-
-          if [ ! -f "fars.geojson" ]; then
+          if [ ! -f "${FWI_FILE}" ]; then
 
             echo ""
-            echo "ERROR: fars.geojson not found."
+            echo "ERROR: Tomorrow FWI raster was not created:"
+            echo "${FWI_FILE}"
 
             exit 1
 
           fi
 
 
-          python - <<'PY'
+          if [ ! -f "${FWI_METADATA}" ]; then
 
-          import json
+            echo ""
+            echo "ERROR: Tomorrow FWI metadata was not created:"
+            echo "${FWI_METADATA}"
 
+            exit 1
 
-          path = "fars.geojson"
-
-
-          with open(
-              path,
-              "r",
-              encoding="utf-8"
-          ) as file:
-
-              data = json.load(
-                  file
-              )
+          fi
 
 
-          if (
-              data.get("type")
-              != "FeatureCollection"
-          ):
-
-              raise SystemExit(
-                  "ERROR: fars.geojson is not a FeatureCollection."
-              )
-
-
-          features = data.get(
-              "features",
-              []
-          )
-
-
-          if not features:
-
-              raise SystemExit(
-                  "ERROR: fars.geojson has no features."
-              )
-
-
-          print("")
-          print(
-              "✓ Fars boundary is valid."
-          )
-
-          print(
-              f"Features: {len(features)}"
-          )
-
-          PY
+          echo ""
+          echo "✓ Tomorrow FWI raster exists."
+          echo "✓ Tomorrow FWI metadata exists."
 
 
       # ========================================================
-      # SHOW FORECAST INFORMATION
+      # VERIFY METADATA DATE
       # ========================================================
 
-      - name: Show forecast information
+      - name: Verify FWI metadata date
 
         shell: bash
 
@@ -572,9 +351,15 @@ jobs:
           import os
 
 
-          path = os.environ[
-              "FWI_METADATA"
+          expected = os.environ[
+              "EXPECTED_DATE"
           ]
+
+
+          path = (
+              "data/raw/fwi/"
+              f"fwi_ecmwf_fars_{expected}.json"
+          )
 
 
           with open(
@@ -589,6 +374,239 @@ jobs:
 
 
           target_date = (
+
+              metadata.get(
+                  "target_date"
+              )
+
+              or
+
+              metadata.get(
+                  "forecast_date"
+              )
+
+          )
+
+
+          print("")
+          print("=" * 70)
+          print("FWI METADATA DATE VALIDATION")
+          print("=" * 70)
+
+
+          print(
+              "Expected:",
+              expected
+          )
+
+
+          print(
+              "Metadata :",
+              target_date
+          )
+
+
+          if target_date != expected:
+
+              raise SystemExit(
+
+                  "ERROR: FWI metadata target date "
+                  "does not equal tomorrow."
+              )
+
+
+          print("")
+          print(
+              "✓ FWI metadata date is correct."
+          )
+
+
+          PY
+
+
+      # ========================================================
+      # VALIDATE GEOTIFF
+      # ========================================================
+
+      - name: Validate FWI GeoTIFF
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+
+          FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${EXPECTED_DATE}.tif"
+
+
+          python - <<'PY'
+
+          import os
+          import rasterio
+
+
+          path = (
+              "data/raw/fwi/"
+              f"fwi_ecmwf_fars_"
+              f"{os.environ['EXPECTED_DATE']}.tif"
+          )
+
+
+          print("")
+          print("=" * 70)
+          print("FWI GEOTIFF VALIDATION")
+          print("=" * 70)
+
+
+          with rasterio.open(
+              path
+          ) as src:
+
+              print(
+                  "File:",
+                  path
+              )
+
+              print(
+                  "CRS:",
+                  src.crs
+              )
+
+              print(
+                  "Width:",
+                  src.width
+              )
+
+              print(
+                  "Height:",
+                  src.height
+              )
+
+              print(
+                  "Resolution:",
+                  src.res
+              )
+
+              print(
+                  "Bounds:",
+                  src.bounds
+              )
+
+              data = src.read(
+                  1,
+                  masked=True
+              )
+
+
+              if src.crs is None:
+
+                  raise SystemExit(
+                      "ERROR: FWI has no CRS."
+                  )
+
+
+              if src.crs.to_epsg() != 4326:
+
+                  raise SystemExit(
+                      "ERROR: FWI CRS is not EPSG:4326."
+                  )
+
+
+              valid_count = int(
+                  data.count()
+              )
+
+
+              if valid_count == 0:
+
+                  raise SystemExit(
+                      "ERROR: FWI contains no valid pixels."
+                  )
+
+
+              print(
+                  "Valid pixels:",
+                  valid_count
+              )
+
+
+              print(
+                  "Minimum:",
+                  float(data.min())
+              )
+
+
+              print(
+                  "Maximum:",
+                  float(data.max())
+              )
+
+
+              print(
+                  "Mean:",
+                  float(data.mean())
+              )
+
+
+          print("")
+          print(
+              "✓ FWI GeoTIFF is valid."
+          )
+
+          PY
+
+
+      # ========================================================
+      # SHOW FINAL FORECAST
+      # ========================================================
+
+      - name: Show final forecast
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+
+          python - <<'PY'
+
+          import json
+          import os
+
+
+          expected = os.environ[
+              "EXPECTED_DATE"
+          ]
+
+
+          path = (
+              "data/raw/fwi/"
+              f"fwi_ecmwf_fars_{expected}.json"
+          )
+
+
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as file:
+
+              metadata = json.load(
+                  file
+              )
+
+
+          print("")
+          print("=" * 70)
+          print("FINAL FIRIS FWI FORECAST")
+          print("=" * 70)
+
+
+          print("")
+          print(
+              "Forecast date:",
               metadata.get(
                   "target_date"
               )
@@ -599,15 +617,13 @@ jobs:
           )
 
 
-          print("")
-          print("=" * 70)
-          print("FIRIS FWI FORECAST")
-          print("=" * 70)
-
           print(
-              "Target date:",
-              target_date
+              "Forecast definition:",
+              metadata.get(
+                  "forecast_definition"
+              )
           )
+
 
           print(
               "Source:",
@@ -616,6 +632,7 @@ jobs:
               )
           )
 
+
           print(
               "Layer:",
               metadata.get(
@@ -623,26 +640,29 @@ jobs:
               )
           )
 
+
           print(
-              "Output file:",
+              "Current Iran datetime:",
               metadata.get(
-                  "output_file"
+                  "current_iran_datetime"
               )
           )
 
+
           print("")
+          print(
+              "✓ Final FWI forecast validated."
+          )
+
 
           PY
 
 
       # ========================================================
       # COMMIT
-      #
-      # This workflow does not run FLI.
-      # It only manages/updates FWI source files.
       # ========================================================
 
-      - name: Commit FWI files
+      - name: Commit FWI
 
         shell: bash
 
@@ -668,7 +688,7 @@ jobs:
           if git diff --cached --quiet; then
 
             echo ""
-            echo "No FWI file changes to commit."
+            echo "No FWI changes to commit."
 
             exit 0
 
@@ -677,14 +697,14 @@ jobs:
 
           git commit \
             -m \
-            "chore(fwi): update forecast FWI [skip ci]"
+            "chore(fwi): update tomorrow forecast [skip ci]"
 
 
       # ========================================================
       # PUSH
       # ========================================================
 
-      - name: Push FWI update
+      - name: Push FWI
 
         shell: bash
 
@@ -698,13 +718,19 @@ jobs:
 
           echo ""
           echo "============================================================"
-          echo "FWI UPDATE COMPLETED SUCCESSFULLY"
+          echo "FWI UPDATE COMPLETED"
           echo "============================================================"
 
-          echo ""
-          echo "Forecast date:"
-          echo "${FWI_DATE}"
 
           echo ""
-          echo "FWI raster:"
-          echo "${FWI_RASTER}"
+          echo "Today in Iran:"
+          echo "${EXPECTED_DATE}"
+
+
+          echo ""
+          echo "Tomorrow forecast:"
+          echo "${EXPECTED_DATE}"
+
+
+          echo ""
+          echo "✓ New FWI forecast committed to main."
