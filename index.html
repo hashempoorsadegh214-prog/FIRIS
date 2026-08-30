@@ -846,7 +846,7 @@ type="button"
 </table>
 
 <div class="about-note">
-💡 با کلیک روی نقشه، مقدار شاخص خطر حریق در نقطه انتخاب‌شده نمایش داده می‌شود.
+💡 با کلیک روی نقشه یا تعیین محردوده منطقه مورد نظر، مقدار شاخص خطر حریق در نقطه انتخاب‌شده نمایش داده می‌شود.
 </div>
 
 </div>
@@ -2419,7 +2419,7 @@ function updateFilterGauge(
     mean,
     regionType === "protected"
       ? "مناطق چهارگانه"
-      : "مناطق چهارگانه",
+      : "مناطق شکار ممنوع",
     `${formatNumber(regionCount)} محدوده | ${formatNumber(totalCells)} سلول`
   );
 }
