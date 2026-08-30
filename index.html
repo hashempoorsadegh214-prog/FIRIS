@@ -635,13 +635,13 @@ for="locationFilter"
 </option>
 
 <option value="protected">
-مناطق چهارگانه 
+مناطق شکار ممنوع
 </option>
 
 <option value="hunting">
-شکار ممنوع
+مناطق چهارگانه
 </option>
-شکار ممنوع
+
 </select>
 
 <div class="filter-description">
@@ -2345,25 +2345,36 @@ function fitLayer(layer) {
    UPDATE FILTER GAUGE
    ============================================================ */
 
-function updateFilterGauge(layer, regionType) {
+function updateFilterGauge(
+  layer,
+  regionType
+) {
 
   if (!layer) {
+
     updateGauge(
       null,
       "محدوده انتخاب‌شده",
       "داده موجود نیست"
     );
+
     return;
   }
 
   let totalWeighted = 0;
   let totalCells = 0;
+  let regionCount = 0;
 
-  for (const regionLayer of layer.getLayers()) {
+  for (
+    const regionLayer of
+    layer.getLayers()
+  ) {
 
-    const feature = regionLayer.toGeoJSON();
+    const feature =
+      regionLayer.toGeoJSON();
 
-    const stats = regionStatistics(feature);
+    const stats =
+      regionStatistics(feature);
 
     if (
       !stats ||
@@ -2373,35 +2384,41 @@ function updateFilterGauge(layer, regionType) {
       continue;
     }
 
-    totalWeighted += stats.mean * stats.count;
-    totalCells += stats.count;
-  }
+    /*
+     * میانگین وزنی بر اساس تعداد سلول‌های
+     * FLI داخل هر محدوده.
+     */
 
-  const regionCount =
-    regionType === "protected"
-      ? 13
-      : 21;
+    totalWeighted +=
+      stats.mean * stats.count;
+
+    totalCells +=
+      stats.count;
+
+    regionCount++;
+  }
 
   if (totalCells <= 0) {
 
     updateGauge(
       null,
       regionType === "protected"
-        ? "مناطق حفاظت‌شده"
+        ? "مناطق چهارگانه"
         : "مناطق شکار ممنوع",
-      `${formatNumber(regionCount)} محدوده | داده خطر موجود نیست`
+      "برای این محدوده داده FLI موجود نیست"
     );
 
     return;
   }
 
   const mean =
-    totalWeighted / totalCells;
+    totalWeighted /
+    totalCells;
 
   updateGauge(
     mean,
     regionType === "protected"
-      ? "مناطق حفاظت‌شده"
+      ? "مناطق چهارگانه"
       : "مناطق شکار ممنوع",
     `${formatNumber(regionCount)} محدوده | ${formatNumber(totalCells)} سلول`
   );
