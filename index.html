@@ -15,9 +15,12 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
 
   <style>
+
     @font-face {
       font-family: "B Nazanin";
-      src: local("B Nazanin"), local("BNazanin"), local("Nazanin");
+      src: local("B Nazanin"),
+           local("BNazanin"),
+           local("Nazanin");
       font-display: swap;
     }
 
@@ -31,8 +34,6 @@
       --header-height: 92px;
 
       --red-main: #b40000;
-      --red-light: #e52b2b;
-
       --green: #176b2c;
 
       --text: #222;
@@ -68,7 +69,6 @@
 
     button,
     select,
-    input,
     a {
       font-family: var(--font-main);
     }
@@ -80,6 +80,7 @@
       display: flex;
       flex-direction: column;
     }
+
 
     /* ============================================================
        HEADER
@@ -112,14 +113,17 @@
       z-index: 3000;
     }
 
+
     .header-center {
       position: relative;
+
       z-index: 2;
 
       text-align: center;
 
       padding: 0 170px;
     }
+
 
     .header-title {
       margin: 0;
@@ -129,20 +133,25 @@
 
       line-height: 1.2;
 
-      text-shadow: 0 2px 4px rgba(0,0,0,.3);
+      text-shadow:
+        0 2px 4px rgba(0,0,0,.3);
     }
+
 
     .header-subtitle {
       margin: 3px 0 0;
 
       font-size: 12px;
+
       font-weight: 600;
     }
+
 
     .header-subtitle-badge {
       display: inline-flex;
 
       align-items: center;
+
       gap: 6px;
 
       margin-top: 5px;
@@ -151,12 +160,15 @@
 
       background: rgba(0,0,0,.28);
 
-      border: 1px solid rgba(255,255,255,.25);
+      border:
+        1px solid
+        rgba(255,255,255,.25);
 
       border-radius: 18px;
 
       font-size: 11px;
     }
+
 
     .header-subtitle-badge .bullet {
       width: 6px;
@@ -166,8 +178,10 @@
 
       border-radius: 50%;
 
-      box-shadow: 0 0 6px #4ade80;
+      box-shadow:
+        0 0 6px #4ade80;
     }
+
 
     /* ============================================================
        HEADER BUTTONS
@@ -187,16 +201,19 @@
 
       gap: 7px;
 
+      padding: 6px 9px;
+
       background: rgba(255,255,255,.08);
 
-      padding: 6px 9px;
+      border:
+        1px solid
+        rgba(255,255,255,.15);
 
       border-radius: 10px;
 
-      border: 1px solid rgba(255,255,255,.15);
-
-      z-index: 5;
+      z-index: 10;
     }
+
 
     .header-btn {
       width: 38px;
@@ -207,7 +224,9 @@
       align-items: center;
       justify-content: center;
 
-      border: 1px solid var(--border);
+      border:
+        1px solid
+        var(--border);
 
       border-radius: 8px;
 
@@ -228,17 +247,21 @@
       flex-shrink: 0;
     }
 
+
     .header-btn:hover {
       background: #f8f9fa;
 
-      transform: translateY(-2px);
+      transform:
+        translateY(-2px);
 
       box-shadow: var(--shadow-md);
     }
 
+
     .header-btn:active {
       transform: translateY(0);
     }
+
 
     .header-btn.primary {
       background: var(--green);
@@ -248,17 +271,20 @@
       border-color: var(--green);
     }
 
+
     .header-btn.primary:hover {
       background: #125523;
     }
 
+
     /* ============================================================
-       DROPDOWN
+       LAYER DROPDOWN
        ============================================================ */
 
     .dropdown {
       position: relative;
     }
+
 
     .dropdown-menu {
       position: absolute;
@@ -267,67 +293,123 @@
 
       left: 0;
 
-      min-width: 260px;
+      width: 285px;
 
       margin: 0;
-      padding: 7px 0;
+
+      padding: 12px;
 
       list-style: none;
 
       background: var(--panel);
 
-      border: 1px solid var(--border-light);
+      border:
+        1px solid
+        var(--border-light);
 
-      border-radius: 10px;
+      border-radius: 12px;
 
       box-shadow: var(--shadow-lg);
 
-      z-index: 5000;
+      z-index: 6000;
 
       display: none;
     }
+
 
     .dropdown-menu.show {
       display: block;
     }
 
-    .dropdown-item {
-      width: 100%;
 
-      display: flex;
+    /* ============================================================
+       LOCATION FILTER
+       ============================================================ */
 
-      align-items: center;
+    .location-filter-title {
+      font-size: 15px;
 
-      gap: 9px;
-
-      padding: 10px 14px;
-
-      border: none;
-
-      background: transparent;
+      font-weight: 900;
 
       color: var(--text);
 
-      cursor: pointer;
+      margin-bottom: 10px;
 
-      text-align: right;
+      padding-bottom: 9px;
+
+      border-bottom:
+        1px solid
+        var(--border-light);
+    }
+
+
+    .location-filter-label {
+      display: block;
+
+      margin-bottom: 6px;
+
+      color: var(--text-light);
+
+      font-size: 12px;
+
+      font-weight: 700;
+    }
+
+
+    .filter-select {
+      width: 100%;
+
+      height: 40px;
+
+      padding:
+        5px
+        10px;
+
+      border:
+        1px solid
+        var(--border);
+
+      border-radius: 8px;
+
+      background: white;
+
+      color: var(--text);
 
       font-size: 13px;
 
-      font-weight: 600;
+      font-weight: 700;
+
+      outline: none;
+
+      cursor: pointer;
     }
 
-    .dropdown-item:hover {
-      background: #f3f5f7;
+
+    .filter-select:focus {
+      border-color: var(--green);
+
+      box-shadow:
+        0 0 0 2px
+        rgba(23,107,44,.10);
     }
 
-    .dropdown-item.active {
-      color: var(--green);
 
-      background: #e8f5e9;
+    .filter-description {
+      margin-top: 9px;
 
-      border-right: 4px solid var(--green);
+      padding: 8px;
+
+      background: #f5f7f8;
+
+      border-radius: 7px;
+
+      color: var(--muted);
+
+      font-size: 10px;
+
+      line-height: 1.7;
     }
+
 
     /* ============================================================
        MAP
@@ -341,10 +423,12 @@
       min-height: 0;
     }
 
+
     #map {
       width: 100%;
       height: 100%;
     }
+
 
     .leaflet-container {
       font-family: var(--font-main);
@@ -352,9 +436,11 @@
       background: #dfe6ea;
     }
 
+
     .leaflet-control-zoom {
       display: none;
     }
+
 
     /* ============================================================
        NIGHT MODE
@@ -371,112 +457,15 @@
 
       display: none;
 
-      background: rgba(20,25,35,.20);
+      background:
+        rgba(20,25,35,.20);
     }
+
 
     body.night #nightOverlay {
       display: block;
     }
 
-    /* ============================================================
-       SPATIAL FILTER
-       ============================================================ */
-
-    .spatial-filter {
-      position: absolute;
-
-      top: 20px;
-      left: 20px;
-
-      width: 260px;
-
-      background: var(--panel);
-
-      border: 1px solid var(--border-light);
-
-      border-radius: 12px;
-
-      box-shadow: var(--shadow-lg);
-
-      padding: 14px;
-
-      z-index: 1400;
-    }
-
-    .filter-title {
-      font-size: 15px;
-
-      font-weight: 900;
-
-      margin-bottom: 10px;
-
-      color: var(--text);
-
-      border-bottom: 1px solid var(--border-light);
-
-      padding-bottom: 9px;
-    }
-
-    .area-option {
-      display: flex;
-
-      align-items: center;
-
-      gap: 8px;
-
-      padding: 7px 4px;
-
-      cursor: pointer;
-
-      font-size: 13px;
-
-      font-weight: 600;
-
-      border-radius: 6px;
-    }
-
-    .area-option:hover {
-      background: #f4f6f8;
-    }
-
-    .area-option input {
-      width: 17px;
-      height: 17px;
-
-      cursor: pointer;
-
-      accent-color: var(--green);
-    }
-
-    .filter-buttons {
-      display: flex;
-
-      gap: 6px;
-
-      margin-top: 9px;
-    }
-
-    .filter-small-btn {
-      flex: 1;
-
-      border: 1px solid var(--border);
-
-      background: #f7f8f9;
-
-      border-radius: 6px;
-
-      padding: 6px 5px;
-
-      cursor: pointer;
-
-      font-size: 11px;
-
-      font-weight: 700;
-    }
-
-    .filter-small-btn:hover {
-      background: #e9ecef;
-    }
 
     /* ============================================================
        GAUGE
@@ -492,7 +481,9 @@
 
       background: var(--panel);
 
-      border: 1px solid var(--border-light);
+      border:
+        1px solid
+        var(--border-light);
 
       border-radius: 14px;
 
@@ -505,6 +496,7 @@
       text-align: center;
     }
 
+
     .gauge-title {
       font-size: 14px;
 
@@ -513,11 +505,13 @@
       margin-bottom: 12px;
     }
 
+
     .gauge {
       width: 145px;
       height: 145px;
 
-      margin: 0 auto 12px;
+      margin:
+        0 auto 12px;
 
       border-radius: 50%;
 
@@ -538,6 +532,7 @@
       position: relative;
     }
 
+
     .gauge::before {
       content: "";
 
@@ -551,11 +546,13 @@
       background: var(--panel);
     }
 
+
     .gauge-content {
       position: relative;
 
       z-index: 2;
     }
+
 
     .gauge-value {
       font-size: 31px;
@@ -565,6 +562,7 @@
       line-height: 1;
     }
 
+
     .gauge-label {
       margin-top: 5px;
 
@@ -572,6 +570,7 @@
 
       font-weight: 800;
     }
+
 
     .gauge-location {
       font-size: 11px;
@@ -584,22 +583,29 @@
 
       padding-top: 9px;
 
-      border-top: 1px solid var(--border-light);
+      border-top:
+        1px solid
+        var(--border-light);
     }
+
 
     .gauge-legend-bar {
       margin-top: 9px;
 
       padding-top: 8px;
 
-      border-top: 1px solid var(--border-light);
+      border-top:
+        1px solid
+        var(--border-light);
     }
+
 
     .gauge-legend-items {
       display: flex;
 
       gap: 2px;
     }
+
 
     .gauge-legend-chip {
       flex: 1;
@@ -615,8 +621,9 @@
       color: white;
     }
 
+
     /* ============================================================
-       POPUP
+       POPUPS
        ============================================================ */
 
     .leaflet-popup-content {
@@ -627,6 +634,7 @@
 
       text-align: center;
     }
+
 
     .fli-popup,
     .region-popup {
@@ -639,6 +647,7 @@
       text-align: center;
     }
 
+
     .popup-title {
       font-size: 14px;
 
@@ -647,10 +656,13 @@
       margin-bottom: 7px;
     }
 
+
     .popup-risk {
       display: inline-block;
 
-      padding: 5px 11px;
+      padding:
+        5px
+        11px;
 
       border-radius: 7px;
 
@@ -660,8 +672,19 @@
 
       font-weight: 800;
 
-      margin: 3px 0 5px;
+      margin:
+        3px 0 5px;
     }
+
+
+    .popup-value {
+      font-size: 12px;
+
+      font-weight: 800;
+
+      margin-top: 4px;
+    }
+
 
     .popup-coord {
       color: var(--muted);
@@ -672,6 +695,7 @@
 
       line-height: 1.5;
     }
+
 
     /* ============================================================
        ABOUT
@@ -689,19 +713,23 @@
 
       padding: 20px;
 
-      background: rgba(0,0,0,.5);
+      background:
+        rgba(0,0,0,.5);
 
       backdrop-filter: blur(4px);
 
-      z-index: 5000;
+      z-index: 7000;
     }
+
 
     .about-overlay.open {
       display: flex;
     }
 
+
     .about-box {
-      width: min(680px, 96vw);
+      width:
+        min(680px,96vw);
 
       max-height: 88vh;
 
@@ -720,6 +748,7 @@
       text-align: right;
     }
 
+
     .about-header {
       display: flex;
 
@@ -730,8 +759,11 @@
 
       padding-bottom: 13px;
 
-      border-bottom: 2px solid var(--border-light);
+      border-bottom:
+        2px solid
+        var(--border-light);
     }
+
 
     .about-title {
       margin: 0;
@@ -743,11 +775,14 @@
       font-weight: 900;
     }
 
+
     .about-close {
       width: 38px;
       height: 38px;
 
-      border: 1px solid var(--border-light);
+      border:
+        1px solid
+        var(--border-light);
 
       border-radius: 9px;
 
@@ -763,6 +798,7 @@
       justify-content: center;
     }
 
+
     .about-text {
       font-size: 13px;
 
@@ -771,9 +807,11 @@
       color: var(--text-light);
     }
 
+
     .about-text p {
       margin: 9px 0;
     }
+
 
     .about-table {
       width: 100%;
@@ -785,20 +823,25 @@
       font-size: 12px;
     }
 
+
     .about-table th,
     .about-table td {
-      border: 1px solid var(--border-light);
+      border:
+        1px solid
+        var(--border-light);
 
       padding: 9px;
 
       text-align: right;
     }
 
+
     .about-table th {
       background: #f1f3f5;
 
       font-weight: 800;
     }
+
 
     .about-note {
       margin-top: 13px;
@@ -809,7 +852,9 @@
 
       background: #e8f5e9;
 
-      border: 1px solid #c8e6c9;
+      border:
+        1px solid
+        #c8e6c9;
 
       font-size: 12px;
 
@@ -817,6 +862,7 @@
 
       color: #2e7d32;
     }
+
 
     /* ============================================================
        MOBILE
@@ -828,25 +874,35 @@
         --header-height: 86px;
       }
 
+
       .header {
         padding: 6px 8px;
       }
 
+
       .header-center {
-        padding: 0 125px 0 10px;
+        padding:
+          0
+          125px
+          0
+          10px;
       }
+
 
       .header-title {
         font-size: 15px;
       }
 
+
       .header-subtitle {
         display: none;
       }
 
+
       .header-subtitle-badge {
         font-size: 9px;
       }
+
 
       .header-buttons-group {
         left: 8px;
@@ -856,6 +912,7 @@
         padding: 4px;
       }
 
+
       .header-btn {
         width: 34px;
         height: 34px;
@@ -863,17 +920,15 @@
         font-size: 13px;
       }
 
-      .spatial-filter {
-        top: 10px;
-        left: 10px;
 
-        width: 220px;
-
-        padding: 10px;
+      .dropdown-menu {
+        width: 245px;
       }
+
 
       .gauge-panel {
         top: auto;
+
         right: 10px;
         bottom: 10px;
 
@@ -882,24 +937,30 @@
         padding: 10px;
       }
 
+
       .gauge {
         width: 105px;
         height: 105px;
       }
+
 
       .gauge::before {
         width: 80px;
         height: 80px;
       }
 
+
       .gauge-value {
         font-size: 24px;
       }
 
+
       .gauge-legend-chip {
         font-size: 7px;
       }
+
     }
+
   </style>
 
 </head>
@@ -914,98 +975,123 @@
 
   <header class="header">
 
-
+```
 <div class="header-buttons-group">
 
-  <!-- LAYERS -->
+
+  <!-- ========================================================
+       MAP / LOCATION FILTER
+       ======================================================== -->
 
   <div class="dropdown">
 
     <button
       id="layersBtn"
       class="header-btn"
-      title="انتخاب لایه"
-      aria-label="انتخاب لایه"
+      title="فیلتر مکانی"
+      aria-label="فیلتر مکانی"
+      type="button"
     >
       🗺️
     </button>
 
-    <ul id="layersMenu" class="dropdown-menu">
 
-      <li>
-        <button
-          class="dropdown-item active"
-          data-layer="fli"
-        >
-          🔥 شاخص خطر حریق
-        </button>
-      </li>
+    <div
+      id="layersMenu"
+      class="dropdown-menu"
+    >
 
-      <li>
-        <button
-          class="dropdown-item"
-          data-layer="protected"
-        >
-          🌳 مناطق محافظت‌شده
-        </button>
-      </li>
+      <div class="location-filter-title">
+        فیلتر مکانی
+      </div>
 
-      <li>
-        <button
-          class="dropdown-item"
-          data-layer="hunting"
-        >
-          🦌 مناطق شکار ممنوع
-        </button>
-      </li>
 
-      <li>
-        <button
-          class="dropdown-item"
-          data-layer="all"
-        >
-          🌐 همه لایه‌ها
-        </button>
-      </li>
+      <label
+        class="location-filter-label"
+        for="locationFilter"
+      >
+        محدوده مورد نظر
+      </label>
 
-    </ul>
+
+      <select
+        id="locationFilter"
+        class="filter-select"
+      >
+
+        <option value="all">
+          کل استان فارس
+        </option>
+
+        <option value="protected">
+          مناطق چهارگانه
+        </option>
+
+        <option value="hunting">
+          مناطق شکار ممنوع
+        </option>
+
+      </select>
+
+
+      <div class="filter-description">
+        با انتخاب محدوده، نقشه به محدوده مورد نظر
+        منتقل شده و لایه مرتبط نمایش داده می‌شود.
+      </div>
+
+    </div>
 
   </div>
 
-  <!-- FIT -->
+
+  <!-- ========================================================
+       FIT FARS
+       ======================================================== -->
 
   <button
     id="fitButton"
     class="header-btn primary"
     title="نمایش کامل استان فارس"
     aria-label="نمایش کامل استان فارس"
+    type="button"
   >
     🌐
   </button>
 
-  <!-- NIGHT -->
+
+  <!-- ========================================================
+       NIGHT
+       ======================================================== -->
 
   <button
     id="modeButton"
     class="header-btn"
     title="حالت شب"
     aria-label="تغییر حالت روز و شب"
+    type="button"
   >
     ☀️
   </button>
 
-  <!-- ABOUT -->
+
+  <!-- ========================================================
+       ABOUT
+       ======================================================== -->
 
   <button
     id="aboutButton"
     class="header-btn"
     title="معرفی سامانه"
     aria-label="معرفی سامانه"
+    type="button"
   >
     ℹ️
   </button>
 
-  <!-- EXCEL -->
+
+  <!-- ========================================================
+       EXCEL
+       ======================================================== -->
 
   <a
     href="data/report/firis_report.xlsx"
@@ -1018,7 +1104,13 @@
     📊
   </a>
 
+
 </div>
+
+
+<!-- ==========================================================
+     HEADER CENTER
+     ========================================================== -->
 
 <div class="header-center">
 
@@ -1026,9 +1118,11 @@
     سامانه پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی
   </div>
 
+
   <div class="header-subtitle">
     استان فارس
   </div>
+
 
   <div class="header-subtitle-badge">
 
@@ -1041,7 +1135,7 @@
   </div>
 
 </div>
-
+```
 
   </header>
 
@@ -1051,89 +1145,10 @@
 
   <div id="map-wrap">
 
-
+```
 <div id="map"></div>
 
 <div id="nightOverlay"></div>
-
-
-<!-- ==========================================================
-     SPATIAL FILTER
-     ========================================================== -->
-
-<div class="spatial-filter">
-
-  <div class="filter-title">
-    فیلتر مکانی
-  </div>
-
-  <label class="area-option">
-
-    <input
-      type="checkbox"
-      id="nationalParkFilter"
-    >
-
-    پارک‌های ملی
-
-  </label>
-
-
-  <label class="area-option">
-
-    <input
-      type="checkbox"
-      id="protectedFilter"
-    >
-
-    مناطق حفاظت‌شده
-
-  </label>
-
-
-  <label class="area-option">
-
-    <input
-      type="checkbox"
-      id="wildlifeFilter"
-    >
-
-    پناهگاه‌های حیات‌وحش
-
-  </label>
-
-
-  <label class="area-option">
-
-    <input
-      type="checkbox"
-      id="huntingFilter"
-    >
-
-    مناطق شکار ممنوع
-
-  </label>
-
-
-  <div class="filter-buttons">
-
-    <button
-      id="filterAllBtn"
-      class="filter-small-btn"
-    >
-      انتخاب همه
-    </button>
-
-    <button
-      id="filterClearBtn"
-      class="filter-small-btn"
-    >
-      پاک کردن
-    </button>
-
-  </div>
-
-</div>
 
 
 <!-- ==========================================================
@@ -1146,6 +1161,7 @@
     وضعیت انتخاب‌شده
   </div>
 
+
   <div class="gauge">
 
     <div class="gauge-content">
@@ -1157,6 +1173,7 @@
         —
       </div>
 
+
       <div
         id="gaugeLabel"
         class="gauge-label"
@@ -1167,6 +1184,7 @@
     </div>
 
   </div>
+
 
   <div
     id="gaugeLocation"
@@ -1187,12 +1205,14 @@
         کم
       </span>
 
+
       <span
         class="gauge-legend-chip"
         style="background:#fdd835;color:#222"
       >
         متوسط
       </span>
+
 
       <span
         class="gauge-legend-chip"
@@ -1201,12 +1221,14 @@
         زیاد
       </span>
 
+
       <span
         class="gauge-legend-chip"
         style="background:#e53935"
       >
         خیلی زیاد
       </span>
+
 
       <span
         class="gauge-legend-chip"
@@ -1220,12 +1242,12 @@
   </div>
 
 </div>
-
+```
 
   </div>
 
   <!-- ============================================================
-       ABOUT
+       ABOUT MODAL
        ============================================================ -->
 
   <div
@@ -1233,29 +1255,36 @@
     class="about-overlay"
   >
 
-
+```
 <div
   class="about-box"
   role="dialog"
   aria-modal="true"
+  aria-labelledby="aboutTitle"
 >
 
   <div class="about-header">
 
-    <h2 class="about-title">
+    <h2
+      id="aboutTitle"
+      class="about-title"
+    >
       معرفی سامانه
     </h2>
+
 
     <button
       id="aboutClose"
       class="about-close"
       title="بستن"
       aria-label="بستن"
+      type="button"
     >
       ×
     </button>
 
   </div>
+
 
   <div class="about-text">
 
@@ -1264,10 +1293,12 @@
       در عرصه‌های طبیعی استان فارس طراحی شده است.
     </p>
 
+
     <p>
       شاخص خطر حریق از ترکیب سه مؤلفه اصلی
       هواشناسی، سوخت و توپوگرافی تولید می‌شود.
     </p>
+
 
     <table class="about-table">
 
@@ -1281,6 +1312,7 @@
 
       </thead>
 
+
       <tbody>
 
         <tr>
@@ -1289,17 +1321,20 @@
           <td>شرایط جوی</td>
         </tr>
 
+
         <tr>
           <td>Fuel</td>
           <td>سوخت</td>
           <td>مواد قابل اشتعال</td>
         </tr>
 
+
         <tr>
           <td>Topography</td>
           <td>توپوگرافی</td>
           <td>اثر شیب</td>
         </tr>
+
 
         <tr>
           <td>FLI</td>
@@ -1311,6 +1346,7 @@
 
     </table>
 
+
     <div class="about-note">
 
       💡 با کلیک روی نقشه، مقدار شاخص خطر حریق
@@ -1321,7 +1357,7 @@
   </div>
 
 </div>
-
+```
 
   </div>
 
@@ -1335,7 +1371,7 @@
 
 
 /* ================================================================
-   GLOBAL STATE
+   APPLICATION STATE
    ================================================================ */
 
 const APP_STATE = {
@@ -1368,7 +1404,7 @@ const APP_STATE = {
 
     currentPopup: null,
 
-    activeLayer: "fli"
+    locationFilter: "all"
 
   }
 
@@ -1376,21 +1412,27 @@ const APP_STATE = {
 
 
 /* ================================================================
-   TOMORROW - SHAMSI ONLY
+   SHAMSI FORECAST DATE
    ================================================================ */
 
 function setupTomorrowDate() {
 
   const badge =
-    document.getElementById("forecastDateBadge");
+    document.getElementById(
+      "forecastDateBadge"
+    );
+
 
   try {
 
-    const tomorrow = new Date();
+    const tomorrow =
+      new Date();
+
 
     tomorrow.setDate(
       tomorrow.getDate() + 1
     );
+
 
     const dateStr =
       tomorrow.toLocaleDateString(
@@ -1403,10 +1445,13 @@ function setupTomorrowDate() {
         }
       );
 
+
     badge.textContent =
       `پیش‌بینی برای ${dateStr}`;
 
-  } catch (error) {
+  }
+
+  catch (error) {
 
     badge.textContent =
       "پیش‌بینی برای فردا";
@@ -1417,22 +1462,24 @@ function setupTomorrowDate() {
 
 
 /* ================================================================
-   FETCH
+   FETCH WITH TIMEOUT
    ================================================================ */
 
 async function fetchWithTimeout(
   url,
-  timeout = 10000
+  timeout = 15000
 ) {
 
   const controller =
     new AbortController();
+
 
   const timer =
     setTimeout(
       () => controller.abort(),
       timeout
     );
+
 
   try {
 
@@ -1445,7 +1492,9 @@ async function fetchWithTimeout(
         }
       );
 
+
     clearTimeout(timer);
+
 
     if (!response.ok) {
 
@@ -1455,19 +1504,26 @@ async function fetchWithTimeout(
 
     }
 
+
     return response;
 
-  } catch (error) {
+  }
+
+  catch (error) {
 
     clearTimeout(timer);
+
 
     if (
       error.name === "AbortError"
     ) {
 
-      throw new Error("Timeout");
+      throw new Error(
+        "Timeout"
+      );
 
     }
+
 
     throw error;
 
@@ -1477,18 +1533,23 @@ async function fetchWithTimeout(
 
 
 /* ================================================================
-   NUMBER
+   FORMAT NUMBER
    ================================================================ */
 
 function formatNumber(value) {
 
-  const number = Number(value);
+  const number =
+    Number(value);
 
-  if (!Number.isFinite(number)) {
+
+  if (
+    !Number.isFinite(number)
+  ) {
 
     return "—";
 
   }
+
 
   return number.toLocaleString(
     "fa-IR",
@@ -1501,14 +1562,18 @@ function formatNumber(value) {
 
 
 /* ================================================================
-   RISK
+   RISK CLASS
    ================================================================ */
 
 function getRisk(value) {
 
-  const num = Number(value);
+  const num =
+    Number(value);
 
-  if (!Number.isFinite(num)) {
+
+  if (
+    !Number.isFinite(num)
+  ) {
 
     return {
       label: "بدون داده",
@@ -1516,6 +1581,7 @@ function getRisk(value) {
     };
 
   }
+
 
   if (num < 20) {
 
@@ -1526,6 +1592,7 @@ function getRisk(value) {
 
   }
 
+
   if (num < 40) {
 
     return {
@@ -1534,6 +1601,7 @@ function getRisk(value) {
     };
 
   }
+
 
   if (num < 60) {
 
@@ -1544,6 +1612,7 @@ function getRisk(value) {
 
   }
 
+
   if (num < 80) {
 
     return {
@@ -1552,6 +1621,7 @@ function getRisk(value) {
     };
 
   }
+
 
   return {
     label: "بحرانی",
@@ -1562,7 +1632,7 @@ function getRisk(value) {
 
 
 /* ================================================================
-   UPDATE GAUGE
+   GAUGE
    ================================================================ */
 
 function updateGauge(
@@ -1576,10 +1646,12 @@ function updateGauge(
       "gaugeValue"
     );
 
+
   const labelElement =
     document.getElementById(
       "gaugeLabel"
     );
+
 
   const locationElement =
     document.getElementById(
@@ -1593,16 +1665,21 @@ function updateGauge(
     )
   ) {
 
-    valueElement.textContent = "—";
+    valueElement.textContent =
+      "—";
+
 
     labelElement.textContent =
       "بدون داده";
 
+
     labelElement.style.color =
       "#777";
 
+
     locationElement.textContent =
       subtitle || "—";
+
 
     return;
 
@@ -1616,11 +1693,14 @@ function updateGauge(
   valueElement.textContent =
     formatNumber(value);
 
+
   labelElement.textContent =
     risk.label;
 
+
   labelElement.style.color =
     risk.color;
+
 
   locationElement.textContent =
     `${title || ""}${subtitle ? " | " + subtitle : ""}`;
@@ -1639,7 +1719,10 @@ function initMap() {
       "map",
       {
         zoomControl: false,
-        preferCanvas: true
+
+        preferCanvas: true,
+
+        attributionControl: true
       }
     );
 
@@ -1660,7 +1743,7 @@ function initMap() {
 
 
 /* ================================================================
-   FARS
+   LOAD FARS
    ================================================================ */
 
 async function loadFars() {
@@ -1670,6 +1753,7 @@ async function loadFars() {
       "fars.geojson"
     );
 
+
   const geojson =
     await response.json();
 
@@ -1678,14 +1762,21 @@ async function loadFars() {
     L.geoJSON(
       geojson,
       {
+
         style: {
+
           color: "#20252a",
+
           weight: 2.2,
+
           opacity: .95,
+
           fill: false
+
         },
 
         interactive: false
+
       }
     ).addTo(
       APP_STATE.map
@@ -1698,7 +1789,7 @@ async function loadFars() {
 
 
 /* ================================================================
-   FLI
+   LOAD FLI
    ================================================================ */
 
 async function loadFLI() {
@@ -1707,6 +1798,7 @@ async function loadFLI() {
     await fetchWithTimeout(
       "data/web/fli_polygons.geojson"
     );
+
 
   const geojson =
     await response.json();
@@ -1717,27 +1809,29 @@ async function loadFLI() {
       geojson,
       {
 
-        style: feature => {
+        style:
+          feature => {
 
-          const color =
-            feature.properties?.color ||
-            "#777";
+            const color =
+              feature.properties?.color ||
+              "#777";
 
-          return {
 
-            color,
+            return {
 
-            weight: .15,
+              color,
 
-            opacity: .85,
+              weight: .15,
 
-            fillColor: color,
+              opacity: .85,
 
-            fillOpacity: .72
+              fillColor: color,
 
-          };
+              fillOpacity: .72
 
-        },
+            };
+
+          },
 
         interactive: false
 
@@ -1753,7 +1847,7 @@ async function loadFLI() {
 
 
 /* ================================================================
-   FLI METADATA
+   LOAD FLI METADATA
    ================================================================ */
 
 async function loadFLIData() {
@@ -1765,13 +1859,16 @@ async function loadFLIData() {
         "data/web/fli_latest.json"
       );
 
+
     APP_STATE.data.fliMetadata =
       await response.json();
 
-  } catch (error) {
+  }
+
+  catch (error) {
 
     console.warn(
-      "Metadata error:",
+      "FLI metadata:",
       error
     );
 
@@ -1781,7 +1878,7 @@ async function loadFLIData() {
 
 
 /* ================================================================
-   GRID
+   LOAD GRID
    ================================================================ */
 
 async function loadGrid() {
@@ -1793,12 +1890,14 @@ async function loadGrid() {
         "data/web/fli_latest_grid.json"
       );
 
+
     const grid =
       await response.json();
 
 
     if (
-      grid?.bounds &&
+      grid &&
+      grid.bounds &&
       Array.isArray(grid.values)
     ) {
 
@@ -1807,10 +1906,12 @@ async function loadGrid() {
 
     }
 
-  } catch (error) {
+  }
+
+  catch (error) {
 
     console.warn(
-      "Grid error:",
+      "FLI grid:",
       error
     );
 
@@ -1820,7 +1921,7 @@ async function loadGrid() {
 
 
 /* ================================================================
-   PROTECTED AREAS
+   LOAD PROTECTED AREAS
    ================================================================ */
 
 async function loadProtected() {
@@ -1829,6 +1930,7 @@ async function loadProtected() {
     await fetchWithTimeout(
       "protected_areas.geojson"
     );
+
 
   const geojson =
     await response.json();
@@ -1874,7 +1976,7 @@ async function loadProtected() {
 
 
 /* ================================================================
-   HUNTING
+   LOAD HUNTING
    ================================================================ */
 
 async function loadHunting() {
@@ -1883,6 +1985,7 @@ async function loadHunting() {
     await fetchWithTimeout(
       "hunting_banned.geojson"
     );
+
 
   const geojson =
     await response.json();
@@ -1928,7 +2031,7 @@ async function loadHunting() {
 
 
 /* ================================================================
-   BOUNDS
+   PARSE GRID BOUNDS
    ================================================================ */
 
 function parseBounds(bounds) {
@@ -1945,13 +2048,17 @@ function parseBounds(bounds) {
 
   return {
 
-    south: Number(bounds[0][0]),
+    south:
+      Number(bounds[0][0]),
 
-    west: Number(bounds[0][1]),
+    west:
+      Number(bounds[0][1]),
 
-    north: Number(bounds[1][0]),
+    north:
+      Number(bounds[1][0]),
 
-    east: Number(bounds[1][1])
+    east:
+      Number(bounds[1][1])
 
   };
 
@@ -1959,7 +2066,7 @@ function parseBounds(bounds) {
 
 
 /* ================================================================
-   COORDINATES
+   VALIDATE COORDINATES
    ================================================================ */
 
 function validateCoords(
@@ -1985,7 +2092,7 @@ function validateCoords(
 
 
 /* ================================================================
-   GRID POINT VALUE
+   GET POINT FLI
    ================================================================ */
 
 function getPointValue(
@@ -2008,7 +2115,12 @@ function getPointValue(
       APP_STATE.data.fliGrid.bounds
     );
 
-  if (!bounds) return null;
+
+  if (!bounds) {
+
+    return null;
+
+  }
 
 
   const {
@@ -2036,6 +2148,7 @@ function getPointValue(
       APP_STATE.data.fliGrid.rows
     );
 
+
   const cols =
     Number(
       APP_STATE.data.fliGrid.cols
@@ -2054,16 +2167,20 @@ function getPointValue(
 
   let row =
     Math.floor(
-      ((north - lat) /
-      (north - south)) *
+      (
+        (north - lat) /
+        (north - south)
+      ) *
       rows
     );
 
 
   let col =
     Math.floor(
-      ((lon - west) /
-      (east - west)) *
+      (
+        (lon - west) /
+        (east - west)
+      ) *
       cols
     );
 
@@ -2071,14 +2188,20 @@ function getPointValue(
   row =
     Math.max(
       0,
-      Math.min(rows - 1, row)
+      Math.min(
+        rows - 1,
+        row
+      )
     );
 
 
   col =
     Math.max(
       0,
-      Math.min(cols - 1, col)
+      Math.min(
+        cols - 1,
+        col
+      )
     );
 
 
@@ -2089,13 +2212,18 @@ function getPointValue(
     );
 
 
-  return (
+  if (
     Number.isFinite(value) &&
     value >= 0 &&
     value <= 100
-  )
-    ? value
-    : null;
+  ) {
+
+    return value;
+
+  }
+
+
+  return null;
 
 }
 
@@ -2144,10 +2272,12 @@ function pointInsideFars(
 
       }
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.warn(
-        "Point check error:",
+        "Fars polygon:",
         error
       );
 
@@ -2167,7 +2297,9 @@ function pointInsideFars(
 
 function regionMean(feature) {
 
-  if (!APP_STATE.data.fliGrid) {
+  if (
+    !APP_STATE.data.fliGrid
+  ) {
 
     return null;
 
@@ -2179,7 +2311,12 @@ function regionMean(feature) {
       APP_STATE.data.fliGrid.bounds
     );
 
-  if (!bounds) return null;
+
+  if (!bounds) {
+
+    return null;
+
+  }
 
 
   const {
@@ -2194,6 +2331,7 @@ function regionMean(feature) {
     Number(
       APP_STATE.data.fliGrid.rows
     );
+
 
   const cols =
     Number(
@@ -2212,6 +2350,7 @@ function regionMean(feature) {
 
 
   let sum = 0;
+
   let count = 0;
 
 
@@ -2223,7 +2362,10 @@ function regionMean(feature) {
 
     const lat =
       north -
-      ((row + .5) / rows) *
+      (
+        (row + .5) /
+        rows
+      ) *
       (north - south);
 
 
@@ -2253,7 +2395,10 @@ function regionMean(feature) {
 
       const lon =
         west +
-        ((col + .5) / cols) *
+        (
+          (col + .5) /
+          cols
+        ) *
         (east - west);
 
 
@@ -2279,10 +2424,12 @@ function regionMean(feature) {
 
         }
 
-      } catch (error) {
+      }
+
+      catch (error) {
 
         console.warn(
-          "Region mean error:",
+          "Region mean:",
           error
         );
 
@@ -2301,6 +2448,68 @@ function regionMean(feature) {
 
 
 /* ================================================================
+   REGION NAME
+   ================================================================ */
+
+function getRegionName(
+  feature,
+  fallback
+) {
+
+  const properties =
+    feature.properties || {};
+
+
+  const keys = [
+
+    "name",
+
+    "NAME",
+
+    "Name",
+
+    "shapeName",
+
+    "ShapeName",
+
+    "NAME_1",
+
+    "NAME_FA",
+
+    "name_fa",
+
+    "title",
+
+    "TITLE",
+
+    "نام",
+
+    "نام منطقه"
+
+  ];
+
+
+  const found =
+    keys
+      .map(
+        key =>
+          properties[key]
+      )
+      .find(
+        value =>
+          value &&
+          String(value).trim()
+      );
+
+
+  return found
+    ? String(found)
+    : fallback;
+
+}
+
+
+/* ================================================================
    REGION POPUP
    ================================================================ */
 
@@ -2310,56 +2519,17 @@ function bindRegion(
   regionType
 ) {
 
-  const properties =
-    feature.properties || {};
-
-
-  const regionLabel =
+  const fallback =
     regionType === "protected"
-      ? "مناطق محافظت‌شده"
-      : "مناطق شکار ممنوع";
-
-
-  const fallbackName =
-    regionType === "protected"
-      ? "منطقه محافظت‌شده"
+      ? "منطقه چهارگانه"
       : "منطقه شکار ممنوع";
 
 
-  const nameKeys = [
-
-    "name",
-    "NAME",
-    "Name",
-
-    "shapeName",
-    "ShapeName",
-
-    "NAME_1",
-
-    "NAME_FA",
-    "name_fa",
-
-    "title",
-    "TITLE",
-
-    "نام",
-    "نام منطقه"
-
-  ];
-
-
   const name =
-    nameKeys
-      .map(
-        key => properties[key]
-      )
-      .find(
-        value =>
-          value &&
-          String(value).trim()
-      ) ||
-    fallbackName;
+    getRegionName(
+      feature,
+      fallback
+    );
 
 
   const mean =
@@ -2385,6 +2555,19 @@ function bindRegion(
         ${risk.label}
       </div>
 
+      ${
+        Number.isFinite(mean)
+        ?
+        `
+          <div class="popup-value">
+            میانگین شاخص خطر:
+            ${formatNumber(mean)}
+          </div>
+        `
+        :
+        ""
+      }
+
     </div>
 
   `;
@@ -2393,7 +2576,7 @@ function bindRegion(
   layer.bindPopup(
     popup,
     {
-      maxWidth: 260
+      maxWidth: 280
     }
   );
 
@@ -2405,7 +2588,9 @@ function bindRegion(
       updateGauge(
         mean,
         name,
-        regionLabel
+        regionType === "protected"
+          ? "مناطق چهارگانه"
+          : "مناطق شکار ممنوع"
       );
 
     }
@@ -2424,10 +2609,12 @@ function setupMapClick() {
     "click",
     event => {
 
-      const {
-        lat,
-        lng: lon
-      } = event.latlng;
+      const lat =
+        event.latlng.lat;
+
+
+      const lon =
+        event.latlng.lng;
 
 
       if (
@@ -2486,17 +2673,17 @@ function setupMapClick() {
             ${risk.label}
           </div>
 
-          <div class="popup-coord">
-
+          <div class="popup-value">
             مقدار شاخص:
-            <strong>${formatNumber(value)}</strong>
+            ${formatNumber(value)}
+          </div>
 
-            <br>
+          <div class="popup-coord">
 
             عرض:
             ${lat.toFixed(5)}
 
-            |
+            <br>
 
             طول:
             ${lon.toFixed(5)}
@@ -2508,29 +2695,13 @@ function setupMapClick() {
       `;
 
 
-      if (
-        APP_STATE.ui.currentPopup
-      ) {
-
-        APP_STATE.map.removeLayer(
-          APP_STATE.ui.currentPopup
-        );
-
-      }
-
-
-      APP_STATE.ui.currentPopup =
-        L.popup({
-          maxWidth: 280
-        })
-        .setLatLng(
-          event.latlng
-        )
-        .setContent(
-          popup
-        )
-        .openOn(
-          APP_STATE.map
+      APP_STATE.map
+        .openPopup(
+          popup,
+          event.latlng,
+          {
+            maxWidth: 280
+          }
         );
 
     }
@@ -2548,13 +2719,19 @@ function setLayerVisible(
   visible
 ) {
 
-  if (!layer) return;
+  if (!layer) {
+
+    return;
+
+  }
 
 
   if (visible) {
 
     if (
-      !APP_STATE.map.hasLayer(layer)
+      !APP_STATE.map.hasLayer(
+        layer
+      )
     ) {
 
       layer.addTo(
@@ -2563,10 +2740,14 @@ function setLayerVisible(
 
     }
 
-  } else {
+  }
+
+  else {
 
     if (
-      APP_STATE.map.hasLayer(layer)
+      APP_STATE.map.hasLayer(
+        layer
+      )
     ) {
 
       APP_STATE.map.removeLayer(
@@ -2581,195 +2762,53 @@ function setLayerVisible(
 
 
 /* ================================================================
-   MAIN LAYER MENU
+   FIT FARS
    ================================================================ */
 
-function setupDropdown() {
+function fitFars() {
 
-  const btn =
-    document.getElementById(
-      "layersBtn"
-    );
+  if (
+    !APP_STATE.layers.fars
+  ) {
 
-  const menu =
-    document.getElementById(
-      "layersMenu"
-    );
+    return;
 
-  const items =
-    menu.querySelectorAll(
-      ".dropdown-item"
-    );
+  }
 
 
-  btn.addEventListener(
-    "click",
-    event => {
+  const bounds =
+    APP_STATE.layers.fars
+      .getBounds();
 
-      event.stopPropagation();
 
-      menu.classList.toggle(
-        "show"
-      );
+  if (
+    !bounds.isValid()
+  ) {
 
+    return;
+
+  }
+
+
+  APP_STATE.map.fitBounds(
+    bounds,
+    {
+      padding: [60,60],
+
+      maxZoom: 8,
+
+      animate: true
     }
   );
 
 
-  document.addEventListener(
-    "click",
-    event => {
+  setTimeout(
+    () => {
 
-      if (
-        !btn.contains(event.target) &&
-        !menu.contains(event.target)
-      ) {
+      APP_STATE.map.invalidateSize();
 
-        menu.classList.remove(
-          "show"
-        );
-
-      }
-
-    }
-  );
-
-
-  items.forEach(
-    item => {
-
-      item.addEventListener(
-        "click",
-        event => {
-
-          event.stopPropagation();
-
-
-          const layer =
-            item.dataset.layer;
-
-
-          APP_STATE.ui.activeLayer =
-            layer;
-
-
-          items.forEach(
-            i =>
-              i.classList.remove(
-                "active"
-              )
-          );
-
-
-          item.classList.add(
-            "active"
-          );
-
-
-          switch(layer) {
-
-            case "fli":
-
-              setLayerVisible(
-                APP_STATE.layers.fli,
-                true
-              );
-
-              setLayerVisible(
-                APP_STATE.layers.protected,
-                false
-              );
-
-              setLayerVisible(
-                APP_STATE.layers.hunting,
-                false
-              );
-
-              fitFars();
-
-              break;
-
-
-            case "protected":
-
-              setLayerVisible(
-                APP_STATE.layers.fli,
-                true
-              );
-
-              setLayerVisible(
-                APP_STATE.layers.protected,
-                true
-              );
-
-              setLayerVisible(
-                APP_STATE.layers.hunting,
-                false
-              );
-
-              fitLayer(
-                APP_STATE.layers.protected
-              );
-
-              break;
-
-
-            case "hunting":
-
-              setLayerVisible(
-                APP_STATE.layers.fli,
-                true
-              );
-
-              setLayerVisible(
-                APP_STATE.layers.protected,
-                false
-              );
-
-              setLayerVisible(
-                APP_STATE.layers.hunting,
-                true
-              );
-
-              fitLayer(
-                APP_STATE.layers.hunting
-              );
-
-              break;
-
-
-            case "all":
-
-              setLayerVisible(
-                APP_STATE.layers.fli,
-                true
-              );
-
-              setLayerVisible(
-                APP_STATE.layers.protected,
-                true
-              );
-
-              setLayerVisible(
-                APP_STATE.layers.hunting,
-                true
-              );
-
-              fitFars();
-
-              break;
-
-          }
-
-
-          menu.classList.remove(
-            "show"
-          );
-
-        }
-      );
-
-    }
+    },
+    300
   );
 
 }
@@ -2781,7 +2820,11 @@ function setupDropdown() {
 
 function fitLayer(layer) {
 
-  if (!layer) return;
+  if (!layer) {
+
+    return;
+
+  }
 
 
   const bounds =
@@ -2802,8 +2845,10 @@ function fitLayer(layer) {
   APP_STATE.map.fitBounds(
     bounds,
     {
-      padding: [80,80],
+      padding: [70,70],
+
       maxZoom: 10,
+
       animate: true
     }
   );
@@ -2812,260 +2857,33 @@ function fitLayer(layer) {
 
 
 /* ================================================================
-   SPATIAL FILTER
+   LOCATION FILTER
    ================================================================ */
 
-/*
-   این بخش عوارض را بر اساس نام/نوع موجود
-   در properties فایل GeoJSON فیلتر می‌کند.
-*/
-
-function normalizeText(value) {
-
-  return String(value || "")
-    .toLowerCase()
-    .trim()
-    .replace(/ي/g, "ی")
-    .replace(/ك/g, "ک");
-
-}
-
-
-function featureMatchesType(
-  feature,
-  type
+function applyLocationFilter(
+  value
 ) {
 
-  const properties =
-    feature.properties || {};
+  APP_STATE.ui.locationFilter =
+    value;
 
 
-  const text =
-    Object.values(properties)
-      .map(value =>
-        normalizeText(value)
-      )
-      .join(" ");
+  /*
+     ابتدا FLI همیشه نمایش داده می‌شود.
+  */
 
-
-  const keywords = {
-
-    nationalPark: [
-
-      "پارک ملی",
-      "پارک‌ملی",
-      "national park",
-      "nationalpark"
-
-    ],
-
-    protected: [
-
-      "منطقه حفاظت",
-      "منطقه حفاظت‌شده",
-      "منطقه حفاظت شده",
-      "protected area",
-      "protectedarea"
-
-    ],
-
-    wildlife: [
-
-      "پناهگاه حیات وحش",
-      "پناهگاه حیات‌وحش",
-      "wildlife refuge",
-      "wildlife refuge area",
-      "wildlife"
-
-    ],
-
-    hunting: [
-
-      "شکار ممنوع",
-      "منطقه شکار ممنوع",
-      "hunting prohibited",
-      "hunting ban",
-      "hunting"
-
-    ]
-
-  };
-
-
-  return (
-    keywords[type] || []
-  ).some(
-    keyword =>
-      text.includes(
-        normalizeText(keyword)
-      )
+  setLayerVisible(
+    APP_STATE.layers.fli,
+    true
   );
 
-}
-
-
-/* ================================================================
-   APPLY SPATIAL FILTER
-   ================================================================ */
-
-function applySpatialFilter() {
-
-  const nationalPark =
-    document.getElementById(
-      "nationalParkFilter"
-    ).checked;
-
-
-  const protectedArea =
-    document.getElementById(
-      "protectedFilter"
-    ).checked;
-
-
-  const wildlife =
-    document.getElementById(
-      "wildlifeFilter"
-    ).checked;
-
-
-  const hunting =
-    document.getElementById(
-      "huntingFilter"
-    ).checked;
-
-
-  const anyEnvironmentalFilter =
-    nationalPark ||
-    protectedArea ||
-    wildlife;
-
 
   /*
-     ابتدا لایه کلی مناطق حفاظت‌شده را مدیریت می‌کنیم.
+     کل استان فارس
   */
 
   if (
-    APP_STATE.layers.protected
-  ) {
-
-    if (
-      anyEnvironmentalFilter
-    ) {
-
-      if (
-        !APP_STATE.map.hasLayer(
-          APP_STATE.layers.protected
-        )
-      ) {
-
-        APP_STATE.layers.protected.addTo(
-          APP_STATE.map
-        );
-
-      }
-
-    }
-
-  }
-
-
-  /*
-     فیلتر عوارض لایه protected
-  */
-
-  if (
-    APP_STATE.layers.protected
-  ) {
-
-    APP_STATE.layers.protected
-      .eachLayer(
-        layer => {
-
-          const feature =
-            layer.feature;
-
-
-          const show =
-            !anyEnvironmentalFilter ||
-
-            (
-              (nationalPark &&
-                featureMatchesType(
-                  feature,
-                  "nationalPark"
-                )) ||
-
-              (protectedArea &&
-                featureMatchesType(
-                  feature,
-                  "protected"
-                )) ||
-
-              (wildlife &&
-                featureMatchesType(
-                  feature,
-                  "wildlife"
-                ))
-            );
-
-
-          if (show) {
-
-            layer.setStyle({
-              opacity: .95,
-              fillOpacity: .10
-            });
-
-          } else {
-
-            layer.setStyle({
-              opacity: 0,
-              fillOpacity: 0
-            });
-
-          }
-
-        }
-      );
-
-  }
-
-
-  /*
-     فیلتر شکار ممنوع
-  */
-
-  if (
-    APP_STATE.layers.hunting
-  ) {
-
-    if (hunting) {
-
-      setLayerVisible(
-        APP_STATE.layers.hunting,
-        true
-      );
-
-    } else {
-
-      setLayerVisible(
-        APP_STATE.layers.hunting,
-        false
-      );
-
-    }
-
-  }
-
-
-  /*
-     اگر هیچ فیلتر مکانی انتخاب نشده،
-     وضعیت پیش‌فرض را برمی‌گردانیم.
-  */
-
-  if (
-    !anyEnvironmentalFilter &&
-    !hunting
+    value === "all"
   ) {
 
     setLayerVisible(
@@ -3073,10 +2891,77 @@ function applySpatialFilter() {
       false
     );
 
+
     setLayerVisible(
       APP_STATE.layers.hunting,
       false
     );
+
+
+    fitFars();
+
+
+    return;
+
+  }
+
+
+  /*
+     مناطق چهارگانه
+  */
+
+  if (
+    value === "protected"
+  ) {
+
+    setLayerVisible(
+      APP_STATE.layers.protected,
+      true
+    );
+
+
+    setLayerVisible(
+      APP_STATE.layers.hunting,
+      false
+    );
+
+
+    fitLayer(
+      APP_STATE.layers.protected
+    );
+
+
+    return;
+
+  }
+
+
+  /*
+     مناطق شکار ممنوع
+  */
+
+  if (
+    value === "hunting"
+  ) {
+
+    setLayerVisible(
+      APP_STATE.layers.protected,
+      false
+    );
+
+
+    setLayerVisible(
+      APP_STATE.layers.hunting,
+      true
+    );
+
+
+    fitLayer(
+      APP_STATE.layers.hunting
+    );
+
+
+    return;
 
   }
 
@@ -3084,117 +2969,144 @@ function applySpatialFilter() {
 
 
 /* ================================================================
-   FILTER EVENTS
+   LOCATION FILTER UI
    ================================================================ */
 
-function setupSpatialFilter() {
+function setupLocationFilter() {
 
-  const filterIds = [
-
-    "nationalParkFilter",
-    "protectedFilter",
-    "wildlifeFilter",
-    "huntingFilter"
-
-  ];
+  const button =
+    document.getElementById(
+      "layersBtn"
+    );
 
 
-  filterIds.forEach(
-    id => {
+  const menu =
+    document.getElementById(
+      "layersMenu"
+    );
 
-      const element =
-        document.getElementById(id);
+
+  const select =
+    document.getElementById(
+      "locationFilter"
+    );
 
 
-      element.addEventListener(
-        "change",
-        applySpatialFilter
+  /*
+     باز و بسته شدن منوی فیلتر
+  */
+
+  button.addEventListener(
+    "click",
+    event => {
+
+      event.stopPropagation();
+
+
+      menu.classList.toggle(
+        "show"
       );
 
     }
   );
 
 
-  document
-    .getElementById(
-      "filterAllBtn"
-    )
-    .addEventListener(
-      "click",
-      () => {
+  /*
+     جلوگیری از بسته شدن هنگام انتخاب
+  */
 
-        filterIds.forEach(
-          id => {
+  menu.addEventListener(
+    "click",
+    event => {
 
-            document.getElementById(
-              id
-            ).checked = true;
+      event.stopPropagation();
 
-          }
+    }
+  );
+
+
+  /*
+     کلیک بیرون از منو
+  */
+
+  document.addEventListener(
+    "click",
+    event => {
+
+      if (
+        !menu.contains(event.target) &&
+        !button.contains(event.target)
+      ) {
+
+        menu.classList.remove(
+          "show"
         );
-
-
-        setLayerVisible(
-          APP_STATE.layers.fli,
-          true
-        );
-
-        setLayerVisible(
-          APP_STATE.layers.protected,
-          true
-        );
-
-        setLayerVisible(
-          APP_STATE.layers.hunting,
-          true
-        );
-
-
-        applySpatialFilter();
 
       }
+
+    }
+  );
+
+
+  /*
+     تغییر محدوده
+  */
+
+  select.addEventListener(
+    "change",
+    event => {
+
+      applyLocationFilter(
+        event.target.value
+      );
+
+
+      /*
+         منو بعد از انتخاب بسته شود.
+      */
+
+      menu.classList.remove(
+        "show"
+      );
+
+    }
+  );
+
+}
+
+
+/* ================================================================
+   FIT BUTTON
+   ================================================================ */
+
+function setupFitButton() {
+
+  const button =
+    document.getElementById(
+      "fitButton"
     );
 
 
-  document
-    .getElementById(
-      "filterClearBtn"
-    )
-    .addEventListener(
-      "click",
-      () => {
+  button.addEventListener(
+    "click",
+    () => {
 
-        filterIds.forEach(
-          id => {
-
-            document.getElementById(
-              id
-            ).checked = false;
-
-          }
+      const select =
+        document.getElementById(
+          "locationFilter"
         );
 
 
-        setLayerVisible(
-          APP_STATE.layers.fli,
-          true
-        );
-
-        setLayerVisible(
-          APP_STATE.layers.protected,
-          false
-        );
-
-        setLayerVisible(
-          APP_STATE.layers.hunting,
-          false
-        );
+      select.value =
+        "all";
 
 
-        applySpatialFilter();
+      applyLocationFilter(
+        "all"
+      );
 
-      }
-    );
+    }
+  );
 
 }
 
@@ -3243,73 +3155,7 @@ function setupNightMode() {
 
 
 /* ================================================================
-   FIT FARS
-   ================================================================ */
-
-function fitFars() {
-
-  if (
-    !APP_STATE.layers.fars
-  ) {
-
-    return;
-
-  }
-
-
-  const bounds =
-    APP_STATE.layers.fars
-      .getBounds();
-
-
-  if (
-    !bounds.isValid()
-  ) {
-
-    return;
-
-  }
-
-
-  APP_STATE.map.fitBounds(
-    bounds,
-    {
-      padding: [60,60],
-      maxZoom: 8,
-      animate: true
-    }
-  );
-
-
-  setTimeout(
-    () =>
-      APP_STATE.map.invalidateSize(),
-    250
-  );
-
-}
-
-
-/* ================================================================
-   FIT BUTTON
-   ================================================================ */
-
-function setupFitButton() {
-
-  document
-    .getElementById(
-      "fitButton"
-    )
-    .addEventListener(
-      "click",
-      fitFars
-    );
-
-}
-
-
-/* ================================================================
-   ABOUT
+   ABOUT MODAL
    ================================================================ */
 
 function setupAbout() {
@@ -3320,36 +3166,40 @@ function setupAbout() {
     );
 
 
-  document
-    .getElementById(
+  const openButton =
+    document.getElementById(
       "aboutButton"
-    )
-    .addEventListener(
-      "click",
-      () => {
-
-        overlay.classList.add(
-          "open"
-        );
-
-      }
     );
 
 
-  document
-    .getElementById(
+  const closeButton =
+    document.getElementById(
       "aboutClose"
-    )
-    .addEventListener(
-      "click",
-      () => {
-
-        overlay.classList.remove(
-          "open"
-        );
-
-      }
     );
+
+
+  openButton.addEventListener(
+    "click",
+    () => {
+
+      overlay.classList.add(
+        "open"
+      );
+
+    }
+  );
+
+
+  closeButton.addEventListener(
+    "click",
+    () => {
+
+      overlay.classList.remove(
+        "open"
+      );
+
+    }
+  );
 
 
   overlay.addEventListener(
@@ -3391,14 +3241,23 @@ function setupAbout() {
 
 
 /* ================================================================
-   START APP
+   START APPLICATION
    ================================================================ */
 
 async function startApp() {
 
   try {
 
+    /*
+       تاریخ شمسی
+    */
+
     setupTomorrowDate();
+
+
+    /*
+       نقشه
+    */
 
     initMap();
 
@@ -3444,10 +3303,12 @@ async function startApp() {
 
       ]);
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.warn(
-        "Optional layers error:",
+        "Spatial layers:",
         error
       );
 
@@ -3463,10 +3324,12 @@ async function startApp() {
       true
     );
 
+
     setLayerVisible(
       APP_STATE.layers.protected,
       false
     );
+
 
     setLayerVisible(
       APP_STATE.layers.hunting,
@@ -3475,18 +3338,16 @@ async function startApp() {
 
 
     /*
-       اتصال دکمه‌ها
+       اتصال رویدادها
     */
 
     setupMapClick();
 
-    setupDropdown();
-
-    setupSpatialFilter();
-
-    setupNightMode();
+    setupLocationFilter();
 
     setupFitButton();
+
+    setupNightMode();
 
     setupAbout();
 
@@ -3497,6 +3358,10 @@ async function startApp() {
 
     fitFars();
 
+
+    /*
+       اصلاح اندازه نقشه
+    */
 
     setTimeout(
       () => {
@@ -3514,17 +3379,15 @@ async function startApp() {
       "FIRIS initialized successfully."
     );
 
+  }
 
-  } catch (error) {
+  catch (error) {
 
     console.error(
-      "Startup error:",
+      "FIRIS startup error:",
       error
     );
 
-    /*
-       خطای قابل مشاهده برای کاربر
-    */
 
     const message =
       document.createElement(
@@ -3535,17 +3398,30 @@ async function startApp() {
     message.style.cssText = `
 
       position:fixed;
+
       top:110px;
+
       left:50%;
+
       transform:translateX(-50%);
+
       z-index:9999;
+
       background:#b40000;
+
       color:white;
+
       padding:12px 20px;
+
       border-radius:8px;
+
       font-family:Tahoma;
+
       font-size:13px;
-      box-shadow:0 4px 15px rgba(0,0,0,.25);
+
+      box-shadow:
+        0 4px 15px
+        rgba(0,0,0,.25);
 
     `;
 
