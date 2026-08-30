@@ -2345,36 +2345,25 @@ function fitLayer(layer) {
    UPDATE FILTER GAUGE
    ============================================================ */
 
-function updateFilterGauge(
-  layer,
-  regionType
-) {
+function updateFilterGauge(layer, regionType) {
 
   if (!layer) {
-
     updateGauge(
       null,
       "محدوده انتخاب‌شده",
       "داده موجود نیست"
     );
-
     return;
   }
 
   let totalWeighted = 0;
   let totalCells = 0;
-  let regionCount = 0;
 
-  for (
-    const regionLayer of
-    layer.getLayers()
-  ) {
+  for (const regionLayer of layer.getLayers()) {
 
-    const feature =
-      regionLayer.toGeoJSON();
+    const feature = regionLayer.toGeoJSON();
 
-    const stats =
-      regionStatistics(feature);
+    const stats = regionStatistics(feature);
 
     if (
       !stats ||
@@ -2384,41 +2373,35 @@ function updateFilterGauge(
       continue;
     }
 
-    /*
-     * میانگین وزنی بر اساس تعداد سلول‌های
-     * FLI داخل هر محدوده.
-     */
-
-    totalWeighted +=
-      stats.mean * stats.count;
-
-    totalCells +=
-      stats.count;
-
-    regionCount++;
+    totalWeighted += stats.mean * stats.count;
+    totalCells += stats.count;
   }
+
+  const regionCount =
+    regionType === "protected"
+      ? 13
+      : 21;
 
   if (totalCells <= 0) {
 
     updateGauge(
       null,
       regionType === "protected"
-        ? "مناطق چهارگانه"
+        ? "مناطق حفاظت‌شده"
         : "مناطق شکار ممنوع",
-      "برای این محدوده داده FLI موجود نیست"
+      `${formatNumber(regionCount)} محدوده | داده خطر موجود نیست`
     );
 
     return;
   }
 
   const mean =
-    totalWeighted /
-    totalCells;
+    totalWeighted / totalCells;
 
   updateGauge(
     mean,
     regionType === "protected"
-      ? "مناطق چهارگانه"
+      ? "مناطق حفاظت‌شده"
       : "مناطق شکار ممنوع",
     `${formatNumber(regionCount)} محدوده | ${formatNumber(totalCells)} سلول`
   );
