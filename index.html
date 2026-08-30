@@ -1,15 +1,20 @@
 <!DOCTYPE html>
 
 <html lang="fa" dir="rtl">
+
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>سامانه پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی</title>
 
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
 
 <style>
+
 @font-face {
   font-family: "B Nazanin";
   src: local("B Nazanin"), local("BNazanin"), local("Nazanin");
@@ -61,7 +66,9 @@ a {
   flex-direction: column;
 }
 
-/* HEADER */
+/* ============================================================
+   HEADER
+   ============================================================ */
 
 .header {
   position: relative;
@@ -72,7 +79,12 @@ a {
   justify-content: center;
   padding: 10px 20px;
   color: white;
-  background: linear-gradient(135deg,#e52e2e 0%,#c31313 50%,#8c0505 100%);
+  background: linear-gradient(
+    135deg,
+    #e52e2e 0%,
+    #c31313 50%,
+    #8c0505 100%
+  );
   box-shadow: var(--shadow-lg);
   z-index: 3000;
 }
@@ -118,7 +130,9 @@ a {
   box-shadow: 0 0 6px #4ade80;
 }
 
-/* BUTTONS */
+/* ============================================================
+   BUTTONS
+   ============================================================ */
 
 .header-buttons-group {
   position: absolute;
@@ -173,7 +187,9 @@ a {
   background: #125523;
 }
 
-/* FILTER */
+/* ============================================================
+   FILTER
+   ============================================================ */
 
 .dropdown {
   position: relative;
@@ -245,7 +261,9 @@ a {
   line-height: 1.7;
 }
 
-/* MAP */
+/* ============================================================
+   MAP
+   ============================================================ */
 
 #map-wrap {
   position: relative;
@@ -267,7 +285,9 @@ a {
   display: none;
 }
 
-/* NIGHT */
+/* ============================================================
+   NIGHT
+   ============================================================ */
 
 #nightOverlay {
   position: absolute;
@@ -282,7 +302,9 @@ body.night #nightOverlay {
   display: block;
 }
 
-/* GAUGE */
+/* ============================================================
+   GAUGE
+   ============================================================ */
 
 .gauge-panel {
   position: absolute;
@@ -377,7 +399,9 @@ body.night #nightOverlay {
   color: white;
 }
 
-/* POPUPS */
+/* ============================================================
+   POPUPS
+   ============================================================ */
 
 .leaflet-popup-content {
   margin: 0 !important;
@@ -423,7 +447,9 @@ body.night #nightOverlay {
   line-height: 1.5;
 }
 
-/* ABOUT */
+/* ============================================================
+   ABOUT
+   ============================================================ */
 
 .about-overlay {
   position: fixed;
@@ -522,9 +548,12 @@ body.night #nightOverlay {
   color: #2e7d32;
 }
 
-/* MOBILE */
+/* ============================================================
+   MOBILE
+   ============================================================ */
 
 @media (max-width: 768px) {
+
   :root {
     --header-height: 86px;
   }
@@ -590,7 +619,9 @@ body.night #nightOverlay {
   .gauge-legend-chip {
     font-size: 7px;
   }
+
 }
+
 </style>
 
 </head>
@@ -634,12 +665,14 @@ for="locationFilter"
 کل استان فارس
 </option>
 
+<!-- اصلاح اصلی: value و عنوان با هم هماهنگ شده‌اند -->
+
 <option value="protected">
-مناطق شکار ممنوع
+مناطق چهارگانه
 </option>
 
 <option value="hunting">
-مناطق چهارگانه
+مناطق شکار ممنوع
 </option>
 
 </select>
@@ -702,7 +735,9 @@ aria-label="خروجی Excel"
 
 <div class="header-subtitle-badge">
 <span class="bullet"></span>
-<span id="forecastDateBadge">پیش‌بینی برای فردا</span>
+<span id="forecastDateBadge">
+پیش‌بینی برای فردا
+</span>
 </div>
 
 </div>
@@ -744,28 +779,49 @@ aria-label="خروجی Excel"
 
 <div class="gauge-legend-items">
 
-<span class="gauge-legend-chip" style="background:#2e7d32">
-کم
-</span>
+<span
+class="gauge-legend-chip"
+style="background:#2e7d32"
 
-<span class="gauge-legend-chip" style="background:#fdd835;color:#222">
-متوسط
-</span>
+>
 
-<span class="gauge-legend-chip" style="background:#fb8c00">
-زیاد
-</span>
+کم </span>
 
-<span class="gauge-legend-chip" style="background:#e53935">
-خیلی زیاد
-</span>
+<span
+class="gauge-legend-chip"
+style="background:#fdd835;color:#222"
 
-<span class="gauge-legend-chip" style="background:#880e4f">
-بحرانی
-</span>
+>
+
+متوسط </span>
+
+<span
+class="gauge-legend-chip"
+style="background:#fb8c00"
+
+>
+
+زیاد </span>
+
+<span
+class="gauge-legend-chip"
+style="background:#e53935"
+
+>
+
+خیلی زیاد </span>
+
+<span
+class="gauge-legend-chip"
+style="background:#880e4f"
+
+>
+
+بحرانی </span>
 
 </div>
 </div>
+
 </div>
 
 </div>
@@ -773,10 +829,10 @@ aria-label="خروجی Excel"
 <div id="aboutOverlay" class="about-overlay">
 
 <div
-class="about-box"
-role="dialog"
-aria-modal="true"
-aria-labelledby="aboutTitle"
+  class="about-box"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="aboutTitle"
 >
 
 <div class="about-header">
@@ -860,6 +916,10 @@ type="button"
 <script>
 "use strict";
 
+/* ============================================================
+   APP STATE
+   ============================================================ */
+
 const APP_STATE = {
 
   map: null,
@@ -879,6 +939,12 @@ const APP_STATE = {
   ui: {
     nightMode: false,
     currentPopup: null,
+
+    /*
+     * all       = کل استان
+     * protected = مناطق چهارگانه
+     * hunting   = مناطق شکار ممنوع
+     */
     locationFilter: "all"
   }
 
@@ -891,30 +957,45 @@ const APP_STATE = {
 
 function setupTomorrowDate() {
 
-  const badge = document.getElementById("forecastDateBadge");
+  const badge =
+    document.getElementById("forecastDateBadge");
+
+  if (!badge) {
+    return;
+  }
 
   try {
 
-    const tomorrow = new Date();
+    const tomorrow =
+      new Date();
 
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const dateStr = tomorrow.toLocaleDateString(
-      "fa-IR",
-      {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric"
-      }
+    tomorrow.setDate(
+      tomorrow.getDate() + 1
     );
 
-    badge.textContent = `پیش‌بینی برای ${dateStr}`;
+    const dateStr =
+      tomorrow.toLocaleDateString(
+        "fa-IR",
+        {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric"
+        }
+      );
+
+    badge.textContent =
+      `پیش‌بینی برای ${dateStr}`;
 
   } catch (error) {
 
-    badge.textContent = "پیش‌بینی برای فردا";
+    console.warn(
+      "Date error:",
+      error
+    );
 
+    badge.textContent =
+      "پیش‌بینی برای فردا";
   }
 
 }
@@ -924,29 +1005,37 @@ function setupTomorrowDate() {
    FETCH
    ============================================================ */
 
-async function fetchWithTimeout(url, timeout = 15000) {
+async function fetchWithTimeout(
+  url,
+  timeout = 15000
+) {
 
-  const controller = new AbortController();
+  const controller =
+    new AbortController();
 
-  const timer = setTimeout(
-    () => controller.abort(),
-    timeout
-  );
+  const timer =
+    setTimeout(
+      () => controller.abort(),
+      timeout
+    );
 
   try {
 
-    const response = await fetch(
-      url,
-      {
-        signal: controller.signal,
-        cache: "no-store"
-      }
-    );
+    const response =
+      await fetch(
+        url,
+        {
+          signal: controller.signal,
+          cache: "no-store"
+        }
+      );
 
     clearTimeout(timer);
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+      throw new Error(
+        `HTTP ${response.status}`
+      );
     }
 
     return response;
@@ -955,12 +1044,15 @@ async function fetchWithTimeout(url, timeout = 15000) {
 
     clearTimeout(timer);
 
-    if (error.name === "AbortError") {
+    if (
+      error.name === "AbortError"
+    ) {
       throw new Error("Timeout");
     }
 
     throw error;
   }
+
 }
 
 
@@ -970,9 +1062,12 @@ async function fetchWithTimeout(url, timeout = 15000) {
 
 function formatNumber(value) {
 
-  const number = Number(value);
+  const number =
+    Number(value);
 
-  if (!Number.isFinite(number)) {
+  if (
+    !Number.isFinite(number)
+  ) {
     return "—";
   }
 
@@ -982,6 +1077,7 @@ function formatNumber(value) {
       maximumFractionDigits: 2
     }
   );
+
 }
 
 
@@ -991,47 +1087,61 @@ function formatNumber(value) {
 
 function getRisk(value) {
 
-  const num = Number(value);
+  const num =
+    Number(value);
 
-  if (!Number.isFinite(num)) {
+  if (
+    !Number.isFinite(num)
+  ) {
+
     return {
       label: "بدون داده",
       color: "#777"
     };
+
   }
 
   if (num < 20) {
+
     return {
       label: "کم",
       color: "#2e7d32"
     };
+
   }
 
   if (num < 40) {
+
     return {
       label: "متوسط",
       color: "#c7a900"
     };
+
   }
 
   if (num < 60) {
+
     return {
       label: "زیاد",
       color: "#fb8c00"
     };
+
   }
 
   if (num < 80) {
+
     return {
       label: "خیلی زیاد",
       color: "#e53935"
     };
+
   }
 
   return {
     label: "بحرانی",
     color: "#880e4f"
   };
+
 }
 
 
@@ -1039,24 +1149,49 @@ function getRisk(value) {
    GAUGE
    ============================================================ */
 
-function updateGauge(value, title, subtitle) {
+function updateGauge(
+  value,
+  title,
+  subtitle
+) {
 
   const valueElement =
-    document.getElementById("gaugeValue");
+    document.getElementById(
+      "gaugeValue"
+    );
 
   const labelElement =
-    document.getElementById("gaugeLabel");
+    document.getElementById(
+      "gaugeLabel"
+    );
 
   const locationElement =
-    document.getElementById("gaugeLocation");
+    document.getElementById(
+      "gaugeLocation"
+    );
 
-  if (!Number.isFinite(Number(value))) {
+  if (
+    !valueElement ||
+    !labelElement ||
+    !locationElement
+  ) {
+    return;
+  }
 
-    valueElement.textContent = "—";
+  if (
+    !Number.isFinite(
+      Number(value)
+    )
+  ) {
 
-    labelElement.textContent = "بدون داده";
+    valueElement.textContent =
+      "—";
 
-    labelElement.style.color = "#777";
+    labelElement.textContent =
+      "بدون داده";
+
+    labelElement.style.color =
+      "#777";
 
     locationElement.textContent =
       subtitle || "—";
@@ -1064,7 +1199,8 @@ function updateGauge(value, title, subtitle) {
     return;
   }
 
-  const risk = getRisk(value);
+  const risk =
+    getRisk(value);
 
   valueElement.textContent =
     formatNumber(value);
@@ -1077,6 +1213,7 @@ function updateGauge(value, title, subtitle) {
 
   locationElement.textContent =
     `${title || ""}${subtitle ? " | " + subtitle : ""}`;
+
 }
 
 
@@ -1086,22 +1223,26 @@ function updateGauge(value, title, subtitle) {
 
 function initMap() {
 
-  APP_STATE.map = L.map(
-    "map",
-    {
-      zoomControl: false,
-      preferCanvas: true,
-      attributionControl: true
-    }
-  );
+  APP_STATE.map =
+    L.map(
+      "map",
+      {
+        zoomControl: false,
+        preferCanvas: true,
+        attributionControl: true
+      }
+    );
 
   L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     {
       maxZoom: 18,
-      attribution: "&copy; OpenStreetMap contributors"
+      attribution:
+        "&copy; OpenStreetMap contributors"
     }
-  ).addTo(APP_STATE.map);
+  ).addTo(
+    APP_STATE.map
+  );
 
 }
 
@@ -1113,7 +1254,9 @@ function initMap() {
 async function loadFars() {
 
   const response =
-    await fetchWithTimeout("fars.geojson");
+    await fetchWithTimeout(
+      "fars.geojson"
+    );
 
   const geojson =
     await response.json();
@@ -1130,9 +1273,12 @@ async function loadFars() {
         },
         interactive: false
       }
-    ).addTo(APP_STATE.map);
+    ).addTo(
+      APP_STATE.map
+    );
 
   return geojson;
+
 }
 
 
@@ -1154,6 +1300,7 @@ async function loadFLI() {
     L.geoJSON(
       geojson,
       {
+
         style: feature => {
 
           const color =
@@ -1161,7 +1308,7 @@ async function loadFLI() {
             "#777";
 
           return {
-            color,
+            color: color,
             weight: .15,
             opacity: .85,
             fillColor: color,
@@ -1169,11 +1316,16 @@ async function loadFLI() {
           };
 
         },
+
         interactive: false
+
       }
-    ).addTo(APP_STATE.map);
+    ).addTo(
+      APP_STATE.map
+    );
 
   return APP_STATE.layers.fli;
+
 }
 
 
@@ -1201,6 +1353,7 @@ async function loadFLIData() {
     );
 
   }
+
 }
 
 
@@ -1226,7 +1379,14 @@ async function loadGrid() {
       Array.isArray(grid.values)
     ) {
 
-      APP_STATE.data.fliGrid = grid;
+      APP_STATE.data.fliGrid =
+        grid;
+
+    } else {
+
+      console.warn(
+        "Invalid FLI grid structure."
+      );
 
     }
 
@@ -1238,11 +1398,13 @@ async function loadGrid() {
     );
 
   }
+
 }
 
 
 /* ============================================================
    PROTECTED
+   مناطق چهارگانه
    ============================================================ */
 
 async function loadProtected() {
@@ -1283,11 +1445,13 @@ async function loadProtected() {
     );
 
   return APP_STATE.layers.protected;
+
 }
 
 
 /* ============================================================
    HUNTING
+   مناطق شکار ممنوع
    ============================================================ */
 
 async function loadHunting() {
@@ -1328,6 +1492,7 @@ async function loadHunting() {
     );
 
   return APP_STATE.layers.hunting;
+
 }
 
 
@@ -1344,16 +1509,11 @@ function parseBounds(bounds) {
     return null;
   }
 
-  /*
-   * حالت استاندارد:
-   * [
-   *   [south, west],
-   *   [north, east]
-   * ]
-   */
+  const a =
+    bounds[0];
 
-  const a = bounds[0];
-  const b = bounds[1];
+  const b =
+    bounds[1];
 
   if (
     !Array.isArray(a) ||
@@ -1364,10 +1524,17 @@ function parseBounds(bounds) {
     return null;
   }
 
-  const y1 = Number(a[0]);
-  const x1 = Number(a[1]);
-  const y2 = Number(b[0]);
-  const x2 = Number(b[1]);
+  const y1 =
+    Number(a[0]);
+
+  const x1 =
+    Number(a[1]);
+
+  const y2 =
+    Number(b[0]);
+
+  const x2 =
+    Number(b[1]);
 
   if (
     !Number.isFinite(y1) ||
@@ -1379,11 +1546,21 @@ function parseBounds(bounds) {
   }
 
   return {
-    south: Math.min(y1, y2),
-    north: Math.max(y1, y2),
-    west: Math.min(x1, x2),
-    east: Math.max(x1, x2)
+
+    south:
+      Math.min(y1, y2),
+
+    north:
+      Math.max(y1, y2),
+
+    west:
+      Math.min(x1, x2),
+
+    east:
+      Math.max(x1, x2)
+
   };
+
 }
 
 
@@ -1391,7 +1568,10 @@ function parseBounds(bounds) {
    COORDINATES
    ============================================================ */
 
-function validateCoords(lat, lon) {
+function validateCoords(
+  lat,
+  lon
+) {
 
   return (
     Number.isFinite(lat) &&
@@ -1401,18 +1581,24 @@ function validateCoords(lat, lon) {
     lon >= -180 &&
     lon <= 180
   );
+
 }
 
 
 /* ============================================================
-   GRID VALUE
+   GRID CELL VALUE
    ============================================================ */
 
-function getPointValue(lat, lon) {
+function getPointValue(
+  lat,
+  lon
+) {
 
   if (
-    !validateCoords(lat, lon) ||
-    !APP_STATE.data.fliGrid
+    !validateCoords(
+      lat,
+      lon
+    )
   ) {
     return null;
   }
@@ -1420,8 +1606,14 @@ function getPointValue(lat, lon) {
   const grid =
     APP_STATE.data.fliGrid;
 
+  if (!grid) {
+    return null;
+  }
+
   const bounds =
-    parseBounds(grid.bounds);
+    parseBounds(
+      grid.bounds
+    );
 
   if (!bounds) {
     return null;
@@ -1450,6 +1642,19 @@ function getPointValue(lat, lon) {
     east
   } = bounds;
 
+  const latRange =
+    north - south;
+
+  const lonRange =
+    east - west;
+
+  if (
+    latRange <= 0 ||
+    lonRange <= 0
+  ) {
+    return null;
+  }
+
   if (
     lat < south ||
     lat > north ||
@@ -1463,7 +1668,7 @@ function getPointValue(lat, lon) {
     Math.floor(
       (
         (north - lat) /
-        (north - south)
+        latRange
       ) * rows
     );
 
@@ -1471,20 +1676,26 @@ function getPointValue(lat, lon) {
     Math.floor(
       (
         (lon - west) /
-        (east - west)
+        lonRange
       ) * cols
     );
 
   row =
     Math.max(
       0,
-      Math.min(rows - 1, row)
+      Math.min(
+        rows - 1,
+        row
+      )
     );
 
   col =
     Math.max(
       0,
-      Math.min(cols - 1, col)
+      Math.min(
+        cols - 1,
+        col
+      )
     );
 
   const value =
@@ -1501,6 +1712,7 @@ function getPointValue(lat, lon) {
   }
 
   return null;
+
 }
 
 
@@ -1508,7 +1720,10 @@ function getPointValue(lat, lon) {
    POINT INSIDE FARS
    ============================================================ */
 
-function pointInsideFars(lat, lon) {
+function pointInsideFars(
+  lat,
+  lon
+) {
 
   if (
     !APP_STATE.layers.fars ||
@@ -1518,7 +1733,9 @@ function pointInsideFars(lat, lon) {
   }
 
   const point =
-    turf.point([lon, lat]);
+    turf.point(
+      [lon, lat]
+    );
 
   for (
     const layer of
@@ -1533,7 +1750,9 @@ function pointInsideFars(lat, lon) {
           layer.toGeoJSON()
         )
       ) {
+
         return true;
+
       }
 
     } catch (error) {
@@ -1544,246 +1763,11 @@ function pointInsideFars(lat, lon) {
       );
 
     }
+
   }
 
   return false;
-}
 
-
-/* ============================================================
-   REGION MEAN - FIXED
-   ============================================================ */
-
-function regionMean(feature) {
-
-  const grid =
-    APP_STATE.data.fliGrid;
-
-  if (!grid) {
-    return null;
-  }
-
-  const bounds =
-    parseBounds(grid.bounds);
-
-  if (!bounds) {
-    return null;
-  }
-
-  const rows =
-    Number(grid.rows);
-
-  const cols =
-    Number(grid.cols);
-
-  if (
-    !Number.isInteger(rows) ||
-    !Number.isInteger(cols) ||
-    rows <= 0 ||
-    cols <= 0 ||
-    !Array.isArray(grid.values)
-  ) {
-    return null;
-  }
-
-  /*
-   * برای سرعت، ابتدا فقط محدوده مکانی Polygon
-   * را پیدا می‌کنیم و تمام شبکه استان را بررسی نمی‌کنیم.
-   */
-
-  let polygonBounds;
-
-  try {
-
-    polygonBounds =
-      turf.bbox(feature);
-
-  } catch (error) {
-
-    console.warn(
-      "Invalid region geometry:",
-      error
-    );
-
-    return null;
-  }
-
-  if (
-    !Array.isArray(polygonBounds) ||
-    polygonBounds.length !== 4
-  ) {
-    return null;
-  }
-
-  const minLon =
-    polygonBounds[0];
-
-  const minLat =
-    polygonBounds[1];
-
-  const maxLon =
-    polygonBounds[2];
-
-  const maxLat =
-    polygonBounds[3];
-
-  const {
-    south,
-    west,
-    north,
-    east
-  } = bounds;
-
-  /*
-   * تبدیل Bounding Box منطقه به محدوده سلول‌های Grid
-   */
-
-  let startRow =
-    Math.floor(
-      (
-        (north - maxLat) /
-        (north - south)
-      ) * rows
-    );
-
-  let endRow =
-    Math.ceil(
-      (
-        (north - minLat) /
-        (north - south)
-      ) * rows
-    );
-
-  let startCol =
-    Math.floor(
-      (
-        (minLon - west) /
-        (east - west)
-      ) * cols
-    );
-
-  let endCol =
-    Math.ceil(
-      (
-        (maxLon - west) /
-        (east - west)
-      ) * cols
-    );
-
-  startRow =
-    Math.max(
-      0,
-      Math.min(rows - 1, startRow)
-    );
-
-  endRow =
-    Math.max(
-      0,
-      Math.min(rows, endRow)
-    );
-
-  startCol =
-    Math.max(
-      0,
-      Math.min(cols - 1, startCol)
-    );
-
-  endCol =
-    Math.max(
-      0,
-      Math.min(cols, endCol)
-    );
-
-  /*
-   * اگر محدوده منطقه با Grid همپوشانی نداشته باشد.
-   */
-
-  if (
-    startRow > endRow ||
-    startCol > endCol
-  ) {
-    return null;
-  }
-
-  let sum = 0;
-  let count = 0;
-
-  for (
-    let row = startRow;
-    row <= endRow && row < rows;
-    row++
-  ) {
-
-    /*
-     * مرکز سلول
-     */
-
-    const lat =
-      north -
-      (
-        (row + 0.5) /
-        rows
-      ) *
-      (north - south);
-
-    for (
-      let col = startCol;
-      col <= endCol && col < cols;
-      col++
-    ) {
-
-      const value =
-        Number(
-          grid.values?.[row]?.[col]
-        );
-
-      if (
-        !Number.isFinite(value) ||
-        value < 0 ||
-        value > 100
-      ) {
-        continue;
-      }
-
-      const lon =
-        west +
-        (
-          (col + 0.5) /
-          cols
-        ) *
-        (east - west);
-
-      const point =
-        turf.point([lon, lat]);
-
-      try {
-
-        if (
-          turf.booleanPointInPolygon(
-            point,
-            feature
-          )
-        ) {
-
-          sum += value;
-          count++;
-
-        }
-
-      } catch (error) {
-
-        console.warn(
-          "Region point test:",
-          error
-        );
-
-      }
-    }
-  }
-
-  return count > 0
-    ? sum / count
-    : null;
 }
 
 
@@ -1791,7 +1775,9 @@ function regionMean(feature) {
    REGION STATISTICS
    ============================================================ */
 
-function regionStatistics(feature) {
+function regionStatistics(
+  feature
+) {
 
   const grid =
     APP_STATE.data.fliGrid;
@@ -1801,7 +1787,9 @@ function regionStatistics(feature) {
   }
 
   const bounds =
-    parseBounds(grid.bounds);
+    parseBounds(
+      grid.bounds
+    );
 
   if (!bounds) {
     return null;
@@ -1826,15 +1814,40 @@ function regionStatistics(feature) {
   let bbox;
 
   try {
-    bbox = turf.bbox(feature);
-  } catch {
+
+    bbox =
+      turf.bbox(
+        feature
+      );
+
+  } catch (error) {
+
+    console.warn(
+      "Invalid region geometry:",
+      error
+    );
+
     return null;
   }
 
-  const minLon = bbox[0];
-  const minLat = bbox[1];
-  const maxLon = bbox[2];
-  const maxLat = bbox[3];
+  if (
+    !Array.isArray(bbox) ||
+    bbox.length !== 4
+  ) {
+    return null;
+  }
+
+  const minLon =
+    Number(bbox[0]);
+
+  const minLat =
+    Number(bbox[1]);
+
+  const maxLon =
+    Number(bbox[2]);
+
+  const maxLat =
+    Number(bbox[3]);
 
   const {
     south,
@@ -1843,35 +1856,110 @@ function regionStatistics(feature) {
     east
   } = bounds;
 
+  const latRange =
+    north - south;
+
+  const lonRange =
+    east - west;
+
+  if (
+    latRange <= 0 ||
+    lonRange <= 0
+  ) {
+    return null;
+  }
+
+  /*
+   * تبدیل Bounding Box به محدوده Grid
+   */
+
   let startRow =
     Math.floor(
-      ((north - maxLat) / (north - south)) * rows
+      (
+        (north - maxLat) /
+        latRange
+      ) * rows
     );
 
   let endRow =
     Math.ceil(
-      ((north - minLat) / (north - south)) * rows
-    );
+      (
+        (north - minLat) /
+        latRange
+      ) * rows
+    ) - 1;
 
   let startCol =
     Math.floor(
-      ((minLon - west) / (east - west)) * cols
+      (
+        (minLon - west) /
+        lonRange
+      ) * cols
     );
 
   let endCol =
     Math.ceil(
-      ((maxLon - west) / (east - west)) * cols
+      (
+        (maxLon - west) /
+        lonRange
+      ) * cols
+    ) - 1;
+
+  /*
+   * محدود کردن به Grid
+   */
+
+  startRow =
+    Math.max(
+      0,
+      Math.min(
+        rows - 1,
+        startRow
+      )
     );
 
-  startRow = Math.max(0, Math.min(rows - 1, startRow));
-  endRow = Math.max(0, Math.min(rows - 1, endRow));
-  startCol = Math.max(0, Math.min(cols - 1, startCol));
-  endCol = Math.max(0, Math.min(cols - 1, endCol));
+  endRow =
+    Math.max(
+      0,
+      Math.min(
+        rows - 1,
+        endRow
+      )
+    );
+
+  startCol =
+    Math.max(
+      0,
+      Math.min(
+        cols - 1,
+        startCol
+      )
+    );
+
+  endCol =
+    Math.max(
+      0,
+      Math.min(
+        cols - 1,
+        endCol
+      )
+    );
+
+  if (
+    startRow > endRow ||
+    startCol > endCol
+  ) {
+    return null;
+  }
 
   let sum = 0;
   let count = 0;
   let min = Infinity;
   let max = -Infinity;
+
+  /*
+   * بررسی مرکز سلول‌ها
+   */
 
   for (
     let row = startRow;
@@ -1881,8 +1969,11 @@ function regionStatistics(feature) {
 
     const lat =
       north -
-      ((row + 0.5) / rows) *
-      (north - south);
+      (
+        (row + 0.5) /
+        rows
+      ) *
+      latRange;
 
     for (
       let col = startCol;
@@ -1905,11 +1996,16 @@ function regionStatistics(feature) {
 
       const lon =
         west +
-        ((col + 0.5) / cols) *
-        (east - west);
+        (
+          (col + 0.5) /
+          cols
+        ) *
+        lonRange;
 
       const point =
-        turf.point([lon, lat]);
+        turf.point(
+          [lon, lat]
+        );
 
       try {
 
@@ -1923,24 +2019,55 @@ function regionStatistics(feature) {
           sum += value;
           count++;
 
-          if (value < min) min = value;
-          if (value > max) max = value;
+          if (
+            value < min
+          ) {
+            min = value;
+          }
+
+          if (
+            value > max
+          ) {
+            max = value;
+          }
+
         }
 
-      } catch {}
+      } catch (error) {
+
+        console.warn(
+          "Region point test:",
+          error
+        );
+
+      }
+
     }
+
   }
 
-  if (count === 0) {
+  if (
+    count === 0
+  ) {
     return null;
   }
 
   return {
-    mean: sum / count,
-    min,
-    max,
-    count
+
+    mean:
+      sum / count,
+
+    min:
+      min,
+
+    max:
+      max,
+
+    count:
+      count
+
   };
+
 }
 
 
@@ -1948,12 +2075,16 @@ function regionStatistics(feature) {
    REGION NAME
    ============================================================ */
 
-function getRegionName(feature, fallback) {
+function getRegionName(
+  feature,
+  fallback
+) {
 
   const properties =
-    feature.properties || {};
+    feature?.properties || {};
 
   const keys = [
+
     "name",
     "NAME",
     "Name",
@@ -1966,12 +2097,14 @@ function getRegionName(feature, fallback) {
     "TITLE",
     "نام",
     "نام منطقه"
+
   ];
 
   const found =
     keys
       .map(
-        key => properties[key]
+        key =>
+          properties[key]
       )
       .find(
         value =>
@@ -1982,6 +2115,36 @@ function getRegionName(feature, fallback) {
   return found
     ? String(found)
     : fallback;
+
+}
+
+
+/* ============================================================
+   REGION TYPE TITLE
+   ============================================================ */
+
+function getRegionTypeTitle(
+  regionType
+) {
+
+  if (
+    regionType === "protected"
+  ) {
+
+    return "مناطق چهارگانه";
+
+  }
+
+  if (
+    regionType === "hunting"
+  ) {
+
+    return "مناطق شکار ممنوع";
+
+  }
+
+  return "محدوده";
+
 }
 
 
@@ -1995,10 +2158,13 @@ function bindRegion(
   regionType
 ) {
 
+  const regionTypeTitle =
+    getRegionTypeTitle(
+      regionType
+    );
+
   const fallback =
-    regionType === "protected"
-      ? "منطقه چهارگانه"
-      : "منطقه شکار ممنوع";
+    regionTypeTitle;
 
   const name =
     getRegionName(
@@ -2007,11 +2173,13 @@ function bindRegion(
     );
 
   /*
-   * محاسبه واقعی خطر برای خود Polygon
+   * محاسبه واقعی FLI
    */
 
   const statistics =
-    regionStatistics(feature);
+    regionStatistics(
+      feature
+    );
 
   const mean =
     statistics
@@ -2019,7 +2187,9 @@ function bindRegion(
       : null;
 
   const risk =
-    getRisk(mean);
+    getRisk(
+      mean
+    );
 
   const popup = `
 
@@ -2034,6 +2204,10 @@ function bindRegion(
         style="background:${risk.color}"
       >
         ${risk.label}
+      </div>
+
+      <div class="popup-value">
+        ${regionTypeTitle}
       </div>
 
       ${
@@ -2067,6 +2241,7 @@ function bindRegion(
       }
 
     </div>
+
   `;
 
   layer.bindPopup(
@@ -2081,20 +2256,19 @@ function bindRegion(
     () => {
 
       /*
-       * مهم:
-       * Gauge مقدار محاسبه‌شده همان Polygon را نشان می‌دهد.
+       * Gauge دقیقاً همان Polygon
+       * و همان نوع منطقه را نشان می‌دهد.
        */
 
       updateGauge(
         mean,
         name,
-        regionType === "protected"
-          ? "مناطق چهارگانه"
-          : "مناطق چهارگانه"
+        regionTypeTitle
       );
 
     }
   );
+
 }
 
 
@@ -2115,9 +2289,8 @@ function setupMapClick() {
         event.latlng.lng;
 
       /*
-       * اگر فیلتر فعال است و کاربر داخل
-       * محدوده انتخاب‌شده کلیک کرده باشد،
-       * همان مقدار نقطه‌ای نمایش داده می‌شود.
+       * اگر فیلتر فعال است:
+       * فقط داخل همان نوع محدوده اجازه کلیک داریم.
        */
 
       if (
@@ -2134,7 +2307,9 @@ function setupMapClick() {
         }
 
         const point =
-          turf.point([lon, lat]);
+          turf.point(
+            [lon, lat]
+          );
 
         let inside = false;
 
@@ -2157,13 +2332,21 @@ function setupMapClick() {
 
             }
 
-          } catch {}
+          } catch (error) {
+
+            console.warn(
+              "Filter point test:",
+              error
+            );
+
+          }
 
         }
 
         if (!inside) {
           return;
         }
+
       }
 
       else {
@@ -2176,6 +2359,7 @@ function setupMapClick() {
         ) {
           return;
         }
+
       }
 
       const value =
@@ -2184,9 +2368,17 @@ function setupMapClick() {
           lon
         );
 
+      /*
+       * عنوان Gauge در حالت کل استان
+       */
+
       updateGauge(
         value,
-        "استان فارس",
+        APP_STATE.ui.locationFilter === "all"
+          ? "استان فارس"
+          : getRegionTypeTitle(
+              APP_STATE.ui.locationFilter
+            ),
         `${lat.toFixed(4)}° ، ${lon.toFixed(4)}°`
       );
 
@@ -2199,7 +2391,9 @@ function setupMapClick() {
       }
 
       const risk =
-        getRisk(value);
+        getRisk(
+          value
+        );
 
       const popup = `
 
@@ -2230,6 +2424,7 @@ function setupMapClick() {
           </div>
 
         </div>
+
       `;
 
       APP_STATE.map.openPopup(
@@ -2239,8 +2434,10 @@ function setupMapClick() {
           maxWidth: 280
         }
       );
+
     }
   );
+
 }
 
 
@@ -2260,20 +2457,33 @@ function setLayerVisible(
   if (visible) {
 
     if (
-      !APP_STATE.map.hasLayer(layer)
+      !APP_STATE.map.hasLayer(
+        layer
+      )
     ) {
-      layer.addTo(APP_STATE.map);
+
+      layer.addTo(
+        APP_STATE.map
+      );
+
     }
 
   } else {
 
     if (
-      APP_STATE.map.hasLayer(layer)
+      APP_STATE.map.hasLayer(
+        layer
+      )
     ) {
-      APP_STATE.map.removeLayer(layer);
+
+      APP_STATE.map.removeLayer(
+        layer
+      );
+
     }
 
   }
+
 }
 
 
@@ -2283,21 +2493,26 @@ function setLayerVisible(
 
 function fitFars() {
 
-  if (!APP_STATE.layers.fars) {
+  if (
+    !APP_STATE.layers.fars ||
+    !APP_STATE.map
+  ) {
     return;
   }
 
   const bounds =
     APP_STATE.layers.fars.getBounds();
 
-  if (!bounds.isValid()) {
+  if (
+    !bounds.isValid()
+  ) {
     return;
   }
 
   APP_STATE.map.fitBounds(
     bounds,
     {
-      padding: [60,60],
+      padding: [60, 60],
       maxZoom: 8,
       animate: true
     }
@@ -2305,10 +2520,13 @@ function fitFars() {
 
   setTimeout(
     () => {
+
       APP_STATE.map.invalidateSize();
+
     },
     300
   );
+
 }
 
 
@@ -2316,28 +2534,36 @@ function fitFars() {
    FIT LAYER
    ============================================================ */
 
-function fitLayer(layer) {
+function fitLayer(
+  layer
+) {
 
   if (!layer) {
+    fitFars();
     return;
   }
 
   const bounds =
     layer.getBounds();
 
-  if (!bounds.isValid()) {
+  if (
+    !bounds.isValid()
+  ) {
+
     fitFars();
     return;
+
   }
 
   APP_STATE.map.fitBounds(
     bounds,
     {
-      padding: [70,70],
+      padding: [70, 70],
       maxZoom: 10,
       animate: true
     }
   );
+
 }
 
 
@@ -2350,15 +2576,21 @@ function updateFilterGauge(
   regionType
 ) {
 
+  const regionTypeTitle =
+    getRegionTypeTitle(
+      regionType
+    );
+
   if (!layer) {
 
     updateGauge(
       null,
-      "محدوده انتخاب‌شده",
+      regionTypeTitle,
       "داده موجود نیست"
     );
 
     return;
+
   }
 
   let totalWeighted = 0;
@@ -2374,41 +2606,47 @@ function updateFilterGauge(
       regionLayer.toGeoJSON();
 
     const stats =
-      regionStatistics(feature);
+      regionStatistics(
+        feature
+      );
 
     if (
       !stats ||
-      !Number.isFinite(stats.mean) ||
+      !Number.isFinite(
+        stats.mean
+      ) ||
       stats.count <= 0
     ) {
       continue;
     }
 
     /*
-     * میانگین وزنی بر اساس تعداد سلول‌های
-     * FLI داخل هر محدوده.
+     * میانگین وزنی بر اساس تعداد سلول‌ها
      */
 
     totalWeighted +=
-      stats.mean * stats.count;
+      stats.mean *
+      stats.count;
 
     totalCells +=
       stats.count;
 
     regionCount++;
+
   }
 
-  if (totalCells <= 0) {
+  if (
+    totalCells <= 0
+  ) {
 
     updateGauge(
       null,
-      regionType === "protected"
-        ? "مناطق چهارگانه"
-        : "مناطق شکار ممنوع",
+      regionTypeTitle,
       "برای این محدوده داده FLI موجود نیست"
     );
 
     return;
+
   }
 
   const mean =
@@ -2417,11 +2655,10 @@ function updateFilterGauge(
 
   updateGauge(
     mean,
-    regionType === "protected"
-      ? "مناطق چهارگانه"
-      : "مناطق شکار ممنوع",
+    regionTypeTitle,
     `${formatNumber(regionCount)} محدوده | ${formatNumber(totalCells)} سلول`
   );
+
 }
 
 
@@ -2429,13 +2666,33 @@ function updateFilterGauge(
    LOCATION FILTER
    ============================================================ */
 
-function applyLocationFilter(value) {
+function applyLocationFilter(
+  value
+) {
+
+  /*
+   * فقط مقادیر معتبر پذیرفته می‌شوند.
+   */
+
+  const validValues = [
+    "all",
+    "protected",
+    "hunting"
+  ];
+
+  if (
+    !validValues.includes(value)
+  ) {
+
+    value = "all";
+
+  }
 
   APP_STATE.ui.locationFilter =
     value;
 
   /*
-   * FLI همیشه باقی می‌ماند.
+   * FLI همیشه نمایش داده می‌شود.
    */
 
   setLayerVisible(
@@ -2444,20 +2701,27 @@ function applyLocationFilter(value) {
   );
 
   /*
+   * ابتدا هر دو لایه منطقه‌ای
+   * خاموش می‌شوند.
+   */
+
+  setLayerVisible(
+    APP_STATE.layers.protected,
+    false
+  );
+
+  setLayerVisible(
+    APP_STATE.layers.hunting,
+    false
+  );
+
+  /*
    * کل استان
    */
 
-  if (value === "all") {
-
-    setLayerVisible(
-      APP_STATE.layers.protected,
-      false
-    );
-
-    setLayerVisible(
-      APP_STATE.layers.hunting,
-      false
-    );
+  if (
+    value === "all"
+  ) {
 
     updateGauge(
       null,
@@ -2468,22 +2732,20 @@ function applyLocationFilter(value) {
     fitFars();
 
     return;
+
   }
 
   /*
    * مناطق چهارگانه
    */
 
-  if (value === "protected") {
+  if (
+    value === "protected"
+  ) {
 
     setLayerVisible(
       APP_STATE.layers.protected,
       true
-    );
-
-    setLayerVisible(
-      APP_STATE.layers.hunting,
-      false
     );
 
     updateFilterGauge(
@@ -2496,18 +2758,16 @@ function applyLocationFilter(value) {
     );
 
     return;
+
   }
 
   /*
    * مناطق شکار ممنوع
    */
 
-  if (value === "hunting") {
-
-    setLayerVisible(
-      APP_STATE.layers.protected,
-      false
-    );
+  if (
+    value === "hunting"
+  ) {
 
     setLayerVisible(
       APP_STATE.layers.hunting,
@@ -2524,7 +2784,9 @@ function applyLocationFilter(value) {
     );
 
     return;
+
   }
+
 }
 
 
@@ -2548,6 +2810,14 @@ function setupLocationFilter() {
     document.getElementById(
       "locationFilter"
     );
+
+  if (
+    !button ||
+    !menu ||
+    !select
+  ) {
+    return;
+  }
 
   button.addEventListener(
     "click",
@@ -2576,8 +2846,12 @@ function setupLocationFilter() {
     event => {
 
       if (
-        !menu.contains(event.target) &&
-        !button.contains(event.target)
+        !menu.contains(
+          event.target
+        ) &&
+        !button.contains(
+          event.target
+        )
       ) {
 
         menu.classList.remove(
@@ -2585,6 +2859,7 @@ function setupLocationFilter() {
         );
 
       }
+
     }
   );
 
@@ -2599,8 +2874,10 @@ function setupLocationFilter() {
       menu.classList.remove(
         "show"
       );
+
     }
   );
+
 }
 
 
@@ -2615,6 +2892,10 @@ function setupFitButton() {
       "fitButton"
     );
 
+  if (!button) {
+    return;
+  }
+
   button.addEventListener(
     "click",
     () => {
@@ -2624,13 +2905,17 @@ function setupFitButton() {
           "locationFilter"
         );
 
-      select.value = "all";
+      if (select) {
+        select.value = "all";
+      }
 
       applyLocationFilter(
         "all"
       );
+
     }
   );
+
 }
 
 
@@ -2644,6 +2929,10 @@ function setupNightMode() {
     document.getElementById(
       "modeButton"
     );
+
+  if (!button) {
+    return;
+  }
 
   button.addEventListener(
     "click",
@@ -2666,8 +2955,10 @@ function setupNightMode() {
         APP_STATE.ui.nightMode
           ? "حالت روز"
           : "حالت شب";
+
     }
   );
+
 }
 
 
@@ -2692,6 +2983,14 @@ function setupAbout() {
       "aboutClose"
     );
 
+  if (
+    !overlay ||
+    !openButton ||
+    !closeButton
+  ) {
+    return;
+  }
+
   openButton.addEventListener(
     "click",
     () => {
@@ -2699,6 +2998,7 @@ function setupAbout() {
       overlay.classList.add(
         "open"
       );
+
     }
   );
 
@@ -2709,6 +3009,7 @@ function setupAbout() {
       overlay.classList.remove(
         "open"
       );
+
     }
   );
 
@@ -2723,7 +3024,9 @@ function setupAbout() {
         overlay.classList.remove(
           "open"
         );
+
       }
+
     }
   );
 
@@ -2738,9 +3041,12 @@ function setupAbout() {
         overlay.classList.remove(
           "open"
         );
+
       }
+
     }
   );
+
 }
 
 
@@ -2758,7 +3064,6 @@ async function startApp() {
 
     /*
      * Grid و Metadata اختیاری هستند.
-     * اگر Metadata موجود نباشد، نباید کل سایت از کار بیفتد.
      */
 
     await Promise.all([
@@ -2766,18 +3071,30 @@ async function startApp() {
       loadGrid()
     ]);
 
+    /*
+     * مرز استان
+     */
+
     await loadFars();
+
+    /*
+     * لایه FLI
+     */
 
     await loadFLI();
 
     /*
-     * لایه‌های مکانی مستقل از FLI بارگذاری می‌شوند.
+     * لایه‌های مناطق
      */
 
     await Promise.all([
       loadProtected(),
       loadHunting()
     ]);
+
+    /*
+     * وضعیت اولیه
+     */
 
     setLayerVisible(
       APP_STATE.layers.fli,
@@ -2794,6 +3111,10 @@ async function startApp() {
       false
     );
 
+    /*
+     * رویدادها
+     */
+
     setupMapClick();
 
     setupLocationFilter();
@@ -2803,6 +3124,10 @@ async function startApp() {
     setupNightMode();
 
     setupAbout();
+
+    /*
+     * نمایش کل استان
+     */
 
     fitFars();
 
@@ -2855,7 +3180,9 @@ async function startApp() {
     document.body.appendChild(
       message
     );
+
   }
+
 }
 
 
