@@ -635,7 +635,7 @@ for="locationFilter"
 </option>
 
 <option value="protected">
-مناطق شکارممنوع
+مناطق شکار ممنوع
 </option>
 
 <option value="hunting">
@@ -1998,7 +1998,7 @@ function bindRegion(
   const fallback =
     regionType === "protected"
       ? "منطقه چهارگانه"
-      : "منطقه چهارگانه";
+      : "منطقه شکار ممنوع";
 
   const name =
     getRegionName(
@@ -2404,7 +2404,7 @@ function updateFilterGauge(
       null,
       regionType === "protected"
         ? "مناطق چهارگانه"
-        : "مناطق چهارگانه",
+        : "مناطق شکار ممنوع",
       "برای این محدوده داده FLI موجود نیست"
     );
 
@@ -2419,7 +2419,7 @@ function updateFilterGauge(
     mean,
     regionType === "protected"
       ? "مناطق چهارگانه"
-      : "مناطق چهارگانه",
+      : "مناطق شکار ممنوع",
     `${formatNumber(regionCount)} محدوده | ${formatNumber(totalCells)} سلول`
   );
 }
