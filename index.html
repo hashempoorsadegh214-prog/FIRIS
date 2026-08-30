@@ -635,11 +635,11 @@ for="locationFilter"
 </option>
 
 <option value="protected">
-مناطق چهارگانه
+مناطق شکارممنوع
 </option>
 
 <option value="hunting">
-مناطق شکار ممنوع
+مناطق چهارگانه
 </option>
 
 </select>
@@ -846,7 +846,7 @@ type="button"
 </table>
 
 <div class="about-note">
-💡 با کلیک روی نقشه یا تعیین منطقه مورد نظر، مقدار شاخص خطر حریق در نقطه انتخاب‌شده نمایش داده می‌شود.
+💡 با کلیک روی نقشه، مقدار شاخص خطر حریق در نقطه انتخاب‌شده نمایش داده می‌شود.
 </div>
 
 </div>
@@ -1997,7 +1997,7 @@ function bindRegion(
 
   const fallback =
     regionType === "protected"
-      ? "منطقه شکار ممنوع"
+      ? "منطقه چهارگانه"
       : "منطقه چهارگانه";
 
   const name =
@@ -2090,7 +2090,7 @@ function bindRegion(
         name,
         regionType === "protected"
           ? "مناطق چهارگانه"
-          : "مناطق شکار ممنوع"
+          : "مناطق چهارگانه"
       );
 
     }
@@ -2419,7 +2419,7 @@ function updateFilterGauge(
     mean,
     regionType === "protected"
       ? "مناطق چهارگانه"
-      : "مناطق شکار ممنوع",
+      : "مناطق چهارگانه",
     `${formatNumber(regionCount)} محدوده | ${formatNumber(totalCells)} سلول`
   );
 }
