@@ -1548,8 +1548,8 @@ def main():
 
         build_region_sheet(
             workbook,
-            "مناطق_چهارگانه",
-            "مناطق چهارگانه",
+            "مناطق_شکار_ممنوع",
+            "مناطق_شکار_ممنوع",
             protected_geojson,
             src,
             styles
@@ -1557,8 +1557,8 @@ def main():
 
         build_region_sheet(
             workbook,
-            "مناطق_شکار_ممنوع",
-            "مناطق شکار ممنوع",
+            "مناطق چهارگانه",
+            "مناطق چهارگانه",
             hunting_geojson,
             src,
             styles
