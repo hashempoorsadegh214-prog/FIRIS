@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="fa" dir="rtl">
 
 <head>
@@ -65,6 +66,7 @@ a {
   flex-direction: column;
 }
 
+
 /* ============================================================
    HEADER
    ============================================================ */
@@ -78,21 +80,73 @@ a {
   justify-content: center;
   padding: 10px 20px;
   color: white;
+
   background: linear-gradient(
     135deg,
     #e52e2e 0%,
     #c31313 50%,
     #8c0505 100%
   );
+
   box-shadow: var(--shadow-lg);
   z-index: 3000;
 }
+
+
+/* ============================================================
+   LOGO - LEFT
+   ============================================================ */
+
+.header-logo {
+  position: absolute;
+  left: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  width: 68px;
+  height: 68px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 20;
+}
+
+.header-logo img {
+  display: block;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: contain;
+
+  /*
+   * تبدیل لوگو به سفید
+   */
+  filter:
+    brightness(0)
+    invert(1);
+
+  opacity: .98;
+
+  transition: var(--transition);
+}
+
+.header-logo img:hover {
+  transform: scale(1.05);
+}
+
+
+/* ============================================================
+   HEADER CENTER
+   ============================================================ */
 
 .header-center {
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: 0 170px;
+  padding: 0 190px;
 }
 
 .header-title {
@@ -109,118 +163,152 @@ a {
   font-weight: 600;
 }
 
+
+/* ============================================================
+   FORECAST BADGE
+   ============================================================ */
+
 .header-subtitle-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+
   margin-top: 5px;
   padding: 3px 11px;
+
   background: rgba(0,0,0,.28);
   border: 1px solid rgba(255,255,255,.25);
   border-radius: 18px;
+
   font-size: 11px;
 }
 
-/* ============================================================
-   چراغ سبز وضعیت پیش‌بینی
-   ============================================================ */
+
+/*
+ * چراغ سبز
+ */
 
 .header-subtitle-badge .bullet {
   width: 7px;
   height: 7px;
-  display: inline-block;
-  flex: 0 0 7px;
+
   background: #4ade80;
+
   border-radius: 50%;
 
-  /*
-   * چراغ به صورت واقعی روشن و خاموش می‌شود.
-   */
-  animation: forecastLedBlink 1s steps(1, end) infinite;
+  box-shadow:
+    0 0 5px #4ade80,
+    0 0 10px rgba(74,222,128,.85);
+
+  flex-shrink: 0;
+
+  animation:
+    forecastLedBlink
+    1.2s
+    ease-in-out
+    infinite;
 }
+
 
 @keyframes forecastLedBlink {
 
-  /*
-   * روشن
-   */
-  0% {
-    opacity: 1;
-    background: #4ade80;
-    box-shadow:
-      0 0 5px #4ade80,
-      0 0 10px #4ade80,
-      0 0 16px rgba(74, 222, 128, .8);
-  }
-
-  /*
-   * خاموش
-   */
-  50% {
-    opacity: 0;
-    background: #4ade80;
-    box-shadow: none;
-  }
-
-  /*
-   * دوباره روشن
-   */
+  0%,
   100% {
-    opacity: 1;
-    background: #4ade80;
+    opacity: .30;
+
+    transform:
+      scale(.78);
+
     box-shadow:
-      0 0 5px #4ade80,
-      0 0 10px #4ade80,
-      0 0 16px rgba(74, 222, 128, .8);
+      0 0 3px #4ade80,
+      0 0 6px rgba(74,222,128,.35);
+  }
+
+  50% {
+    opacity: 1;
+
+    transform:
+      scale(1.18);
+
+    box-shadow:
+      0 0 7px #4ade80,
+      0 0 14px rgba(74,222,128,.95),
+      0 0 20px rgba(74,222,128,.55);
   }
 
 }
 
+
 /* ============================================================
-   BUTTONS
+   HEADER BUTTONS - RIGHT
    ============================================================ */
 
 .header-buttons-group {
   position: absolute;
-  left: 20px;
+
+  right: 20px;
+  left: auto;
+
   top: 50%;
   transform: translateY(-50%);
+
   display: flex;
   align-items: center;
+
   gap: 7px;
+
   padding: 6px 9px;
+
   background: rgba(255,255,255,.08);
   border: 1px solid rgba(255,255,255,.15);
   border-radius: 10px;
+
   z-index: 10;
 }
+
+
+/* ============================================================
+   HEADER BUTTON
+   ============================================================ */
 
 .header-btn {
   width: 38px;
   height: 38px;
+
   display: inline-flex;
   align-items: center;
   justify-content: center;
+
   border: 1px solid var(--border);
   border-radius: 8px;
+
   background: var(--panel);
   color: var(--text);
+
   cursor: pointer;
   text-decoration: none;
+
   font-size: 16px;
   line-height: 1;
+
   transition: var(--transition);
+
   flex-shrink: 0;
 }
 
 .header-btn:hover {
   background: #f8f9fa;
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+
+  transform:
+    translateY(-2px);
+
+  box-shadow:
+    var(--shadow-md);
 }
 
 .header-btn:active {
-  transform: translateY(0);
+  transform:
+    translateY(0);
 }
 
 .header-btn.primary {
@@ -233,27 +321,47 @@ a {
   background: #125523;
 }
 
+
 /* ============================================================
-   FILTER
+   DROPDOWN COMMON
    ============================================================ */
 
 .dropdown {
   position: relative;
 }
 
+
+/*
+ * منوی فیلتر مکانی
+ */
+
 .dropdown-menu {
   position: absolute;
+
   top: calc(100% + 9px);
-  left: 0;
+  right: 0;
+  left: auto;
+
   width: 285px;
+
   margin: 0;
   padding: 12px;
+
   list-style: none;
+
   background: var(--panel);
-  border: 1px solid var(--border-light);
+
+  border:
+    1px solid
+    var(--border-light);
+
   border-radius: 12px;
-  box-shadow: var(--shadow-lg);
+
+  box-shadow:
+    var(--shadow-lg);
+
   z-index: 6000;
+
   display: none;
 }
 
@@ -261,19 +369,41 @@ a {
   display: block;
 }
 
+
+/*
+ * منوی مستقل آرشیو
+ */
+
+.archive-menu {
+  width: 285px;
+}
+
+
+/* ============================================================
+   FILTER
+   ============================================================ */
+
 .location-filter-title {
   font-size: 15px;
   font-weight: 900;
+
   color: var(--text);
+
   margin-bottom: 10px;
   padding-bottom: 9px;
-  border-bottom: 1px solid var(--border-light);
+
+  border-bottom:
+    1px solid
+    var(--border-light);
 }
 
 .location-filter-label {
   display: block;
+
   margin-bottom: 6px;
+
   color: var(--text-light);
+
   font-size: 12px;
   font-weight: 700;
 }
@@ -281,31 +411,50 @@ a {
 .filter-select {
   width: 100%;
   height: 40px;
+
   padding: 5px 10px;
-  border: 1px solid var(--border);
+
+  border:
+    1px solid
+    var(--border);
+
   border-radius: 8px;
+
   background: white;
   color: var(--text);
+
   font-size: 13px;
   font-weight: 700;
+
   outline: none;
   cursor: pointer;
 }
 
 .filter-select:focus {
-  border-color: var(--green);
-  box-shadow: 0 0 0 2px rgba(23,107,44,.10);
+  border-color:
+    var(--green);
+
+  box-shadow:
+    0 0 0 2px
+    rgba(23,107,44,.10);
 }
 
 .filter-description {
   margin-top: 9px;
+
   padding: 8px;
+
   background: #f5f7f8;
+
   border-radius: 7px;
+
   color: var(--muted);
+
   font-size: 10px;
+
   line-height: 1.7;
 }
+
 
 /* ============================================================
    MAP
@@ -313,6 +462,7 @@ a {
 
 #map-wrap {
   position: relative;
+
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -331,22 +481,30 @@ a {
   display: none;
 }
 
+
 /* ============================================================
    NIGHT
    ============================================================ */
 
 #nightOverlay {
   position: absolute;
+
   inset: 0;
+
   z-index: 1000;
+
   pointer-events: none;
+
   display: none;
-  background: rgba(20,25,35,.20);
+
+  background:
+    rgba(20,25,35,.20);
 }
 
 body.night #nightOverlay {
   display: block;
 }
+
 
 /* ============================================================
    GAUGE
@@ -354,49 +512,75 @@ body.night #nightOverlay {
 
 .gauge-panel {
   position: absolute;
+
   top: 20px;
   right: 20px;
+
   width: 270px;
+
   background: var(--panel);
-  border: 1px solid var(--border-light);
+
+  border:
+    1px solid
+    var(--border-light);
+
   border-radius: 14px;
-  box-shadow: var(--shadow-lg);
+
+  box-shadow:
+    var(--shadow-lg);
+
   padding: 17px;
+
   z-index: 1400;
+
   text-align: center;
 }
 
 .gauge-title {
   font-size: 14px;
   font-weight: 800;
+
   margin-bottom: 12px;
 }
 
 .gauge {
   width: 145px;
   height: 145px;
-  margin: 0 auto 12px;
+
+  margin:
+    0 auto 12px;
+
   border-radius: 50%;
-  background: conic-gradient(
-    #2e7d32 0deg 72deg,
-    #fdd835 72deg 144deg,
-    #fb8c00 144deg 216deg,
-    #e53935 216deg 288deg,
-    #880e4f 288deg 360deg
-  );
+
+  background:
+    conic-gradient(
+      #2e7d32 0deg 72deg,
+      #fdd835 72deg 144deg,
+      #fb8c00 144deg 216deg,
+      #e53935 216deg 288deg,
+      #880e4f 288deg 360deg
+    );
+
   display: flex;
+
   align-items: center;
   justify-content: center;
+
   position: relative;
 }
 
 .gauge::before {
   content: "";
+
   position: absolute;
+
   width: 110px;
   height: 110px;
+
   border-radius: 50%;
-  background: var(--panel);
+
+  background:
+    var(--panel);
 }
 
 .gauge-content {
@@ -407,28 +591,39 @@ body.night #nightOverlay {
 .gauge-value {
   font-size: 31px;
   font-weight: 900;
+
   line-height: 1;
 }
 
 .gauge-label {
   margin-top: 5px;
+
   font-size: 12px;
   font-weight: 800;
 }
 
 .gauge-location {
   font-size: 11px;
+
   color: var(--muted);
+
   line-height: 1.6;
+
   margin-top: 8px;
   padding-top: 9px;
-  border-top: 1px solid var(--border-light);
+
+  border-top:
+    1px solid
+    var(--border-light);
 }
 
 .gauge-legend-bar {
   margin-top: 9px;
   padding-top: 8px;
-  border-top: 1px solid var(--border-light);
+
+  border-top:
+    1px solid
+    var(--border-light);
 }
 
 .gauge-legend-items {
@@ -438,12 +633,17 @@ body.night #nightOverlay {
 
 .gauge-legend-chip {
   flex: 1;
+
   font-size: 8px;
   font-weight: 700;
+
   padding: 4px 2px;
+
   border-radius: 4px;
+
   color: white;
 }
+
 
 /* ============================================================
    POPUPS
@@ -452,6 +652,7 @@ body.night #nightOverlay {
 .leaflet-popup-content {
   margin: 0 !important;
   padding: 0 !important;
+
   direction: rtl;
   text-align: center;
 }
@@ -459,7 +660,9 @@ body.night #nightOverlay {
 .fli-popup,
 .region-popup {
   min-width: 230px;
+
   padding: 12px;
+
   direction: rtl;
   text-align: center;
 }
@@ -467,31 +670,42 @@ body.night #nightOverlay {
 .popup-title {
   font-size: 14px;
   font-weight: 900;
+
   margin-bottom: 7px;
 }
 
 .popup-risk {
   display: inline-block;
+
   padding: 5px 11px;
+
   border-radius: 7px;
+
   color: white;
+
   font-size: 12px;
   font-weight: 800;
+
   margin: 3px 0 5px;
 }
 
 .popup-value {
   font-size: 12px;
   font-weight: 800;
+
   margin-top: 4px;
 }
 
 .popup-coord {
   color: var(--muted);
+
   font-size: 10px;
+
   margin-top: 7px;
+
   line-height: 1.5;
 }
+
 
 /* ============================================================
    ABOUT
@@ -499,13 +713,22 @@ body.night #nightOverlay {
 
 .about-overlay {
   position: fixed;
+
   inset: 0;
+
   display: none;
+
   align-items: center;
   justify-content: center;
+
   padding: 20px;
-  background: rgba(0,0,0,.5);
-  backdrop-filter: blur(4px);
+
+  background:
+    rgba(0,0,0,.5);
+
+  backdrop-filter:
+    blur(4px);
+
   z-index: 7000;
 }
 
@@ -515,28 +738,45 @@ body.night #nightOverlay {
 
 .about-box {
   width: min(680px,96vw);
+
   max-height: 88vh;
+
   overflow-y: auto;
-  background: var(--panel);
+
+  background:
+    var(--panel);
+
   border-radius: 15px;
-  box-shadow: var(--shadow-lg);
+
+  box-shadow:
+    var(--shadow-lg);
+
   padding: 25px;
+
   direction: rtl;
   text-align: right;
 }
 
 .about-header {
   display: flex;
+
   align-items: center;
   justify-content: space-between;
+
   margin-bottom: 17px;
   padding-bottom: 13px;
-  border-bottom: 2px solid var(--border-light);
+
+  border-bottom:
+    2px solid
+    var(--border-light);
 }
 
 .about-title {
   margin: 0;
-  color: var(--red-main);
+
+  color:
+    var(--red-main);
+
   font-size: 22px;
   font-weight: 900;
 }
@@ -544,20 +784,32 @@ body.night #nightOverlay {
 .about-close {
   width: 38px;
   height: 38px;
-  border: 1px solid var(--border-light);
+
+  border:
+    1px solid
+    var(--border-light);
+
   border-radius: 9px;
+
   background: #f8f9fa;
+
   cursor: pointer;
+
   font-size: 20px;
+
   display: flex;
+
   align-items: center;
   justify-content: center;
 }
 
 .about-text {
   font-size: 13px;
+
   line-height: 1.8;
-  color: var(--text-light);
+
+  color:
+    var(--text-light);
 }
 
 .about-text p {
@@ -566,33 +818,51 @@ body.night #nightOverlay {
 
 .about-table {
   width: 100%;
+
   border-collapse: collapse;
+
   margin-top: 13px;
+
   font-size: 12px;
 }
 
 .about-table th,
 .about-table td {
-  border: 1px solid var(--border-light);
+  border:
+    1px solid
+    var(--border-light);
+
   padding: 9px;
+
   text-align: right;
 }
 
 .about-table th {
   background: #f1f3f5;
+
   font-weight: 800;
 }
 
 .about-note {
   margin-top: 13px;
+
   padding: 11px;
+
   border-radius: 9px;
+
   background: #e8f5e9;
-  border: 1px solid #c8e6c9;
+
+  border:
+    1px solid
+    #c8e6c9;
+
   font-size: 12px;
+
   line-height: 1.8;
+
   color: #2e7d32;
 }
+
 
 /* ============================================================
    MOBILE
@@ -608,8 +878,19 @@ body.night #nightOverlay {
     padding: 6px 8px;
   }
 
+  .header-logo {
+    left: 8px;
+
+    width: 48px;
+    height: 48px;
+  }
+
   .header-center {
-    padding: 0 125px 0 10px;
+    padding:
+      0
+      115px
+      0
+      65px;
   }
 
   .header-title {
@@ -625,26 +906,36 @@ body.night #nightOverlay {
   }
 
   .header-buttons-group {
-    left: 8px;
+    right: 8px;
+    left: auto;
+
     gap: 4px;
+
     padding: 4px;
   }
 
   .header-btn {
     width: 34px;
     height: 34px;
+
     font-size: 13px;
   }
 
-  .dropdown-menu {
+  .dropdown-menu,
+  .archive-menu {
     width: 245px;
+
+    right: 0;
+    left: auto;
   }
 
   .gauge-panel {
     top: auto;
     right: 10px;
     bottom: 10px;
+
     width: 215px;
+
     padding: 10px;
   }
 
@@ -668,17 +959,97 @@ body.night #nightOverlay {
 
 }
 
+
+/* ============================================================
+   VERY SMALL MOBILE
+   ============================================================ */
+
+@media (max-width: 480px) {
+
+  .header-logo {
+    width: 42px;
+    height: 42px;
+
+    left: 5px;
+  }
+
+  .header-center {
+    padding:
+      0
+      110px
+      0
+      55px;
+  }
+
+  .header-title {
+    font-size: 13px;
+  }
+
+  .header-subtitle-badge {
+    font-size: 8px;
+
+    padding:
+      2px 7px;
+  }
+
+  .header-buttons-group {
+    right: 5px;
+
+    gap: 2px;
+
+    padding: 3px;
+  }
+
+  .header-btn {
+    width: 31px;
+    height: 31px;
+
+    font-size: 12px;
+  }
+
+}
+
 </style>
 
 </head>
+
 
 <body>
 
 <div id="app">
 
+
+<!-- ============================================================
+     HEADER
+     ============================================================ -->
+
 <header class="header">
 
+
+<!-- ============================================================
+     LOGO
+     ============================================================ -->
+
+<div class="header-logo">
+
+  <img
+    src="logo.webp"
+    alt="لوگوی سامانه"
+  >
+
+</div>
+
+
+<!-- ============================================================
+     BUTTONS - RIGHT
+     ============================================================ -->
+
 <div class="header-buttons-group">
+
+
+<!-- ============================================================
+     LOCATION FILTER
+     ============================================================ -->
 
 <div class="dropdown">
 
@@ -688,13 +1059,21 @@ class="header-btn"
 title="فیلتر مکانی"
 aria-label="فیلتر مکانی"
 type="button"
-> 🗺️</button>
+>
+🗺️
+</button>
 
-<div id="layersMenu" class="dropdown-menu">
+
+<div
+id="layersMenu"
+class="dropdown-menu"
+>
+
 
 <div class="location-filter-title">
 فیلتر مکانی
 </div>
+
 
 <label
 class="location-filter-label"
@@ -703,7 +1082,11 @@ for="locationFilter"
 محدوده مورد نظر
 </label>
 
-<select id="locationFilter" class="filter-select">
+
+<select
+id="locationFilter"
+class="filter-select"
+>
 
 <option value="all">
 کل استان فارس
@@ -719,13 +1102,44 @@ for="locationFilter"
 
 </select>
 
+
 <div class="filter-description">
 با انتخاب محدوده، نقشه به محدوده مورد نظر منتقل شده و لایه مرتبط نمایش داده می‌شود.
 </div>
 
-<div class="location-filter-title" style="margin-top:13px;">
+
+</div>
+
+</div>
+
+
+<!-- ============================================================
+     ARCHIVE BUTTON - SEPARATE
+     ============================================================ -->
+
+<div class="dropdown">
+
+<button
+id="archiveBtn"
+class="header-btn"
+title="آرشیو پیش‌بینی"
+aria-label="آرشیو پیش‌بینی"
+type="button"
+>
+📅
+</button>
+
+
+<div
+id="archiveMenu"
+class="dropdown-menu archive-menu"
+>
+
+
+<div class="location-filter-title">
 آرشیو پیش‌بینی
 </div>
+
 
 <label
 class="location-filter-label"
@@ -734,7 +1148,11 @@ for="archiveFilter"
 تاریخ پیش‌بینی
 </label>
 
-<select id="archiveFilter" class="filter-select">
+
+<select
+id="archiveFilter"
+class="filter-select"
+>
 
 <option value="latest">
 آخرین پیش‌بینی
@@ -742,12 +1160,20 @@ for="archiveFilter"
 
 </select>
 
+
 <div class="filter-description">
 با انتخاب تاریخ، نقشه و اطلاعات همان پیش‌بینی نمایش داده می‌شود.
 </div>
 
+
 </div>
+
 </div>
+
+
+<!-- ============================================================
+     FIT
+     ============================================================ -->
 
 <button
 id="fitButton"
@@ -755,7 +1181,14 @@ class="header-btn primary"
 title="نمایش کامل استان فارس"
 aria-label="نمایش کامل استان فارس"
 type="button"
-> 🌐</button>
+>
+🌐
+</button>
+
+
+<!-- ============================================================
+     NIGHT MODE
+     ============================================================ -->
 
 <button
 id="modeButton"
@@ -763,7 +1196,14 @@ class="header-btn"
 title="حالت شب"
 aria-label="تغییر حالت روز و شب"
 type="button"
-> ☀️</button>
+>
+☀️
+</button>
+
+
+<!-- ============================================================
+     ABOUT
+     ============================================================ -->
 
 <button
 id="aboutButton"
@@ -771,7 +1211,14 @@ class="header-btn"
 title="معرفی سامانه"
 aria-label="معرفی سامانه"
 type="button"
-> ℹ️</button>
+>
+ℹ️
+</button>
+
+
+<!-- ============================================================
+     EXCEL
+     ============================================================ -->
 
 <a
 href="data/report/firis_report.xlsx"
@@ -780,30 +1227,50 @@ rel="noopener"
 class="header-btn primary"
 title="خروجی Excel"
 aria-label="خروجی Excel"
-> 📊</a>
+>
+📊
+</a>
+
 
 </div>
 
+
+<!-- ============================================================
+     HEADER CENTER
+     ============================================================ -->
+
 <div class="header-center">
+
 
 <div class="header-title">
 سامانه پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی
 </div>
 
+
 <div class="header-subtitle">
 استان فارس
 </div>
 
+
 <div class="header-subtitle-badge">
+
 <span class="bullet"></span>
+
 <span id="forecastDateBadge">
 پیش‌بینی برای فردا
 </span>
+
 </div>
+
 
 </div>
 
 </header>
+
+
+<!-- ============================================================
+     MAP
+     ============================================================ -->
 
 <div id="map-wrap">
 
@@ -811,34 +1278,59 @@ aria-label="خروجی Excel"
 
 <div id="nightOverlay"></div>
 
+
+<!-- ============================================================
+     GAUGE
+     ============================================================ -->
+
 <div class="gauge-panel">
+
 
 <div class="gauge-title">
 وضعیت انتخاب‌شده
 </div>
 
+
 <div class="gauge">
+
 
 <div class="gauge-content">
 
-<div id="gaugeValue" class="gauge-value">
+
+<div
+id="gaugeValue"
+class="gauge-value"
+>
 —
 </div>
 
-<div id="gaugeLabel" class="gauge-label">
+
+<div
+id="gaugeLabel"
+class="gauge-label"
+>
 انتخاب کنید
 </div>
 
-</div>
+
 </div>
 
-<div id="gaugeLocation" class="gauge-location">
+</div>
+
+
+<div
+id="gaugeLocation"
+class="gauge-location"
+>
 —
 </div>
 
+
 <div class="gauge-legend-bar">
 
+
 <div class="gauge-legend-items">
+
 
 <span
 class="gauge-legend-chip"
@@ -847,12 +1339,14 @@ style="background:#2e7d32"
 کم
 </span>
 
+
 <span
 class="gauge-legend-chip"
 style="background:#fdd835;color:#222"
 >
 متوسط
 </span>
+
 
 <span
 class="gauge-legend-chip"
@@ -861,12 +1355,14 @@ style="background:#fb8c00"
 زیاد
 </span>
 
+
 <span
 class="gauge-legend-chip"
 style="background:#e53935"
 >
 خیلی زیاد
 </span>
+
 
 <span
 class="gauge-legend-chip"
@@ -875,14 +1371,25 @@ style="background:#880e4f"
 بحرانی
 </span>
 
-</div>
-</div>
 
 </div>
 
 </div>
 
-<div id="aboutOverlay" class="about-overlay">
+</div>
+
+</div>
+
+
+<!-- ============================================================
+     ABOUT
+     ============================================================ -->
+
+<div
+id="aboutOverlay"
+class="about-overlay"
+>
+
 
 <div
 class="about-box"
@@ -891,11 +1398,17 @@ aria-modal="true"
 aria-labelledby="aboutTitle"
 >
 
+
 <div class="about-header">
 
-<h2 id="aboutTitle" class="about-title">
+
+<h2
+id="aboutTitle"
+class="about-title"
+>
 معرفی سامانه
 </h2>
+
 
 <button
 id="aboutClose"
@@ -903,73 +1416,150 @@ class="about-close"
 title="بستن"
 aria-label="بستن"
 type="button"
-> ×</button>
+>
+×
+</button>
+
 
 </div>
 
+
 <div class="about-text">
+
 
 <p>
 این سامانه برای پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی استان فارس طراحی شده است.
 </p>
 
+
 <p>
 شاخص خطر حریق از ترکیب سه مؤلفه اصلی هواشناسی، سوخت و توپوگرافی تولید می‌شود.
 </p>
 
+
 <table class="about-table">
 
+
 <thead>
+
 <tr>
-<th>مؤلفه</th>
-<th>نقش</th>
-<th>منطق</th>
+
+<th>
+مؤلفه
+</th>
+
+<th>
+نقش
+</th>
+
+<th>
+منطق
+</th>
+
 </tr>
+
 </thead>
+
 
 <tbody>
 
-<tr>
-<td>FWI</td>
-<td>هواشناسی حریق</td>
-<td>شرایط جوی</td>
-</tr>
 
 <tr>
-<td>Fuel</td>
-<td>سوخت</td>
-<td>مواد قابل اشتعال</td>
+
+<td>
+FWI
+</td>
+
+<td>
+هواشناسی حریق
+</td>
+
+<td>
+شرایط جوی
+</td>
+
 </tr>
 
-<tr>
-<td>Topography</td>
-<td>توپوگرافی</td>
-<td>اثر شیب</td>
-</tr>
 
 <tr>
-<td>FLI</td>
-<td>شاخص ترکیبی</td>
-<td>ترکیب مؤلفه‌ها</td>
+
+<td>
+Fuel
+</td>
+
+<td>
+سوخت
+</td>
+
+<td>
+مواد قابل اشتعال
+</td>
+
 </tr>
+
+
+<tr>
+
+<td>
+Topography
+</td>
+
+<td>
+توپوگرافی
+</td>
+
+<td>
+اثر شیب
+</td>
+
+</tr>
+
+
+<tr>
+
+<td>
+FLI
+</td>
+
+<td>
+شاخص ترکیبی
+</td>
+
+<td>
+ترکیب مؤلفه‌ها
+</td>
+
+</tr>
+
 
 </tbody>
+
 </table>
+
 
 <div class="about-note">
 💡 با کلیک روی نقشه، مقدار شاخص خطر حریق در نقطه انتخاب‌شده نمایش داده می‌شود.
 </div>
 
+
 </div>
-</div>
+
 </div>
 
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</div>
+
+
+<script
+src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
 
 <script>
+
 "use strict";
+
 
 /* ============================================================
    APP STATE
@@ -1009,7 +1599,9 @@ const APP_STATE = {
 function setupTomorrowDate() {
 
   const badge =
-    document.getElementById("forecastDateBadge");
+    document.getElementById(
+      "forecastDateBadge"
+    );
 
   if (!badge) {
     return;
@@ -1047,6 +1639,7 @@ function setupTomorrowDate() {
 
     badge.textContent =
       "پیش‌بینی برای فردا";
+
   }
 
 }
@@ -1084,9 +1677,11 @@ async function fetchWithTimeout(
     clearTimeout(timer);
 
     if (!response.ok) {
+
       throw new Error(
         `HTTP ${response.status}`
       );
+
     }
 
     return response;
@@ -1098,10 +1693,15 @@ async function fetchWithTimeout(
     if (
       error.name === "AbortError"
     ) {
-      throw new Error("Timeout");
+
+      throw new Error(
+        "Timeout"
+      );
+
     }
 
     throw error;
+
   }
 
 }
@@ -1119,7 +1719,9 @@ function formatNumber(value) {
   if (
     !Number.isFinite(number)
   ) {
+
     return "—";
+
   }
 
   return number.toLocaleString(
@@ -1226,7 +1828,9 @@ function updateGauge(
     !labelElement ||
     !locationElement
   ) {
+
     return;
+
   }
 
   if (
@@ -1248,6 +1852,7 @@ function updateGauge(
       subtitle || "—";
 
     return;
+
   }
 
   const risk =
@@ -1454,7 +2059,7 @@ async function loadGrid() {
 
 
 /* ============================================================
-   ARCHIVE
+   ARCHIVE DATE FORMAT
    ============================================================ */
 
 function formatArchiveDate(
@@ -1464,8 +2069,12 @@ function formatArchiveDate(
   const parts =
     String(isoDate).split("-");
 
-  if (parts.length !== 3) {
+  if (
+    parts.length !== 3
+  ) {
+
     return String(isoDate);
+
   }
 
   const date =
@@ -1498,6 +2107,10 @@ function formatArchiveDate(
 }
 
 
+/* ============================================================
+   FORECAST BADGE
+   ============================================================ */
+
 function updateForecastBadgeFromMetadata() {
 
   const badge =
@@ -1525,6 +2138,10 @@ function updateForecastBadgeFromMetadata() {
 
 }
 
+
+/* ============================================================
+   LOAD ARCHIVE DATES
+   ============================================================ */
 
 async function loadArchiveDates() {
 
@@ -1556,21 +2173,25 @@ async function loadArchiveDates() {
 
     APP_STATE.data.archiveDates =
       dates
-        .map(item =>
-          typeof item === "string"
-            ? item
-            : item?.date
+        .map(
+          item =>
+            typeof item === "string"
+              ? item
+              : item?.date
         )
         .filter(Boolean)
         .sort();
 
     const current =
-      select.value || "latest";
+      select.value ||
+      "latest";
 
     select.innerHTML = "";
 
     const latestOption =
-      document.createElement("option");
+      document.createElement(
+        "option"
+      );
 
     latestOption.value =
       "latest";
@@ -1585,30 +2206,39 @@ async function loadArchiveDates() {
     APP_STATE.data.archiveDates
       .slice()
       .reverse()
-      .forEach(date => {
+      .forEach(
+        date => {
 
-        const option =
-          document.createElement("option");
+          const option =
+            document.createElement(
+              "option"
+            );
 
-        option.value =
-          date;
+          option.value =
+            date;
 
-        option.textContent =
-          formatArchiveDate(date);
+          option.textContent =
+            formatArchiveDate(
+              date
+            );
 
-        select.appendChild(
-          option
-        );
+          select.appendChild(
+            option
+          );
 
-      });
+        }
+      );
 
     if (
       current !== "latest" &&
-      APP_STATE.data.archiveDates.includes(current)
+      APP_STATE.data.archiveDates.includes(
+        current
+      )
     ) {
 
       select.value =
         current;
+
     }
 
   } catch (error) {
@@ -1622,6 +2252,10 @@ async function loadArchiveDates() {
 
 }
 
+
+/* ============================================================
+   LOAD ARCHIVE FORECAST
+   ============================================================ */
 
 async function loadArchiveForecast(
   date
@@ -1657,10 +2291,13 @@ async function loadArchiveForecast(
     updateForecastBadgeFromMetadata();
 
     return;
+
   }
+
 
   const base =
     `data/web/archive/${date}/`;
+
 
   const responses =
     await Promise.all([
@@ -1679,6 +2316,7 @@ async function loadArchiveForecast(
 
     ]);
 
+
   const metadata =
     await responses[0].json();
 
@@ -1687,6 +2325,7 @@ async function loadArchiveForecast(
 
   const polygons =
     await responses[2].json();
+
 
   if (
     !grid ||
@@ -1698,7 +2337,9 @@ async function loadArchiveForecast(
     throw new Error(
       "آرشیو Grid معتبر نیست."
     );
+
   }
+
 
   if (
     !polygons ||
@@ -1709,7 +2350,9 @@ async function loadArchiveForecast(
     throw new Error(
       "آرشیو FLI معتبر نیست."
     );
+
   }
+
 
   APP_STATE.data.fliMetadata =
     metadata;
@@ -1719,6 +2362,7 @@ async function loadArchiveForecast(
 
   APP_STATE.data.currentArchiveDate =
     date;
+
 
   if (
     APP_STATE.layers.fli &&
@@ -1732,6 +2376,7 @@ async function loadArchiveForecast(
     );
 
   }
+
 
   APP_STATE.layers.fli =
     L.geoJSON(
@@ -1759,14 +2404,20 @@ async function loadArchiveForecast(
       }
     );
 
+
   APP_STATE.layers.fli.addTo(
     APP_STATE.map
   );
+
 
   updateForecastBadgeFromMetadata();
 
 }
 
+
+/* ============================================================
+   ARCHIVE FILTER
+   ============================================================ */
 
 function setupArchiveFilter() {
 
@@ -1775,9 +2426,79 @@ function setupArchiveFilter() {
       "archiveFilter"
     );
 
-  if (!select) {
+  const button =
+    document.getElementById(
+      "archiveBtn"
+    );
+
+  const menu =
+    document.getElementById(
+      "archiveMenu"
+    );
+
+  if (
+    !select ||
+    !button ||
+    !menu
+  ) {
+
     return;
+
   }
+
+
+  /*
+   * باز و بسته کردن منوی آرشیو
+   */
+
+  button.addEventListener(
+    "click",
+    event => {
+
+      event.stopPropagation();
+
+      /*
+       * منوی فیلتر مکانی بسته شود.
+       */
+
+      const locationMenu =
+        document.getElementById(
+          "layersMenu"
+        );
+
+      if (locationMenu) {
+
+        locationMenu.classList.remove(
+          "show"
+        );
+
+      }
+
+      menu.classList.toggle(
+        "show"
+      );
+
+    }
+  );
+
+
+  /*
+   * کلیک داخل منو نباید باعث بسته شدن آن شود.
+   */
+
+  menu.addEventListener(
+    "click",
+    event => {
+
+      event.stopPropagation();
+
+    }
+  );
+
+
+  /*
+   * انتخاب تاریخ
+   */
 
   select.addEventListener(
     "change",
@@ -1802,6 +2523,33 @@ function setupArchiveFilter() {
         select.value =
           APP_STATE.data.currentArchiveDate ||
           "latest";
+
+      }
+
+    }
+  );
+
+
+  /*
+   * کلیک خارج از منو
+   */
+
+  document.addEventListener(
+    "click",
+    event => {
+
+      if (
+        !menu.contains(
+          event.target
+        ) &&
+        !button.contains(
+          event.target
+        )
+      ) {
+
+        menu.classList.remove(
+          "show"
+        );
 
       }
 
@@ -1913,7 +2661,9 @@ function parseBounds(bounds) {
     !Array.isArray(bounds) ||
     bounds.length < 2
   ) {
+
     return null;
+
   }
 
   const a =
@@ -1928,7 +2678,9 @@ function parseBounds(bounds) {
     a.length < 2 ||
     b.length < 2
   ) {
+
     return null;
+
   }
 
   const y1 =
@@ -1949,7 +2701,9 @@ function parseBounds(bounds) {
     !Number.isFinite(y2) ||
     !Number.isFinite(x2)
   ) {
+
     return null;
+
   }
 
   return {
@@ -2007,7 +2761,9 @@ function getPointValue(
       lon
     )
   ) {
+
     return null;
+
   }
 
   const grid =
@@ -2039,7 +2795,9 @@ function getPointValue(
     cols <= 0 ||
     !Array.isArray(grid.values)
   ) {
+
     return null;
+
   }
 
   const {
@@ -2059,7 +2817,9 @@ function getPointValue(
     latRange <= 0 ||
     lonRange <= 0
   ) {
+
     return null;
+
   }
 
   if (
@@ -2068,7 +2828,9 @@ function getPointValue(
     lon < west ||
     lon > east
   ) {
+
     return null;
+
   }
 
   let row =
@@ -2115,7 +2877,9 @@ function getPointValue(
     value >= 0 &&
     value <= 100
   ) {
+
     return value;
+
   }
 
   return null;
@@ -2134,9 +2898,14 @@ function pointInsideFars(
 
   if (
     !APP_STATE.layers.fars ||
-    !validateCoords(lat, lon)
+    !validateCoords(
+      lat,
+      lon
+    )
   ) {
+
     return false;
+
   }
 
   const point =
@@ -2215,7 +2984,9 @@ function regionStatistics(
     cols <= 0 ||
     !Array.isArray(grid.values)
   ) {
+
     return null;
+
   }
 
   let bbox;
@@ -2235,13 +3006,16 @@ function regionStatistics(
     );
 
     return null;
+
   }
 
   if (
     !Array.isArray(bbox) ||
     bbox.length !== 4
   ) {
+
     return null;
+
   }
 
   const minLon =
@@ -2273,7 +3047,9 @@ function regionStatistics(
     latRange <= 0 ||
     lonRange <= 0
   ) {
+
     return null;
+
   }
 
   let startRow =
@@ -2307,6 +3083,7 @@ function regionStatistics(
         lonRange
       ) * cols
     ) - 1;
+
 
   startRow =
     Math.max(
@@ -2344,17 +3121,22 @@ function regionStatistics(
       )
     );
 
+
   if (
     startRow > endRow ||
     startCol > endCol
   ) {
+
     return null;
+
   }
+
 
   let sum = 0;
   let count = 0;
   let min = Infinity;
   let max = -Infinity;
+
 
   for (
     let row = startRow;
@@ -2369,6 +3151,7 @@ function regionStatistics(
         rows
       ) *
       latRange;
+
 
     for (
       let col = startCol;
@@ -2386,7 +3169,9 @@ function regionStatistics(
         value < 0 ||
         value > 100
       ) {
+
         continue;
+
       }
 
       const lon =
@@ -2412,18 +3197,23 @@ function regionStatistics(
         ) {
 
           sum += value;
+
           count++;
 
           if (
             value < min
           ) {
+
             min = value;
+
           }
 
           if (
             value > max
           ) {
+
             max = value;
+
           }
 
         }
@@ -2441,11 +3231,15 @@ function regionStatistics(
 
   }
 
+
   if (
     count === 0
   ) {
+
     return null;
+
   }
+
 
   return {
 
@@ -2515,7 +3309,7 @@ function getRegionName(
 
 
 /* ============================================================
-   REGION TYPE TITLE
+   REGION TYPE
    ============================================================ */
 
 function getRegionTypeTitle(
@@ -2635,12 +3429,14 @@ function bindRegion(
 
   `;
 
+
   layer.bindPopup(
     popup,
     {
       maxWidth: 280
     }
   );
+
 
   layer.on(
     "click",
@@ -2674,6 +3470,7 @@ function setupMapClick() {
       const lon =
         event.latlng.lng;
 
+
       if (
         APP_STATE.ui.locationFilter !== "all"
       ) {
@@ -2694,6 +3491,7 @@ function setupMapClick() {
 
         let inside = false;
 
+
         for (
           const layer of
           activeLayer.getLayers()
@@ -2709,6 +3507,7 @@ function setupMapClick() {
             ) {
 
               inside = true;
+
               break;
 
             }
@@ -2724,6 +3523,7 @@ function setupMapClick() {
 
         }
 
+
         if (!inside) {
           return;
         }
@@ -2738,16 +3538,20 @@ function setupMapClick() {
             lon
           )
         ) {
+
           return;
+
         }
 
       }
+
 
       const value =
         getPointValue(
           lat,
           lon
         );
+
 
       updateGauge(
         value,
@@ -2759,18 +3563,23 @@ function setupMapClick() {
         `${lat.toFixed(4)}° ، ${lon.toFixed(4)}°`
       );
 
+
       if (
         !Number.isFinite(
           Number(value)
         )
       ) {
+
         return;
+
       }
+
 
       const risk =
         getRisk(
           value
         );
+
 
       const popup = `
 
@@ -2803,6 +3612,7 @@ function setupMapClick() {
         </div>
 
       `;
+
 
       APP_STATE.map.openPopup(
         popup,
@@ -2874,7 +3684,9 @@ function fitFars() {
     !APP_STATE.layers.fars ||
     !APP_STATE.map
   ) {
+
     return;
+
   }
 
   const bounds =
@@ -2883,7 +3695,9 @@ function fitFars() {
   if (
     !bounds.isValid()
   ) {
+
     return;
+
   }
 
   APP_STATE.map.fitBounds(
@@ -2894,6 +3708,7 @@ function fitFars() {
       animate: true
     }
   );
+
 
   setTimeout(
     () => {
@@ -2916,8 +3731,11 @@ function fitLayer(
 ) {
 
   if (!layer) {
+
     fitFars();
+
     return;
+
   }
 
   const bounds =
@@ -2928,6 +3746,7 @@ function fitLayer(
   ) {
 
     fitFars();
+
     return;
 
   }
@@ -2970,9 +3789,13 @@ function updateFilterGauge(
 
   }
 
+
   let totalWeighted = 0;
+
   let totalCells = 0;
+
   let regionCount = 0;
+
 
   for (
     const regionLayer of
@@ -2994,8 +3817,11 @@ function updateFilterGauge(
       ) ||
       stats.count <= 0
     ) {
+
       continue;
+
     }
+
 
     totalWeighted +=
       stats.mean *
@@ -3007,6 +3833,7 @@ function updateFilterGauge(
     regionCount++;
 
   }
+
 
   if (
     totalCells <= 0
@@ -3022,9 +3849,11 @@ function updateFilterGauge(
 
   }
 
+
   const mean =
     totalWeighted /
     totalCells;
+
 
   updateGauge(
     mean,
@@ -3049,6 +3878,7 @@ function applyLocationFilter(
     "hunting"
   ];
 
+
   if (
     !validValues.includes(value)
   ) {
@@ -3057,23 +3887,28 @@ function applyLocationFilter(
 
   }
 
+
   APP_STATE.ui.locationFilter =
     value;
+
 
   setLayerVisible(
     APP_STATE.layers.fli,
     true
   );
 
+
   setLayerVisible(
     APP_STATE.layers.protected,
     false
   );
 
+
   setLayerVisible(
     APP_STATE.layers.hunting,
     false
   );
+
 
   if (
     value === "all"
@@ -3090,6 +3925,7 @@ function applyLocationFilter(
     return;
 
   }
+
 
   if (
     value === "protected"
@@ -3112,6 +3948,7 @@ function applyLocationFilter(
     return;
 
   }
+
 
   if (
     value === "hunting"
@@ -3139,7 +3976,7 @@ function applyLocationFilter(
 
 
 /* ============================================================
-   FILTER UI
+   LOCATION FILTER UI
    ============================================================ */
 
 function setupLocationFilter() {
@@ -3159,13 +3996,17 @@ function setupLocationFilter() {
       "locationFilter"
     );
 
+
   if (
     !button ||
     !menu ||
     !select
   ) {
+
     return;
+
   }
+
 
   button.addEventListener(
     "click",
@@ -3173,12 +4014,32 @@ function setupLocationFilter() {
 
       event.stopPropagation();
 
+
+      /*
+       * منوی آرشیو بسته شود.
+       */
+
+      const archiveMenu =
+        document.getElementById(
+          "archiveMenu"
+        );
+
+      if (archiveMenu) {
+
+        archiveMenu.classList.remove(
+          "show"
+        );
+
+      }
+
+
       menu.classList.toggle(
         "show"
       );
 
     }
   );
+
 
   menu.addEventListener(
     "click",
@@ -3188,6 +4049,7 @@ function setupLocationFilter() {
 
     }
   );
+
 
   document.addEventListener(
     "click",
@@ -3210,6 +4072,7 @@ function setupLocationFilter() {
 
     }
   );
+
 
   select.addEventListener(
     "change",
@@ -3244,6 +4107,7 @@ function setupFitButton() {
     return;
   }
 
+
   button.addEventListener(
     "click",
     () => {
@@ -3254,8 +4118,12 @@ function setupFitButton() {
         );
 
       if (select) {
-        select.value = "all";
+
+        select.value =
+          "all";
+
       }
+
 
       applyLocationFilter(
         "all"
@@ -3268,7 +4136,7 @@ function setupFitButton() {
 
 
 /* ============================================================
-   NIGHT
+   NIGHT MODE
    ============================================================ */
 
 function setupNightMode() {
@@ -3282,6 +4150,7 @@ function setupNightMode() {
     return;
   }
 
+
   button.addEventListener(
     "click",
     () => {
@@ -3289,15 +4158,18 @@ function setupNightMode() {
       APP_STATE.ui.nightMode =
         !APP_STATE.ui.nightMode;
 
+
       document.body.classList.toggle(
         "night",
         APP_STATE.ui.nightMode
       );
 
+
       button.textContent =
         APP_STATE.ui.nightMode
           ? "🌙"
           : "☀️";
+
 
       button.title =
         APP_STATE.ui.nightMode
@@ -3331,13 +4203,17 @@ function setupAbout() {
       "aboutClose"
     );
 
+
   if (
     !overlay ||
     !openButton ||
     !closeButton
   ) {
+
     return;
+
   }
+
 
   openButton.addEventListener(
     "click",
@@ -3350,6 +4226,7 @@ function setupAbout() {
     }
   );
 
+
   closeButton.addEventListener(
     "click",
     () => {
@@ -3360,6 +4237,7 @@ function setupAbout() {
 
     }
   );
+
 
   overlay.addEventListener(
     "click",
@@ -3377,6 +4255,7 @@ function setupAbout() {
 
     }
   );
+
 
   document.addEventListener(
     "keydown",
@@ -3410,34 +4289,66 @@ async function startApp() {
 
     initMap();
 
+
+    /*
+     * Grid و Metadata
+     */
+
     await Promise.all([
       loadFLIData(),
       loadGrid()
     ]);
 
+
+    /*
+     * مرز استان
+     */
+
     await loadFars();
 
+
+    /*
+     * FLI
+     */
+
     await loadFLI();
+
+
+    /*
+     * مناطق
+     */
 
     await Promise.all([
       loadProtected(),
       loadHunting()
     ]);
 
+
+    /*
+     * وضعیت اولیه
+     */
+
     setLayerVisible(
       APP_STATE.layers.fli,
       true
     );
+
 
     setLayerVisible(
       APP_STATE.layers.protected,
       false
     );
 
+
     setLayerVisible(
       APP_STATE.layers.hunting,
       false
     );
+
+
+    /*
+     * رویدادها
+     */
 
     setupMapClick();
 
@@ -3451,11 +4362,27 @@ async function startApp() {
 
     setupAbout();
 
+
+    /*
+     * آرشیو
+     */
+
     await loadArchiveDates();
+
+
+    /*
+     * تاریخ پیش‌بینی
+     */
 
     updateForecastBadgeFromMetadata();
 
+
+    /*
+     * نمایش استان
+     */
+
     fitFars();
+
 
     setTimeout(
       () => {
@@ -3468,9 +4395,11 @@ async function startApp() {
       500
     );
 
+
     console.log(
       "FIRIS initialized successfully."
     );
+
 
   } catch (error) {
 
@@ -3479,29 +4408,49 @@ async function startApp() {
       error
     );
 
+
     const message =
       document.createElement(
         "div"
       );
 
+
     message.style.cssText = `
+
       position:fixed;
+
       top:110px;
+
       left:50%;
+
       transform:translateX(-50%);
+
       z-index:9999;
+
       background:#b40000;
+
       color:white;
+
       padding:12px 20px;
+
       border-radius:8px;
+
       font-family:Tahoma;
+
       font-size:13px;
-      box-shadow:0 4px 15px rgba(0,0,0,.25);
+
+      box-shadow:
+        0 4px 15px
+        rgba(0,0,0,.25);
+
       direction:rtl;
+
     `;
+
 
     message.textContent =
       "خطا در بارگذاری داده‌های سامانه";
+
 
     document.body.appendChild(
       message
@@ -3524,4 +4473,5 @@ document.addEventListener(
 </script>
 
 </body>
+
 </html>
