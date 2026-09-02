@@ -1,4 +1,4 @@
-
+```python
 #!/usr/bin/env python3
 
 """
@@ -13,13 +13,18 @@ FLI = 100 * (
 Spatial rules:
 - FWI is the reference grid.
 - Fuel -> FWI grid using nearest neighbour.
-- Slope is calculated on native DEM first, then aligned to FWI.
+- Slope is calculated on the native DEM.
+- DEM NoData values are NEVER artificially filled.
+- Slope is calculated only where the required neighbouring
+  DEM cells are valid.
+- Native slope is then aligned to the FWI grid.
 - All final calculations are restricted to fars.geojson.
-- NoData is never artificially filled.
+- NoData is preserved.
 - Coverage inside Fars is explicitly reported.
 - All final outputs use the exact FWI reference grid.
-- FLI calculation itself is unchanged.
+- Main FLI weights remain unchanged.
 """
+
 
 from __future__ import annotations
 
@@ -47,9 +52,35 @@ FUEL_WEIGHT = 0.35
 TOPO_WEIGHT = 0.20
 
 FWI_MAX = 100.0
+
+# 45 degrees is the reference point at which
+# the topographic component reaches 1.0.
 SLOPE_REFERENCE = 45.0
 
 OUTPUT_NODATA = -9999.0
+
+
+# ============================================================
+# FUEL COMPONENT WEIGHTS
+# ============================================================
+
+# Available variables in Fuelbeds_metric:
+#
+# W_1hLoad       -> Fine Fuel
+# W_10hLoad      \
+# W_100hLoad      > Dead Wood
+# W_1000hLoad    /
+# Woody Cover    -> Woody Cover
+# Litter Cover   \
+# L_depth         > Litter
+#
+# Canopy Structure is NOT used because it is
+# not present in the supplied Fuelbeds_metric table.
+
+FINE_FUEL_WEIGHT = 0.35
+DEAD_WOOD_WEIGHT = 0.30
+WOODY_COVER_WEIGHT = 0.15
+LITTER_WEIGHT = 0.20
 
 
 # ============================================================
@@ -976,6 +1007,26 @@ def calculate_native_slope(
     dem_path: Path
 ):
 
+    """
+    Calculate slope on the native DEM.
+
+    Method:
+        Central finite differences.
+
+    Important:
+        NoData pixels are NOT filled.
+
+        A slope value is calculated only where:
+        - center DEM pixel is valid
+        - north pixel is valid
+        - south pixel is valid
+        - west pixel is valid
+        - east pixel is valid
+
+    Slope output unit:
+        degrees
+    """
+
     print()
     print(
         "CALCULATING SLOPE ON NATIVE DEM"
@@ -1038,43 +1089,126 @@ def calculate_native_slope(
             f"Y={dy:.3f} m"
         )
 
-        fill_value = float(
-            np.nanmedian(dem)
+        # ----------------------------------------------------
+        # OUTPUT SLOPE
+        # ----------------------------------------------------
+
+        slope = np.full(
+            dem.shape,
+            np.nan,
+            dtype=np.float32
         )
 
-        working = np.where(
-            valid,
-            dem,
-            fill_value
-        ).astype(
-            np.float32
-        )
+        rows, cols = dem.shape
 
-        gradient_y, gradient_x = (
-            np.gradient(
-                working,
-                dy,
-                dx
+        if (
+            rows >= 3
+            and
+            cols >= 3
+        ):
+
+            center = dem[
+                1:-1,
+                1:-1
+            ]
+
+            north = dem[
+                :-2,
+                1:-1
+            ]
+
+            south = dem[
+                2:,
+                1:-1
+            ]
+
+            west = dem[
+                1:-1,
+                :-2
+            ]
+
+            east = dem[
+                1:-1,
+                2:
+            ]
+
+            # ------------------------------------------------
+            # VALIDITY MASK
+            # ------------------------------------------------
+
+            local_valid = (
+
+                np.isfinite(center)
+                &
+                np.isfinite(north)
+                &
+                np.isfinite(south)
+                &
+                np.isfinite(west)
+                &
+                np.isfinite(east)
             )
-        )
 
-        slope_rad = np.arctan(
-            np.sqrt(
-                gradient_x ** 2
+            # ------------------------------------------------
+            # GRADIENTS
+            # ------------------------------------------------
+
+            dzdx = np.full(
+                center.shape,
+                np.nan,
+                dtype=np.float32
+            )
+
+            dzdy = np.full(
+                center.shape,
+                np.nan,
+                dtype=np.float32
+            )
+
+            dzdx[local_valid] = (
+
+                east[local_valid]
+                -
+                west[local_valid]
+
+            ) / (
+                2.0 * dx
+            )
+
+            dzdy[local_valid] = (
+
+                south[local_valid]
+                -
+                north[local_valid]
+
+            ) / (
+                2.0 * dy
+            )
+
+            # ------------------------------------------------
+            # SLOPE
+            # ------------------------------------------------
+
+            gradient = np.sqrt(
+
+                dzdx ** 2
                 +
-                gradient_y ** 2
+                dzdy ** 2
+
             )
-        )
 
-        slope = np.degrees(
-            slope_rad
-        ).astype(
-            np.float32
-        )
+            local_slope = np.degrees(
+                np.arctan(
+                    gradient
+                )
+            )
 
-        slope[
-            ~valid
-        ] = np.nan
+            slope[
+                1:-1,
+                1:-1
+            ][local_valid] = (
+                local_slope[local_valid]
+            )
 
         slope[
             ~np.isfinite(slope)
@@ -1085,6 +1219,17 @@ def calculate_native_slope(
             f"{stats(slope)}"
         )
 
+        valid_slope_count = int(
+            np.sum(
+                np.isfinite(slope)
+            )
+        )
+
+        print(
+            f"Valid native slope pixels: "
+            f"{valid_slope_count:,}"
+        )
+
         return (
             slope,
             src.transform,
@@ -1093,7 +1238,7 @@ def calculate_native_slope(
 
 
 # ============================================================
-# ALIGN SLOPE
+# ALIGN SLOPE TO FWI
 # ============================================================
 
 def align_slope_to_fwi(
@@ -1283,6 +1428,10 @@ def load_fuel_mapping(
             f"  - {column}"
         )
 
+    # --------------------------------------------------------
+    # FUEL CODE
+    # --------------------------------------------------------
+
     code_col = find_column(
 
         df,
@@ -1302,6 +1451,10 @@ def load_fuel_mapping(
             "Could not identify fuel-code column."
         )
 
+    # --------------------------------------------------------
+    # WOODY COVER
+    # --------------------------------------------------------
+
     woody_col = find_column(
 
         df,
@@ -1311,6 +1464,10 @@ def load_fuel_mapping(
             "Woody Cover"
         ]
     )
+
+    # --------------------------------------------------------
+    # FINE FUEL
+    # --------------------------------------------------------
 
     w1_col = find_column(
 
@@ -1322,6 +1479,10 @@ def load_fuel_mapping(
             "W_1hLoad"
         ]
     )
+
+    # --------------------------------------------------------
+    # DEAD WOOD
+    # --------------------------------------------------------
 
     w10_col = find_column(
 
@@ -1356,6 +1517,10 @@ def load_fuel_mapping(
         ]
     )
 
+    # --------------------------------------------------------
+    # LITTER
+    # --------------------------------------------------------
+
     litter_cover_col = find_column(
 
         df,
@@ -1387,9 +1552,17 @@ def load_fuel_mapping(
         errors="coerce"
     )
 
+    # ========================================================
+    # FINE FUEL
+    # ========================================================
+
     fine = normalize_column(
         df[w1_col]
     )
+
+    # ========================================================
+    # DEAD WOOD
+    # ========================================================
 
     dead_parts = []
 
@@ -1446,19 +1619,30 @@ def load_fuel_mapping(
 
         dead /= total_weight
 
-    woody = (
+    # ========================================================
+    # WOODY COVER
+    # ========================================================
+    #
+    # IMPORTANT:
+    # Woody Cover is used ONLY ONCE.
+    # ========================================================
 
-        normalize_column(
+    if woody_col is not None:
+
+        woody = normalize_column(
             df[woody_col]
         )
 
-        if woody_col is not None
+    else:
 
-        else pd.Series(
+        woody = pd.Series(
             0.0,
             index=df.index
         )
-    )
+
+    # ========================================================
+    # LITTER
+    # ========================================================
 
     litter_parts = []
 
@@ -1493,17 +1677,30 @@ def load_fuel_mapping(
             index=df.index
         )
 
-    # --------------------------------------------------------
-    # EXISTING FUEL FORMULA
-    # --------------------------------------------------------
+    # ========================================================
+    # CORRECTED FUEL FORMULA
+    # ========================================================
+    #
+    # Fine Fuel     = 35%
+    # Dead Wood     = 30%
+    # Woody Cover   = 15%
+    # Litter        = 20%
+    #
+    # Total         = 100%
+    #
+    # Woody Cover is NOT duplicated.
+    # Canopy Structure is NOT used.
+    # ========================================================
 
     fuel_score = (
 
-        0.35 * fine
-        + 0.30 * dead
-        + 0.15 * woody
-        + 0.10 * litter
-        + 0.10 * woody
+        FINE_FUEL_WEIGHT * fine
+        +
+        DEAD_WOOD_WEIGHT * dead
+        +
+        WOODY_COVER_WEIGHT * woody
+        +
+        LITTER_WEIGHT * litter
 
     ).clip(
         0.0,
@@ -1567,6 +1764,7 @@ def load_fuel_mapping(
             "Fuel mapping is empty."
         )
 
+    print()
     print(
         f"Fuel-code column: "
         f"{code_col}"
@@ -1575,6 +1773,43 @@ def load_fuel_mapping(
     print(
         f"Fuel mapping entries: "
         f"{len(mapping)}"
+    )
+
+    print()
+    print(
+        "FUEL COMPONENT WEIGHTS"
+    )
+    print(
+        "----------------------"
+    )
+
+    print(
+        f"Fine Fuel     : "
+        f"{FINE_FUEL_WEIGHT:.2f}"
+    )
+
+    print(
+        f"Dead Wood     : "
+        f"{DEAD_WOOD_WEIGHT:.2f}"
+    )
+
+    print(
+        f"Woody Cover   : "
+        f"{WOODY_COVER_WEIGHT:.2f}"
+    )
+
+    print(
+        f"Litter        : "
+        f"{LITTER_WEIGHT:.2f}"
+    )
+
+    print(
+        "Canopy        : NOT USED"
+    )
+
+    print(
+        "TOTAL         : "
+        f"{FINE_FUEL_WEIGHT + DEAD_WOOD_WEIGHT + WOODY_COVER_WEIGHT + LITTER_WEIGHT:.2f}"
     )
 
     return mapping
@@ -1690,14 +1925,6 @@ def write_raster(
     reference: dict
 ):
 
-    # --------------------------------------------------------
-    # IMPORTANT:
-    #
-    # Every raster is written from the exact FWI profile.
-    # Therefore Width, Height, CRS, Transform and Bounds
-    # are inherited from the FWI reference grid.
-    # --------------------------------------------------------
-
     profile = (
         reference["profile"].copy()
     )
@@ -1797,7 +2024,6 @@ def main():
     print("FIRIS BUILD START")
     print("=" * 70)
 
-
     # ========================================================
     # FWI REFERENCE
     # ========================================================
@@ -1805,7 +2031,6 @@ def main():
     fwi, reference = read_fwi(
         args.fwi_raster
     )
-
 
     # ========================================================
     # FARS MASK
@@ -1815,7 +2040,6 @@ def main():
         args.boundary,
         reference
     )
-
 
     # ========================================================
     # FUEL ALIGNMENT
@@ -1830,7 +2054,6 @@ def main():
         Resampling.nearest
     )
 
-
     # ========================================================
     # DEM / SLOPE
     # ========================================================
@@ -1841,7 +2064,6 @@ def main():
 
         reference
     )
-
 
     # ========================================================
     # FUEL MAPPING
@@ -1864,7 +2086,6 @@ def main():
         fuel_mapping
     )
 
-
     # ========================================================
     # FWI NORMALIZATION
     # ========================================================
@@ -1881,13 +2102,13 @@ def main():
 
     f_fwi[fwi_valid] = np.clip(
 
-        fwi[fwi_valid] /
+        fwi[fwi_valid]
+        /
         FWI_MAX,
 
         0.0,
         1.0
     )
-
 
     # ========================================================
     # TOPOGRAPHY NORMALIZATION
@@ -1912,7 +2133,6 @@ def main():
         0.0,
         1.0
     )
-
 
     # ========================================================
     # COVERAGE INSIDE FARS
@@ -1963,7 +2183,6 @@ def main():
     common_count = int(
         np.sum(common)
     )
-
 
     print()
     print(
@@ -2026,13 +2245,8 @@ def main():
             "inside Fars."
         )
 
-
     # ========================================================
     # FLI CALCULATION
-    # ========================================================
-    #
-    # UNCHANGED
-    #
     # ========================================================
 
     fli = np.full(
@@ -2062,7 +2276,6 @@ def main():
         100.0
     )
 
-
     print()
     print(
         "FINAL FLI"
@@ -2075,7 +2288,6 @@ def main():
         f"Statistics: "
         f"{stats(fli)}"
     )
-
 
     # ========================================================
     # OUTPUT PATHS
@@ -2125,7 +2337,6 @@ def main():
         f"firis_report_{date}.json"
     )
 
-
     # ========================================================
     # MASK FINAL OUTPUTS TO FARS
     # ========================================================
@@ -2166,7 +2377,6 @@ def main():
         np.nan
     )
 
-
     # ========================================================
     # FUEL COVERAGE
     # ========================================================
@@ -2189,7 +2399,6 @@ def main():
         0.0
     )
 
-
     # ========================================================
     # WRITE OUTPUTS
     # ========================================================
@@ -2202,66 +2411,41 @@ def main():
         "---------------"
     )
 
-
     write_raster(
-
         f_fwi_path,
-
         f_fwi_out,
-
         reference
     )
 
-
     write_raster(
-
         f_fuel_path,
-
         f_fuel_out,
-
         reference
     )
 
-
     write_raster(
-
         slope_path,
-
         slope_out,
-
         reference
     )
 
-
     write_raster(
-
         f_topo_path,
-
         f_topo_out,
-
         reference
     )
 
-
     write_raster(
-
         fli_path,
-
         fli,
-
         reference
     )
-
 
     write_raster(
-
         coverage_path,
-
         coverage,
-
         reference
     )
-
 
     # ========================================================
     # FINAL GRID VALIDATION
@@ -2294,7 +2478,6 @@ def main():
             reference
         )
     )
-
 
     # ========================================================
     # REPORT
@@ -2332,6 +2515,61 @@ def main():
 
             "F_Topo":
                 TOPO_WEIGHT
+        },
+
+        "fuel_formula": {
+
+            "FineFuel":
+                FINE_FUEL_WEIGHT,
+
+            "DeadWood":
+                DEAD_WOOD_WEIGHT,
+
+            "WoodyCover":
+                WOODY_COVER_WEIGHT,
+
+            "Litter":
+                LITTER_WEIGHT,
+
+            "CanopyStructure":
+                None,
+
+            "WoodyCover_used_once":
+                True,
+
+            "weights_sum":
+                (
+                    FINE_FUEL_WEIGHT
+                    +
+                    DEAD_WOOD_WEIGHT
+                    +
+                    WOODY_COVER_WEIGHT
+                    +
+                    LITTER_WEIGHT
+                )
+        },
+
+        "slope_method": {
+
+            "calculation":
+                "Native DEM central finite differences",
+
+            "nodata_filling":
+                False,
+
+            "nodata_policy":
+                "Slope is calculated only where "
+                "center, north, south, west and east "
+                "DEM cells are valid.",
+
+            "units":
+                "degrees",
+
+            "reference_degrees":
+                SLOPE_REFERENCE,
+
+            "normalization":
+                "clip(slope_degrees / 45, 0, 1)"
         },
 
         "target_grid": {
@@ -2403,7 +2641,8 @@ def main():
 
             "DEM":
                 "native slope calculation "
-                "then bilinear to FWI"
+                "without artificial NoData filling, "
+                "then bilinear alignment to FWI"
         },
 
         "normalization": {
@@ -2412,7 +2651,10 @@ def main():
                 "clip(FWI / 100, 0, 1)",
 
             "F_Fuel":
-                "Fuelbeds_metric weighted score",
+                "0.35 FineFuel + "
+                "0.30 DeadWood + "
+                "0.15 WoodyCover + "
+                "0.20 Litter",
 
             "F_Topo":
                 "clip(slope_degrees / 45, 0, 1)"
@@ -2566,10 +2808,17 @@ def main():
 
             "grid_policy":
                 "All final rasters use the "
-                "exact FWI reference profile."
+                "exact FWI reference profile.",
+
+            "woody_policy":
+                "Woody Cover is included exactly once.",
+
+            "canopy_policy":
+                "Canopy Structure is not included "
+                "because it is absent from "
+                "Fuelbeds_metric."
         }
     }
-
 
     # ========================================================
     # WRITE JSON REPORT
@@ -2596,7 +2845,6 @@ def main():
         file.write(
             "\n"
         )
-
 
     # ========================================================
     # FINAL
@@ -2635,3 +2883,4 @@ def main():
 if __name__ == "__main__":
 
     main()
+```
