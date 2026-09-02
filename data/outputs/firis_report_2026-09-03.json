@@ -1,6 +1,6 @@
 {
   "project": "FIRIS - Fars Integrated Fire Information System",
-  "generated_at_utc": "2026-09-02T13:36:43.586065+00:00",
+  "generated_at_utc": "2026-09-02T14:38:34.208930+00:00",
   "run_date": "2026-09-03",
   "boundary": "fars.geojson",
   "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
@@ -8,6 +8,23 @@
     "F_FWI": 0.45,
     "F_Fuel": 0.35,
     "F_Topo": 0.2
+  },
+  "fuel_formula": {
+    "FineFuel": 0.35,
+    "DeadWood": 0.3,
+    "WoodyCover": 0.15,
+    "Litter": 0.2,
+    "CanopyStructure": null,
+    "WoodyCover_used_once": true,
+    "weights_sum": 1.0
+  },
+  "slope_method": {
+    "calculation": "Native DEM central finite differences",
+    "nodata_filling": false,
+    "nodata_policy": "Slope is calculated only where center, north, south, west and east DEM cells are valid.",
+    "units": "degrees",
+    "reference_degrees": 45.0,
+    "normalization": "clip(slope_degrees / 45, 0, 1)"
   },
   "target_grid": {
     "reference": "FWI",
@@ -102,11 +119,11 @@
   "alignment": {
     "FWI": "reference grid",
     "Fuel": "nearest-neighbour to FWI",
-    "DEM": "native slope calculation then bilinear to FWI"
+    "DEM": "native slope calculation without artificial NoData filling, then bilinear alignment to FWI"
   },
   "normalization": {
     "F_FWI": "clip(FWI / 100, 0, 1)",
-    "F_Fuel": "Fuelbeds_metric weighted score",
+    "F_Fuel": "0.35 FineFuel + 0.30 DeadWood + 0.15 WoodyCover + 0.20 Litter",
     "F_Topo": "clip(slope_degrees / 45, 0, 1)"
   },
   "grid_validation": {
@@ -279,11 +296,11 @@
     "FWI_valid_percent": 100.0,
     "Fuel_valid_pixels": 904755,
     "Fuel_valid_percent": 49.6938,
-    "Topo_valid_pixels": 1820644,
-    "Topo_valid_percent": 99.9992,
-    "common_valid_pixels": 904755,
-    "common_valid_percent": 49.6938,
-    "common_valid_percent_of_FWI": 49.6938
+    "Topo_valid_pixels": 1820636,
+    "Topo_valid_percent": 99.9988,
+    "common_valid_pixels": 904753,
+    "common_valid_percent": 49.6937,
+    "common_valid_percent_of_FWI": 49.6937
   },
   "statistics": {
     "FWI": {
@@ -303,30 +320,30 @@
     "F_Fuel": {
       "count": 904755,
       "min": 0.0,
-      "max": 0.216056,
-      "mean": 0.063716,
-      "std": 0.040755
+      "max": 0.232112,
+      "mean": 0.099255,
+      "std": 0.062829
     },
     "Slope_degrees": {
-      "count": 1820644,
+      "count": 1820636,
       "min": 0.0,
       "max": 67.927628,
-      "mean": 9.031255,
-      "std": 8.334649
+      "mean": 9.031106,
+      "std": 8.334291
     },
     "F_Topo": {
-      "count": 1820644,
+      "count": 1820636,
       "min": 0.0,
       "max": 1.0,
-      "mean": 0.200613,
-      "std": 0.184825
+      "mean": 0.20061,
+      "std": 0.184821
     },
     "FLI": {
-      "count": 904755,
+      "count": 904753,
       "min": 0.0,
-      "max": 68.530182,
-      "mean": 40.363304,
-      "std": 9.270539
+      "max": 70.197777,
+      "mean": 41.607227,
+      "std": 9.633836
     }
   },
   "fuel": {
@@ -351,6 +368,8 @@
   "interpretation": {
     "NoData_policy": "NoData is preserved; missing source coverage is never extrapolated.",
     "coverage_warning": true,
-    "grid_policy": "All final rasters use the exact FWI reference profile."
+    "grid_policy": "All final rasters use the exact FWI reference profile.",
+    "woody_policy": "Woody Cover is included exactly once.",
+    "canopy_policy": "Canopy Structure is not included because it is absent from Fuelbeds_metric."
   }
 }
