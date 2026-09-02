@@ -681,6 +681,28 @@ for="locationFilter"
 با انتخاب محدوده، نقشه به محدوده مورد نظر منتقل شده و لایه مرتبط نمایش داده می‌شود.
 </div>
 
+<div class="location-filter-title" style="margin-top:13px;">
+آرشیو پیش‌بینی
+</div>
+
+<label
+class="location-filter-label"
+for="archiveFilter"
+>
+تاریخ پیش‌بینی </label>
+
+<select id="archiveFilter" class="filter-select">
+
+<option value="latest">
+آخرین پیش‌بینی
+</option>
+
+</select>
+
+<div class="filter-description">
+با انتخاب تاریخ، نقشه و اطلاعات همان پیش‌بینی نمایش داده می‌شود.
+</div>
+
 </div>
 </div>
 
@@ -933,7 +955,9 @@ const APP_STATE = {
 
   data: {
     fliGrid: null,
-    fliMetadata: null
+    fliMetadata: null,
+    archiveDates: [],
+    currentArchiveDate: "latest"
   },
 
   ui: {
@@ -1398,6 +1422,369 @@ async function loadGrid() {
     );
 
   }
+
+}
+
+
+/* ============================================================
+   ARCHIVE
+   ============================================================ */
+
+function formatArchiveDate(
+  isoDate
+) {
+
+  const parts =
+    String(isoDate).split("-");
+
+  if (parts.length !== 3) {
+    return String(isoDate);
+  }
+
+  const date =
+    new Date(
+      Number(parts[0]),
+      Number(parts[1]) - 1,
+      Number(parts[2]),
+      12,
+      0,
+      0
+    );
+
+  try {
+
+    return date.toLocaleDateString(
+      "fa-IR-u-ca-persian",
+      {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      }
+    );
+
+  } catch (error) {
+
+    return String(isoDate);
+
+  }
+
+}
+
+
+function updateForecastBadgeFromMetadata() {
+
+  const badge =
+    document.getElementById(
+      "forecastDateBadge"
+    );
+
+  if (!badge) {
+    return;
+  }
+
+  const metadata =
+    APP_STATE.data.fliMetadata;
+
+  const forecastDate =
+    metadata?.forecast_date ||
+    metadata?.target_date;
+
+  if (!forecastDate) {
+    return;
+  }
+
+  badge.textContent =
+    `پیش‌بینی برای ${formatArchiveDate(forecastDate)}`;
+
+}
+
+
+async function loadArchiveDates() {
+
+  const select =
+    document.getElementById(
+      "archiveFilter"
+    );
+
+  if (!select) {
+    return;
+  }
+
+  try {
+
+    const response =
+      await fetchWithTimeout(
+        "data/web/archive/index.json"
+      );
+
+    const data =
+      await response.json();
+
+    const dates =
+      Array.isArray(data)
+        ? data
+        : Array.isArray(data?.dates)
+          ? data.dates
+          : [];
+
+    APP_STATE.data.archiveDates =
+      dates
+        .map(item =>
+          typeof item === "string"
+            ? item
+            : item?.date
+        )
+        .filter(Boolean)
+        .sort();
+
+    const current =
+      select.value || "latest";
+
+    select.innerHTML = "";
+
+    const latestOption =
+      document.createElement("option");
+
+    latestOption.value =
+      "latest";
+
+    latestOption.textContent =
+      "آخرین پیش‌بینی";
+
+    select.appendChild(
+      latestOption
+    );
+
+    APP_STATE.data.archiveDates
+      .slice()
+      .reverse()
+      .forEach(date => {
+
+        const option =
+          document.createElement("option");
+
+        option.value =
+          date;
+
+        option.textContent =
+          formatArchiveDate(date);
+
+        select.appendChild(
+          option
+        );
+
+      });
+
+    if (
+      current !== "latest" &&
+      APP_STATE.data.archiveDates.includes(current)
+    ) {
+
+      select.value =
+        current;
+    }
+
+  } catch (error) {
+
+    /*
+     * Archive is optional. If archive/index.json is not
+     * available yet, the existing site continues normally.
+     */
+
+    console.warn(
+      "FIRIS archive index unavailable:",
+      error
+    );
+
+  }
+
+}
+
+
+async function loadArchiveForecast(
+  date
+) {
+
+  if (
+    !date ||
+    date === "latest"
+  ) {
+
+    await loadFLIData();
+
+    await loadGrid();
+
+    if (
+      APP_STATE.layers.fli &&
+      APP_STATE.map.hasLayer(
+        APP_STATE.layers.fli
+      )
+    ) {
+
+      APP_STATE.map.removeLayer(
+        APP_STATE.layers.fli
+      );
+
+    }
+
+    await loadFLI();
+
+    APP_STATE.data.currentArchiveDate =
+      "latest";
+
+    updateForecastBadgeFromMetadata();
+
+    return;
+  }
+
+  const base =
+    `data/web/archive/${date}/`;
+
+  const responses =
+    await Promise.all([
+
+      fetchWithTimeout(
+        `${base}fli.json`
+      ),
+
+      fetchWithTimeout(
+        `${base}fli_grid.json`
+      ),
+
+      fetchWithTimeout(
+        `${base}fli_polygons.geojson`
+      )
+
+    ]);
+
+  const metadata =
+    await responses[0].json();
+
+  const grid =
+    await responses[1].json();
+
+  const polygons =
+    await responses[2].json();
+
+  if (
+    !grid ||
+    !Array.isArray(
+      grid.values
+    )
+  ) {
+
+    throw new Error(
+      "آرشیو Grid معتبر نیست."
+    );
+  }
+
+  if (
+    !polygons ||
+    polygons.type !==
+      "FeatureCollection"
+  ) {
+
+    throw new Error(
+      "آرشیو FLI معتبر نیست."
+    );
+  }
+
+  APP_STATE.data.fliMetadata =
+    metadata;
+
+  APP_STATE.data.fliGrid =
+    grid;
+
+  APP_STATE.data.currentArchiveDate =
+    date;
+
+  if (
+    APP_STATE.layers.fli &&
+    APP_STATE.map.hasLayer(
+      APP_STATE.layers.fli
+    )
+  ) {
+
+    APP_STATE.map.removeLayer(
+      APP_STATE.layers.fli
+    );
+
+  }
+
+  APP_STATE.layers.fli =
+    L.geoJSON(
+      polygons,
+      {
+
+        style: feature => {
+
+          const color =
+            feature.properties?.color ||
+            "#777";
+
+          return {
+            color: color,
+            weight: .15,
+            opacity: .85,
+            fillColor: color,
+            fillOpacity: .72
+          };
+
+        },
+
+        interactive: false
+
+      }
+    );
+
+  APP_STATE.layers.fli.addTo(
+    APP_STATE.map
+  );
+
+  updateForecastBadgeFromMetadata();
+
+}
+
+
+function setupArchiveFilter() {
+
+  const select =
+    document.getElementById(
+      "archiveFilter"
+    );
+
+  if (!select) {
+    return;
+  }
+
+  select.addEventListener(
+    "change",
+    async event => {
+
+      const date =
+        event.target.value;
+
+      try {
+
+        await loadArchiveForecast(
+          date
+        );
+
+      } catch (error) {
+
+        console.error(
+          "FIRIS archive error:",
+          error
+        );
+
+        select.value =
+          APP_STATE.data.currentArchiveDate ||
+          "latest";
+
+      }
+
+    }
+  );
 
 }
 
@@ -3119,11 +3506,17 @@ async function startApp() {
 
     setupLocationFilter();
 
+    setupArchiveFilter();
+
     setupFitButton();
 
     setupNightMode();
 
     setupAbout();
+
+    await loadArchiveDates();
+
+    updateForecastBadgeFromMetadata();
 
     /*
      * نمایش کل استان
