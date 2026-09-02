@@ -89,12 +89,21 @@ jobs:
 
           python - <<'PY'
           import os
-          from datetime import datetime, timedelta
+
+          from datetime import (
+              datetime,
+              timedelta
+          )
+
           from zoneinfo import ZoneInfo
 
-          iran = ZoneInfo("Asia/Tehran")
+          iran = ZoneInfo(
+              "Asia/Tehran"
+          )
 
-          now_iran = datetime.now(iran)
+          now_iran = datetime.now(
+              iran
+          )
 
           today = now_iran.date()
 
@@ -227,9 +236,13 @@ jobs:
           import os
           import sys
 
-          path = os.environ["FWI_JSON"]
+          path = os.environ[
+              "FWI_JSON"
+          ]
 
-          expected = os.environ["TOMORROW_DATE"]
+          expected = os.environ[
+              "TOMORROW_DATE"
+          ]
 
           with open(
               path,
@@ -237,12 +250,18 @@ jobs:
               encoding="utf-8"
           ) as file:
 
-              metadata = json.load(file)
+              metadata = json.load(
+                  file
+              )
 
           target = (
-              metadata.get("target_date")
+              metadata.get(
+                  "target_date"
+              )
               or
-              metadata.get("forecast_date")
+              metadata.get(
+                  "forecast_date"
+              )
           )
 
           print("")
@@ -290,6 +309,8 @@ jobs:
           mkdir -p data/outputs
 
           mkdir -p data/report
+
+          mkdir -p data/web
 
           echo ""
           echo "============================================================"
@@ -380,7 +401,7 @@ jobs:
           echo "${REPORT_FILE}"
 
           # --------------------------------------------------------
-          # Remove previous Excel completely.
+          # Always remove previous latest report.
           # --------------------------------------------------------
 
           rm -f "${REPORT_FILE}"
@@ -414,21 +435,25 @@ jobs:
           sha256sum "${REPORT_FILE}"
 
           echo ""
-          echo "✓ Excel report generated."
+          echo "✓ Latest Excel report generated."
 
 
       # ============================================================
-      # 10. STRICT EXCEL VALIDATION
+      # 10. VERIFY LATEST EXCEL
       # ============================================================
 
-      - name: Verify Excel report
+      - name: Verify latest Excel report
         shell: bash
         run: |
           set -euo pipefail
 
           python - <<'PY'
           from pathlib import Path
-          from openpyxl import load_workbook
+
+          from openpyxl import (
+              load_workbook
+          )
+
           import os
           import sys
 
@@ -446,7 +471,7 @@ jobs:
 
           print("")
           print("============================================================")
-          print("STRICT EXCEL VALIDATION")
+          print("STRICT LATEST EXCEL VALIDATION")
           print("============================================================")
 
           print("")
@@ -478,7 +503,7 @@ jobs:
 
                   print("")
                   print(
-                      "ERROR: Sheet 'خلاصه' was not found."
+                      "ERROR: Sheet 'خلاصه' not found."
                   )
 
                   sys.exit(1)
@@ -497,16 +522,206 @@ jobs:
               print("Excel B4:")
               print(actual_fli)
 
-              if str(actual_date) != expected_date:
+              if str(
+                  actual_date
+              ) != expected_date:
 
                   print("")
                   print(
-                      "ERROR: Excel forecast date is incorrect."
+                      "ERROR: Latest Excel date is incorrect."
+                  )
+
+                  sys.exit(1)
+
+              if str(
+                  actual_fli
+              ) != expected_fli:
+
+                  print("")
+                  print(
+                      "ERROR: Latest Excel FLI filename is incorrect."
+                  )
+
+                  sys.exit(1)
+
+              print("")
+              print(
+                  "✓ Latest Excel date is correct."
+              )
+
+              print(
+                  "✓ Latest Excel FLI filename is correct."
+              )
+
+          finally:
+
+              wb.close()
+
+
+      # ============================================================
+      # 11. SAVE EXCEL INSIDE TOMORROW ARCHIVE
+      # ============================================================
+
+      - name: Archive Excel report
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ARCHIVE_DIR="data/web/archive/${TOMORROW_DATE}"
+
+          REPORT_FILE="data/report/firis_report.xlsx"
+
+          ARCHIVE_REPORT="${ARCHIVE_DIR}/firis_report.xlsx"
+
+          echo ""
+          echo "============================================================"
+          echo "ARCHIVING EXCEL REPORT"
+          echo "============================================================"
+
+          echo ""
+          echo "Forecast date:"
+          echo "${TOMORROW_DATE}"
+
+          echo ""
+          echo "Source:"
+          echo "${REPORT_FILE}"
+
+          echo ""
+          echo "Archive directory:"
+          echo "${ARCHIVE_DIR}"
+
+          echo ""
+          echo "Archive Excel:"
+          echo "${ARCHIVE_REPORT}"
+
+          mkdir -p "${ARCHIVE_DIR}"
+
+          cp -f \
+            "${REPORT_FILE}" \
+            "${ARCHIVE_REPORT}"
+
+          if [ ! -f "${ARCHIVE_REPORT}" ]; then
+
+            echo ""
+            echo "ERROR: Archived Excel was not created."
+
+            exit 1
+
+          fi
+
+          echo ""
+          echo "Archived Excel created:"
+          ls -lh "${ARCHIVE_REPORT}"
+
+          echo ""
+          echo "Archived Excel SHA256:"
+          sha256sum "${ARCHIVE_REPORT}"
+
+          echo ""
+          echo "✓ Excel archived successfully."
+
+
+      # ============================================================
+      # 12. VERIFY ARCHIVED EXCEL
+      # ============================================================
+
+      - name: Verify archived Excel report
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          from pathlib import Path
+
+          from openpyxl import (
+              load_workbook
+          )
+
+          import os
+          import sys
+
+          date = os.environ[
+              "TOMORROW_DATE"
+          ]
+
+          report = Path(
+              f"data/web/archive/{date}/firis_report.xlsx"
+          )
+
+          expected_fli = (
+              f"fli_fars_{date}.tif"
+          )
+
+          print("")
+          print("============================================================")
+          print("ARCHIVED EXCEL VALIDATION")
+          print("============================================================")
+
+          print("")
+          print("Archive Excel:")
+          print(report)
+
+          print("")
+          print("Expected date:")
+          print(date)
+
+          print("")
+          print("Expected FLI:")
+          print(expected_fli)
+
+          if not report.exists():
+
+              print("")
+              print(
+                  "ERROR: Archived Excel does not exist."
+              )
+
+              sys.exit(1)
+
+          wb = load_workbook(
+              report,
+              read_only=True,
+              data_only=True
+          )
+
+          try:
+
+              if "خلاصه" not in wb.sheetnames:
+
+                  print("")
+                  print(
+                      "ERROR: Archived Excel sheet "
+                      "'خلاصه' not found."
+                  )
+
+                  sys.exit(1)
+
+              ws = wb["خلاصه"]
+
+              actual_date = ws["B3"].value
+
+              actual_fli = ws["B4"].value
+
+              print("")
+              print("Archived Excel B3:")
+              print(actual_date)
+
+              print("")
+              print("Archived Excel B4:")
+              print(actual_fli)
+
+              if str(
+                  actual_date
+              ) != date:
+
+                  print("")
+                  print(
+                      "ERROR: Archived Excel date is incorrect."
                   )
 
                   print(
                       "Expected:",
-                      expected_date
+                      date
                   )
 
                   print(
@@ -516,11 +731,14 @@ jobs:
 
                   sys.exit(1)
 
-              if str(actual_fli) != expected_fli:
+              if str(
+                  actual_fli
+              ) != expected_fli:
 
                   print("")
                   print(
-                      "ERROR: Excel FLI filename is incorrect."
+                      "ERROR: Archived Excel FLI filename "
+                      "is incorrect."
                   )
 
                   print(
@@ -537,15 +755,16 @@ jobs:
 
               print("")
               print(
-                  "✓ Excel forecast date is correct."
+                  "✓ Archived Excel date is correct."
               )
 
               print(
-                  "✓ Excel FLI filename is correct."
+                  "✓ Archived Excel FLI filename is correct."
               )
 
               print(
-                  "✓ Excel matches tomorrow's FLI."
+                  "✓ Archived Excel belongs to the "
+                  "selected forecast date."
               )
 
           finally:
@@ -554,7 +773,7 @@ jobs:
 
 
       # ============================================================
-      # 11. BUILD WEB GIS
+      # 13. BUILD WEB GIS
       # ============================================================
 
       - name: Build Web GIS map
@@ -575,9 +794,6 @@ jobs:
 
           echo ""
 
-          # Explicit Pillow runtime check immediately before
-          # build_web_map.py.
-
           python -c "from PIL import Image; print('Pillow runtime OK:', Image.__version__)"
 
           echo ""
@@ -588,7 +804,7 @@ jobs:
 
 
       # ============================================================
-      # 12. VERIFY WEB GIS
+      # 14. VERIFY WEB GIS
       # ============================================================
 
       - name: Verify Web GIS outputs
@@ -619,6 +835,22 @@ jobs:
 
           fi
 
+          if [ ! -f \
+            "data/web/archive/${TOMORROW_DATE}/firis_report.xlsx"
+          ]; then
+
+            echo ""
+            echo "ERROR: Tomorrow archived Excel not found."
+
+            echo ""
+            echo "Expected:"
+            echo \
+              "data/web/archive/${TOMORROW_DATE}/firis_report.xlsx"
+
+            exit 1
+
+          fi
+
           echo ""
           echo "Latest JSON:"
           ls -lh \
@@ -626,19 +858,21 @@ jobs:
 
           echo ""
           echo "Tomorrow archive:"
-
           find \
             "data/web/archive/${TOMORROW_DATE}" \
-            -maxdepth 2 \
+            -maxdepth 1 \
             -type f \
             -print
 
           echo ""
           echo "✓ Web GIS validation passed."
 
+          echo ""
+          echo "✓ Archived Excel validation passed."
+
 
       # ============================================================
-      # 13. UPDATE ARCHIVE INDEX
+      # 15. UPDATE ARCHIVE INDEX
       # ============================================================
 
       - name: Update Archive Index
@@ -704,7 +938,7 @@ jobs:
 
 
       # ============================================================
-      # 14. FINAL DATE CONSISTENCY CHECK
+      # 16. FINAL DATE CONSISTENCY CHECK
       # ============================================================
 
       - name: Final date consistency check
@@ -736,9 +970,14 @@ jobs:
             "data/outputs/fli_fars_${TOMORROW_DATE}.tif"
 
           echo ""
-          echo "Excel:"
+          echo "Latest Excel:"
           echo \
             "data/report/firis_report.xlsx"
+
+          echo ""
+          echo "Archived Excel:"
+          echo \
+            "data/web/archive/${TOMORROW_DATE}/firis_report.xlsx"
 
           echo ""
           echo "Web:"
@@ -758,7 +997,7 @@ jobs:
 
 
       # ============================================================
-      # 15. COMMIT AND PUSH
+      # 17. COMMIT AND PUSH
       # ============================================================
 
       - name: Commit FIRIS outputs
