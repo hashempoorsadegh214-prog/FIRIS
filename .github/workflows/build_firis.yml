@@ -1,4 +1,4 @@
-```yaml
+
 name: Build FIRIS
 
 on:
@@ -519,4 +519,3 @@ jobs:
           echo ""
 
           echo "✓ Done."
-```
