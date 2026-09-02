@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="fa" dir="rtl">
 
 <head>
@@ -123,39 +122,58 @@ a {
 }
 
 /* ============================================================
-   FORECAST LED
+   چراغ سبز وضعیت پیش‌بینی
    ============================================================ */
 
 .header-subtitle-badge .bullet {
   width: 7px;
   height: 7px;
+  display: inline-block;
+  flex: 0 0 7px;
   background: #4ade80;
   border-radius: 50%;
-  box-shadow:
-    0 0 5px #4ade80,
-    0 0 10px rgba(74, 222, 128, .85);
-  animation: forecastLedBlink 1.4s ease-in-out infinite;
-  flex-shrink: 0;
+
+  /*
+   * چراغ به صورت واقعی روشن و خاموش می‌شود.
+   */
+  animation: forecastLedBlink 1s steps(1, end) infinite;
 }
 
 @keyframes forecastLedBlink {
-  0%,
-  100% {
-    opacity: .35;
-    transform: scale(.85);
+
+  /*
+   * روشن
+   */
+  0% {
+    opacity: 1;
+    background: #4ade80;
     box-shadow:
-      0 0 3px #4ade80,
-      0 0 6px rgba(74, 222, 128, .35);
+      0 0 5px #4ade80,
+      0 0 10px #4ade80,
+      0 0 16px rgba(74, 222, 128, .8);
   }
 
+  /*
+   * خاموش
+   */
   50% {
-    opacity: 1;
-    transform: scale(1.15);
-    box-shadow:
-      0 0 7px #4ade80,
-      0 0 14px rgba(74, 222, 128, .95),
-      0 0 20px rgba(74, 222, 128, .55);
+    opacity: 0;
+    background: #4ade80;
+    box-shadow: none;
   }
+
+  /*
+   * دوباره روشن
+   */
+  100% {
+    opacity: 1;
+    background: #4ade80;
+    box-shadow:
+      0 0 5px #4ade80,
+      0 0 10px #4ade80,
+      0 0 16px rgba(74, 222, 128, .8);
+  }
+
 }
 
 /* ============================================================
@@ -670,7 +688,6 @@ class="header-btn"
 title="فیلتر مکانی"
 aria-label="فیلتر مکانی"
 type="button"
-
 > 🗺️</button>
 
 <div id="layersMenu" class="dropdown-menu">
@@ -682,10 +699,9 @@ type="button"
 <label
 class="location-filter-label"
 for="locationFilter"
-
 >
-
-محدوده مورد نظر </label>
+محدوده مورد نظر
+</label>
 
 <select id="locationFilter" class="filter-select">
 
@@ -693,10 +709,8 @@ for="locationFilter"
 کل استان فارس
 </option>
 
-<!-- اصلاح اصلی: value و عنوان با هم هماهنگ شده‌اند -->
-
 <option value="protected">
-مناطق شکارممنوع 
+مناطق شکارممنوع
 </option>
 
 <option value="hunting">
@@ -717,7 +731,8 @@ for="locationFilter"
 class="location-filter-label"
 for="archiveFilter"
 >
-تاریخ پیش‌بینی </label>
+تاریخ پیش‌بینی
+</label>
 
 <select id="archiveFilter" class="filter-select">
 
@@ -740,7 +755,6 @@ class="header-btn primary"
 title="نمایش کامل استان فارس"
 aria-label="نمایش کامل استان فارس"
 type="button"
-
 > 🌐</button>
 
 <button
@@ -749,7 +763,6 @@ class="header-btn"
 title="حالت شب"
 aria-label="تغییر حالت روز و شب"
 type="button"
-
 > ☀️</button>
 
 <button
@@ -758,7 +771,6 @@ class="header-btn"
 title="معرفی سامانه"
 aria-label="معرفی سامانه"
 type="button"
-
 > ℹ️</button>
 
 <a
@@ -768,7 +780,6 @@ rel="noopener"
 class="header-btn primary"
 title="خروجی Excel"
 aria-label="خروجی Excel"
-
 > 📊</a>
 
 </div>
@@ -832,42 +843,37 @@ aria-label="خروجی Excel"
 <span
 class="gauge-legend-chip"
 style="background:#2e7d32"
-
 >
-
-کم </span>
+کم
+</span>
 
 <span
 class="gauge-legend-chip"
 style="background:#fdd835;color:#222"
-
 >
-
-متوسط </span>
+متوسط
+</span>
 
 <span
 class="gauge-legend-chip"
 style="background:#fb8c00"
-
 >
-
-زیاد </span>
+زیاد
+</span>
 
 <span
 class="gauge-legend-chip"
 style="background:#e53935"
-
 >
-
-خیلی زیاد </span>
+خیلی زیاد
+</span>
 
 <span
 class="gauge-legend-chip"
 style="background:#880e4f"
-
 >
-
-بحرانی </span>
+بحرانی
+</span>
 
 </div>
 </div>
@@ -879,10 +885,10 @@ style="background:#880e4f"
 <div id="aboutOverlay" class="about-overlay">
 
 <div
-  class="about-box"
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="aboutTitle"
+class="about-box"
+role="dialog"
+aria-modal="true"
+aria-labelledby="aboutTitle"
 >
 
 <div class="about-header">
@@ -897,7 +903,6 @@ class="about-close"
 title="بستن"
 aria-label="بستن"
 type="button"
-
 > ×</button>
 
 </div>
@@ -991,12 +996,6 @@ const APP_STATE = {
   ui: {
     nightMode: false,
     currentPopup: null,
-
-    /*
-     * all       = کل استان
-     * protected = مناطق چهارگانه
-     * hunting   = مناطق شکار ممنوع
-     */
     locationFilter: "all"
   }
 
@@ -1614,11 +1613,6 @@ async function loadArchiveDates() {
 
   } catch (error) {
 
-    /*
-     * Archive is optional. If archive/index.json is not
-     * available yet, the existing site continues normally.
-     */
-
     console.warn(
       "FIRIS archive index unavailable:",
       error
@@ -1819,7 +1813,6 @@ function setupArchiveFilter() {
 
 /* ============================================================
    PROTECTED
-   مناطق چهارگانه
    ============================================================ */
 
 async function loadProtected() {
@@ -1866,7 +1859,6 @@ async function loadProtected() {
 
 /* ============================================================
    HUNTING
-   مناطق شکار ممنوع
    ============================================================ */
 
 async function loadHunting() {
@@ -2284,10 +2276,6 @@ function regionStatistics(
     return null;
   }
 
-  /*
-   * تبدیل Bounding Box به محدوده Grid
-   */
-
   let startRow =
     Math.floor(
       (
@@ -2319,10 +2307,6 @@ function regionStatistics(
         lonRange
       ) * cols
     ) - 1;
-
-  /*
-   * محدود کردن به Grid
-   */
 
   startRow =
     Math.max(
@@ -2371,10 +2355,6 @@ function regionStatistics(
   let count = 0;
   let min = Infinity;
   let max = -Infinity;
-
-  /*
-   * بررسی مرکز سلول‌ها
-   */
 
   for (
     let row = startRow;
@@ -2531,7 +2511,6 @@ function getRegionName(
     ? String(found)
     : fallback;
 
-
 }
 
 
@@ -2587,10 +2566,6 @@ function bindRegion(
       feature,
       fallback
     );
-
-  /*
-   * محاسبه واقعی FLI
-   */
 
   const statistics =
     regionStatistics(
@@ -2671,11 +2646,6 @@ function bindRegion(
     "click",
     () => {
 
-      /*
-       * Gauge دقیقاً همان Polygon
-       * و همان نوع منطقه را نشان می‌دهد.
-       */
-
       updateGauge(
         mean,
         name,
@@ -2703,11 +2673,6 @@ function setupMapClick() {
 
       const lon =
         event.latlng.lng;
-
-      /*
-       * اگر فیلتر فعال است:
-       * فقط داخل همان نوع محدوده اجازه کلیک داریم.
-       */
 
       if (
         APP_STATE.ui.locationFilter !== "all"
@@ -2783,10 +2748,6 @@ function setupMapClick() {
           lat,
           lon
         );
-
-      /*
-       * عنوان Gauge در حالت کل استان
-       */
 
       updateGauge(
         value,
@@ -3036,10 +2997,6 @@ function updateFilterGauge(
       continue;
     }
 
-    /*
-     * میانگین وزنی بر اساس تعداد سلول‌ها
-     */
-
     totalWeighted +=
       stats.mean *
       stats.count;
@@ -3086,10 +3043,6 @@ function applyLocationFilter(
   value
 ) {
 
-  /*
-   * فقط مقادیر معتبر پذیرفته می‌شوند.
-   */
-
   const validValues = [
     "all",
     "protected",
@@ -3107,19 +3060,10 @@ function applyLocationFilter(
   APP_STATE.ui.locationFilter =
     value;
 
-  /*
-   * FLI همیشه نمایش داده می‌شود.
-   */
-
   setLayerVisible(
     APP_STATE.layers.fli,
     true
   );
-
-  /*
-   * ابتدا هر دو لایه منطقه‌ای
-   * خاموش می‌شوند.
-   */
 
   setLayerVisible(
     APP_STATE.layers.protected,
@@ -3130,10 +3074,6 @@ function applyLocationFilter(
     APP_STATE.layers.hunting,
     false
   );
-
-  /*
-   * کل استان
-   */
 
   if (
     value === "all"
@@ -3150,10 +3090,6 @@ function applyLocationFilter(
     return;
 
   }
-
-  /*
-   * مناطق شکارممنوع
-   */
 
   if (
     value === "protected"
@@ -3176,10 +3112,6 @@ function applyLocationFilter(
     return;
 
   }
-
-  /*
-   * مناطق چهارگانه
-   */
 
   if (
     value === "hunting"
@@ -3478,39 +3410,19 @@ async function startApp() {
 
     initMap();
 
-    /*
-     * Grid و Metadata اختیاری هستند.
-     */
-
     await Promise.all([
       loadFLIData(),
       loadGrid()
     ]);
 
-    /*
-     * مرز استان
-     */
-
     await loadFars();
 
-    /*
-     * لایه FLI
-     */
-
     await loadFLI();
-
-    /*
-     * لایه‌های مناطق
-     */
 
     await Promise.all([
       loadProtected(),
       loadHunting()
     ]);
-
-    /*
-     * وضعیت اولیه
-     */
 
     setLayerVisible(
       APP_STATE.layers.fli,
@@ -3527,10 +3439,6 @@ async function startApp() {
       false
     );
 
-    /*
-     * رویدادها
-     */
-
     setupMapClick();
 
     setupLocationFilter();
@@ -3546,10 +3454,6 @@ async function startApp() {
     await loadArchiveDates();
 
     updateForecastBadgeFromMetadata();
-
-    /*
-     * نمایش کل استان
-     */
 
     fitFars();
 
