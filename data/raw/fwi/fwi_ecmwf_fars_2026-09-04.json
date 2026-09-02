@@ -1,0 +1,64 @@
+{
+  "project": "FIRIS",
+  "indicator": "ECMWF Fire Weather Index",
+  "source": "Copernicus GWIS WMS",
+  "source_url": "https://maps.effis.emergency.copernicus.eu/gwis",
+  "layer": "ecmwf.fwi",
+  "timezone": "Asia/Tehran",
+  "current_iran_datetime": "2026-09-03T00:50:49.679487+03:30",
+  "forecast_date": "2026-09-04",
+  "forecast_definition": "Tomorrow according to Iran local date",
+  "boundary_file": "fars.geojson",
+  "boundary_margin_degree": 0.1,
+  "request_bbox": {
+    "west": 50.50318309972035,
+    "south": 26.94561700022441,
+    "east": 55.68006519994905,
+    "north": 31.76959889996929
+  },
+  "request_parameters": {
+    "SERVICE": "WMS",
+    "VERSION": "1.1.1",
+    "REQUEST": "GetMap",
+    "LAYERS": "ecmwf.fwi",
+    "STYLES": "",
+    "SRS": "EPSG:4326",
+    "BBOX": "50.50318310,26.94561700,55.68006520,31.76959890",
+    "WIDTH": "2000",
+    "HEIGHT": "2000",
+    "FORMAT": "image/tiff",
+    "TRANSPARENT": "FALSE",
+    "TIME": "2026-09-04"
+  },
+  "request_url": "https://maps.effis.emergency.copernicus.eu/gwis?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=ecmwf.fwi&STYLES=&SRS=EPSG%3A4326&BBOX=50.50318310%2C26.94561700%2C55.68006520%2C31.76959890&WIDTH=2000&HEIGHT=2000&FORMAT=image%2Ftiff&TRANSPARENT=FALSE&TIME=2026-09-04",
+  "downloaded_at_utc": "2026-09-02T21:20:52.851518+00:00",
+  "raster": {
+    "crs": "EPSG:4326",
+    "width": 2000,
+    "height": 2000,
+    "resolution": {
+      "x": 0.002588441050000003,
+      "y": 0.002411990949999999
+    },
+    "bounds": {
+      "west": 50.5031831,
+      "south": 26.945617,
+      "east": 55.68006520000001,
+      "north": 31.7695989
+    },
+    "transform": [
+      0.002588441050000003,
+      0.0,
+      50.5031831,
+      0.0,
+      -0.002411990949999999,
+      31.7695989
+    ],
+    "nodata": null,
+    "valid_pixels": 4000000,
+    "min": 0.0,
+    "max": 104.37785339355469,
+    "mean": 40.712398529052734
+  },
+  "output_file": "fwi_ecmwf_fars_2026-09-04.tif"
+}
