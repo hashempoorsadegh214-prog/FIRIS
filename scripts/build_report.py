@@ -16,7 +16,7 @@ FIRIS - Detailed Excel Fire Risk Report
 4. طبقات_خطر
 5. اطلاعات_فنی
 
-نگاشت قطعی لایه‌ها:
+نگاشت نمایشی طبق درخواست پروژه:
 
 protected_areas.geojson
     -> مناطق چهارگانه
@@ -37,13 +37,11 @@ import rasterio
 
 from openpyxl import Workbook
 from openpyxl.cell.cell import MergedCell
-from openpyxl.styles import (
-    Alignment,
-    Border,
-    Font,
-    PatternFill,
-    Side,
-)
+from openpyxl.styles import Alignment
+from openpyxl.styles import Border
+from openpyxl.styles import Font
+from openpyxl.styles import PatternFill
+from openpyxl.styles import Side
 from openpyxl.utils import get_column_letter
 
 from rasterio.mask import mask
@@ -79,7 +77,10 @@ RISK_COLORS = {
 def parse_args():
 
     parser = argparse.ArgumentParser(
-        description="Build detailed FIRIS fire-risk Excel report."
+        description=(
+            "Build detailed FIRIS Excel "
+            "fire-risk report."
+        )
     )
 
     parser.add_argument(
@@ -107,16 +108,20 @@ def parse_args():
         "--protected",
         required=False,
         type=Path,
-        default=Path("protected_areas.geojson"),
-        help="Four protected areas GeoJSON."
+        default=Path(
+            "protected_areas.geojson"
+        ),
+        help="Protected areas GeoJSON."
     )
 
     parser.add_argument(
         "--hunting",
         required=False,
         type=Path,
-        default=Path("hunting_banned.geojson"),
-        help="Hunting banned areas GeoJSON."
+        default=Path(
+            "hunting_banned.geojson"
+        ),
+        help="Hunting banned GeoJSON."
     )
 
     return parser.parse_args()
@@ -147,23 +152,29 @@ def risk_class(
 ) -> str:
 
     if value is None:
+
         return "بدون داده"
 
     value = float(value)
 
     if not np.isfinite(value):
+
         return "بدون داده"
 
     if value < 20:
+
         return "کم"
 
     if value < 40:
+
         return "متوسط"
 
     if value < 60:
+
         return "زیاد"
 
     if value < 80:
+
         return "خیلی زیاد"
 
     return "بحرانی"
@@ -187,47 +198,6 @@ def risk_fill(
 
 
 # ============================================================
-# RISK FONT
-# ============================================================
-
-def risk_font(
-    label: str
-) -> Font:
-
-    # زرد باید نوشته مشکی داشته باشد
-    if label == "متوسط":
-        text_color = "000000"
-    else:
-        text_color = "FFFFFF"
-
-    return Font(
-        name="B Nazanin",
-        size=11,
-        bold=True,
-        color=text_color
-    )
-
-
-# ============================================================
-# APPLY RISK STYLE
-# ============================================================
-
-def apply_risk_style(
-    cell,
-    label: str
-):
-
-    cell.fill = risk_fill(label)
-    cell.font = risk_font(label)
-
-    cell.alignment = Alignment(
-        horizontal="center",
-        vertical="center",
-        wrap_text=True
-    )
-
-
-# ============================================================
 # LOAD GEOJSON
 # ============================================================
 
@@ -245,12 +215,18 @@ def load_geojson(
         encoding="utf-8"
     ) as file:
 
-        data = json.load(file)
+        data = json.load(
+            file
+        )
 
-    if data.get("type") != "FeatureCollection":
+    if (
+        data.get("type")
+        != "FeatureCollection"
+    ):
 
         raise ValueError(
-            f"Invalid GeoJSON FeatureCollection: {path}"
+            f"Invalid GeoJSON FeatureCollection: "
+            f"{path}"
         )
 
     features = data.get(
@@ -265,79 +241,6 @@ def load_geojson(
         )
 
     return data
-
-
-# ============================================================
-# GEOJSON FINGERPRINT
-# ============================================================
-
-def geojson_fingerprint(
-    data: dict[str, Any]
-) -> str:
-
-    """
-    برای تشخیص اینکه دو فایل GeoJSON
-    عملاً محتوای یکسان دارند یا نه.
-    """
-
-    normalized = json.dumps(
-        data,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":")
-    )
-
-    return normalized
-
-
-# ============================================================
-# CHECK GEOJSON DUPLICATION
-# ============================================================
-
-def check_geojson_sources(
-    protected_geojson: dict[str, Any],
-    hunting_geojson: dict[str, Any],
-    protected_path: Path,
-    hunting_path: Path
-):
-
-    protected_fp = geojson_fingerprint(
-        protected_geojson
-    )
-
-    hunting_fp = geojson_fingerprint(
-        hunting_geojson
-    )
-
-    if protected_fp == hunting_fp:
-
-        print("")
-        print("=" * 70)
-        print("WARNING: DUPLICATE GEOJSON DATA")
-        print("=" * 70)
-        print("")
-        print(
-            "protected_areas.geojson and hunting_banned.geojson "
-            "contain identical data."
-        )
-        print("")
-        print(
-            "Excel mapping is correct, but the source data are identical."
-        )
-        print("")
-        print(
-            f"Protected: {protected_path}"
-        )
-        print(
-            f"Hunting:   {hunting_path}"
-        )
-        print("")
-        print(
-            "The report will still be generated, but both sheets "
-            "will naturally contain the same geographic features."
-        )
-        print("=" * 70)
-        print("")
 
 
 # ============================================================
@@ -372,7 +275,9 @@ def get_feature_name(
 
     for key in candidates:
 
-        value = properties.get(key)
+        value = properties.get(
+            key
+        )
 
         if (
             value is not None
@@ -389,9 +294,11 @@ def get_feature_name(
             value,
             str
         ):
+
             continue
 
         if not value.strip():
+
             continue
 
         key_lower = (
@@ -419,7 +326,9 @@ def load_fli(
     path: Path
 ):
 
-    with rasterio.open(path) as src:
+    with rasterio.open(
+        path
+    ) as src:
 
         if src.crs is None:
 
@@ -452,7 +361,9 @@ def load_fli(
             (data > 100)
         ] = np.nan
 
-        valid = np.isfinite(data)
+        valid = np.isfinite(
+            data
+        )
 
         if not np.any(valid):
 
@@ -460,17 +371,25 @@ def load_fli(
                 "FLI raster contains no valid pixels."
             )
 
-        valid_values = data[valid]
+        valid_values = data[
+            valid
+        ]
 
         statistics = {
             "min": float(
-                np.min(valid_values)
+                np.min(
+                    valid_values
+                )
             ),
             "max": float(
-                np.max(valid_values)
+                np.max(
+                    valid_values
+                )
             ),
             "mean": float(
-                np.mean(valid_values)
+                np.mean(
+                    valid_values
+                )
             ),
             "count": int(
                 valid_values.size
@@ -478,9 +397,15 @@ def load_fli(
         }
 
         metadata = {
-            "crs": str(src.crs),
-            "width": int(src.width),
-            "height": int(src.height),
+            "crs": str(
+                src.crs
+            ),
+            "width": int(
+                src.width
+            ),
+            "height": int(
+                src.height
+            ),
             "resolution_x": float(
                 src.res[0]
             ),
@@ -502,12 +427,24 @@ def load_fli(
                 ),
             },
             "transform": [
-                float(src.transform.a),
-                float(src.transform.b),
-                float(src.transform.c),
-                float(src.transform.d),
-                float(src.transform.e),
-                float(src.transform.f),
+                float(
+                    src.transform.a
+                ),
+                float(
+                    src.transform.b
+                ),
+                float(
+                    src.transform.c
+                ),
+                float(
+                    src.transform.d
+                ),
+                float(
+                    src.transform.e
+                ),
+                float(
+                    src.transform.f
+                ),
             ],
         }
 
@@ -553,12 +490,16 @@ def calculate_region_statistics(
 
         band = masked_data[0]
 
-        if np.ma.isMaskedArray(band):
+        if np.ma.isMaskedArray(
+            band
+        ):
 
             values = (
                 band
                 .compressed()
-                .astype(np.float32)
+                .astype(
+                    np.float32
+                )
             )
 
         else:
@@ -628,7 +569,7 @@ def calculate_region_statistics(
 
 
 # ============================================================
-# WHOLE PROVINCE RISK CLASSES
+# WHOLE-PROVINCE RISK CLASSES
 # ============================================================
 
 def calculate_class_statistics(
@@ -694,7 +635,7 @@ def calculate_class_statistics(
 
 
 # ============================================================
-# EXCEL STYLES
+# EXCEL STYLE
 # ============================================================
 
 def create_styles():
@@ -734,12 +675,6 @@ def create_styles():
             name="B Nazanin",
             size=11,
         ),
-
-        "bold_font": Font(
-            name="B Nazanin",
-            size=11,
-            bold=True,
-        ),
     }
 
 
@@ -768,9 +703,11 @@ def apply_sheet_format(
                 cell,
                 MergedCell
             ):
+
                 continue
 
             if cell.value is None:
+
                 continue
 
             cell.border = styles[
@@ -798,15 +735,19 @@ def style_header_row(
     styles
 ):
 
-    for cell in worksheet[row_number]:
+    for cell in worksheet[
+        row_number
+    ]:
 
         if isinstance(
             cell,
             MergedCell
         ):
+
             continue
 
         if cell.value is None:
+
             continue
 
         cell.fill = styles[
@@ -848,9 +789,11 @@ def auto_fit_columns(
                 cell,
                 MergedCell
             ):
+
                 continue
 
             if cell.value is None:
+
                 continue
 
             try:
@@ -865,72 +808,37 @@ def auto_fit_columns(
 
                 continue
 
-            value_length = len(
-                str(cell.value)
+            text = str(
+                cell.value
             )
 
-            current = column_widths.get(
-                column_letter,
-                minimum
+            current_width = (
+                column_widths.get(
+                    column_letter,
+                    0
+                )
             )
 
             column_widths[
                 column_letter
-            ] = min(
-                max(
-                    current,
-                    value_length + 2
-                ),
-                maximum
+            ] = max(
+                current_width,
+                len(text) + 2
             )
 
-    for column_letter, width in column_widths.items():
+    for column_letter, width in (
+        column_widths.items()
+    ):
 
         worksheet.column_dimensions[
             column_letter
-        ].width = max(
-            minimum,
-            width
+        ].width = min(
+            max(
+                width,
+                minimum
+            ),
+            maximum
         )
-
-
-# ============================================================
-# ADD TITLE
-# ============================================================
-
-def add_sheet_title(
-    worksheet,
-    title,
-    styles,
-    columns=6
-):
-
-    worksheet.merge_cells(
-        start_row=1,
-        start_column=1,
-        end_row=1,
-        end_column=columns
-    )
-
-    cell = worksheet.cell(
-        row=1,
-        column=1
-    )
-
-    cell.value = title
-
-    cell.font = styles[
-        "title_font"
-    ]
-
-    cell.alignment = Alignment(
-        horizontal="center",
-        vertical="center",
-    )
-
-    worksheet.row_dimensions[
-        1
-    ].height = 28
 
 
 # ============================================================
@@ -939,289 +847,200 @@ def add_sheet_title(
 
 def build_summary_sheet(
     workbook,
-    fli_stats,
-    metadata,
     run_date,
+    input_path,
+    statistics,
+    metadata,
     styles
 ):
 
-    worksheet = workbook.create_sheet(
-        "خلاصه"
+    worksheet = workbook.active
+
+    worksheet.title = "خلاصه"
+
+    worksheet.merge_cells(
+        "A1:C1"
     )
 
-    add_sheet_title(
-        worksheet,
-        "گزارش شاخص خطر حریق FIRIS",
-        styles,
-        4
+    title_cell = worksheet[
+        "A1"
+    ]
+
+    title_cell.value = (
+        "گزارش خطر حریق استان فارس"
     )
+
+    title_cell.font = styles[
+        "title_font"
+    ]
+
+    title_cell.alignment = Alignment(
+        horizontal="center",
+        vertical="center",
+    )
+
+    worksheet.row_dimensions[
+        1
+    ].height = 30
 
     rows = [
-        ("عنوان", "شاخص خطر حریق FIRIS"),
-        ("تاریخ پیش‌بینی", run_date or "نامشخص"),
-        ("حداقل FLI", fli_stats["min"]),
-        ("حداکثر FLI", fli_stats["max"]),
-        ("میانگین FLI", fli_stats["mean"]),
-        ("تعداد سلول‌های معتبر", fli_stats["count"]),
-        ("سیستم مختصات", metadata["crs"]),
         (
-            "ابعاد Raster",
-            f'{metadata["width"]} × {metadata["height"]}'
+            "تاریخ پیش‌بینی",
+            run_date,
         ),
         (
-            "تفکیک مکانی",
-            f'{metadata["resolution_x"]} × '
-            f'{metadata["resolution_y"]}'
+            "فایل FLI",
+            input_path.name,
+        ),
+        (
+            "سیستم مختصات",
+            metadata["crs"],
+        ),
+        (
+            "تعداد سلول معتبر",
+            statistics["count"],
+        ),
+        (
+            "حداقل FLI",
+            round(
+                statistics["min"],
+                2
+            ),
+        ),
+        (
+            "حداکثر FLI",
+            round(
+                statistics["max"],
+                2
+            ),
+        ),
+        (
+            "میانگین FLI",
+            round(
+                statistics["mean"],
+                2
+            ),
+        ),
+        (
+            "طبقه خطر استان",
+            risk_class(
+                statistics["mean"]
+            ),
+        ),
+        (
+            "رزولوشن X",
+            metadata["resolution_x"],
+        ),
+        (
+            "رزولوشن Y",
+            metadata["resolution_y"],
         ),
     ]
 
-    worksheet.append([])
+    for row_number, (
+        label,
+        value
+    ) in enumerate(
+        rows,
+        start=3
+    ):
 
-    worksheet.append([
-        "عنوان",
-        "مقدار"
-    ])
+        worksheet.cell(
+            row_number,
+            1,
+            label
+        )
 
-    style_header_row(
-        worksheet,
-        3,
-        styles
-    )
-
-    for title, value in rows:
-
-        worksheet.append([
-            title,
+        worksheet.cell(
+            row_number,
+            2,
             value
-        ])
-
-    # --------------------------------------------------------
-    # قالب‌بندی عمومی
-    # --------------------------------------------------------
+        )
 
     apply_sheet_format(
         worksheet,
         styles
     )
 
-    # --------------------------------------------------------
-    # عنوان ستون‌ها را دوباره حفظ می‌کنیم
-    # --------------------------------------------------------
+    risk_row = 10
 
-    style_header_row(
-        worksheet,
-        3,
-        styles
+    risk_label = risk_class(
+        statistics["mean"]
     )
 
-    # --------------------------------------------------------
-    # تشخیص طبقه خطر استانی
-    # --------------------------------------------------------
-
-    province_risk = risk_class(
-        fli_stats["mean"]
+    risk_cell = worksheet.cell(
+        risk_row,
+        2
     )
 
-    # --------------------------------------------------------
-    # ردیف میانگین FLI
-    #
-    # در جدول فعلی:
-    #
-    # row 8 = میانگین FLI
-    #
-    # چون عنوان در ستون A و مقدار در ستون B است.
-    # --------------------------------------------------------
-
-    mean_row = None
-
-    for row in range(
-        4,
-        worksheet.max_row + 1
-    ):
-
-        if worksheet.cell(
-            row=row,
-            column=1
-        ).value == "میانگین FLI":
-
-            mean_row = row
-            break
-
-    # --------------------------------------------------------
-    # رنگ مقدار میانگین FLI
-    # --------------------------------------------------------
-
-    if mean_row is not None:
-
-        risk_cell = worksheet.cell(
-            row=mean_row,
-            column=2
-        )
-
-        apply_risk_style(
-            risk_cell,
-            province_risk
-        )
-
-    # --------------------------------------------------------
-    # یک ردیف جداگانه برای طبقه خطر استان
-    # --------------------------------------------------------
-
-    risk_row = worksheet.max_row + 1
-
-    worksheet.cell(
-        row=risk_row,
-        column=1
-    ).value = "طبقه خطر استان"
-
-    worksheet.cell(
-        row=risk_row,
-        column=2
-    ).value = province_risk
-
-    worksheet.cell(
-        row=risk_row,
-        column=1
-    ).font = styles[
-        "bold_font"
-    ]
-
-    worksheet.cell(
-        row=risk_row,
-        column=1
-    ).alignment = Alignment(
-        horizontal="right",
-        vertical="center"
+    risk_cell.fill = risk_fill(
+        risk_label
     )
 
-    # رنگ قطعی سلول طبقه خطر
-    apply_risk_style(
-        worksheet.cell(
-            row=risk_row,
-            column=2
+    risk_cell.font = Font(
+        name="B Nazanin",
+        size=11,
+        bold=True,
+        color=(
+            "000000"
+            if risk_label == "متوسط"
+            else "FFFFFF"
         ),
-        province_risk
     )
-
-    # --------------------------------------------------------
-    # دوباره border و alignment سلول‌های جدول
-    # --------------------------------------------------------
-
-    for row in worksheet.iter_rows():
-
-        for cell in row:
-
-            if isinstance(
-                cell,
-                MergedCell
-            ):
-                continue
-
-            if cell.value is None:
-                continue
-
-            cell.border = styles[
-                "border"
-            ]
-
-    # --------------------------------------------------------
-    # دوباره رنگ سلول خطر
-    #
-    # این قسمت عمداً در انتهای تابع قرار گرفته تا هیچ
-    # قالب‌بندی عمومی دیگری رنگ را حذف نکند.
-    # --------------------------------------------------------
-
-    if mean_row is not None:
-
-        apply_risk_style(
-            worksheet.cell(
-                row=mean_row,
-                column=2
-            ),
-            province_risk
-        )
-
-        worksheet.cell(
-            row=mean_row,
-            column=2
-        ).border = styles[
-            "border"
-        ]
-
-    apply_risk_style(
-        worksheet.cell(
-            row=risk_row,
-            column=2
-        ),
-        province_risk
-    )
-
-    worksheet.cell(
-        row=risk_row,
-        column=2
-    ).border = styles[
-        "border"
-    ]
 
     auto_fit_columns(
-        worksheet,
-        minimum=15,
-        maximum=42
+        worksheet
     )
+
+    worksheet.freeze_panes = "A3"
 
 
 # ============================================================
-# REGION SHEET
+# REGIONAL SHEET
 # ============================================================
 
 def build_region_sheet(
     workbook,
-    sheet_name: str,
-    region_type: str,
-    geojson: dict[str, Any],
+    sheet_title,
+    region_label,
+    geojson,
     src,
     styles
 ):
 
     worksheet = workbook.create_sheet(
-        sheet_name
+        title=sheet_title
     )
-
-    add_sheet_title(
-        worksheet,
-        region_type,
-        styles,
-        7
-    )
-
-    worksheet.append([])
-
-    # --------------------------------------------------------
-    # ستون‌ها
-    #
-    # این ساختار برای هر دو شیت کاملاً یکسان است.
-    # فقط region_type تغییر می‌کند.
-    # --------------------------------------------------------
 
     headers = [
         "ردیف",
-        "نوع منطقه",
         "نام منطقه",
+        "نوع منطقه",
+        "میانگین FLI",
         "حداقل FLI",
         "حداکثر FLI",
-        "میانگین FLI",
+        "تعداد سلول معتبر",
         "طبقه خطر",
     ]
 
-    worksheet.append(
-        headers
-    )
+    for column_number, value in enumerate(
+        headers,
+        start=1
+    ):
+
+        worksheet.cell(
+            1,
+            column_number,
+            value
+        )
 
     style_header_row(
         worksheet,
-        3,
+        1,
         styles
     )
+
+    row_number = 2
 
     features = geojson.get(
         "features",
@@ -1235,88 +1054,104 @@ def build_region_sheet(
 
         name = get_feature_name(
             feature,
-            f"منطقه {index}"
+            f"{region_label} {index}"
         )
 
-        stats = calculate_region_statistics(
+        statistics = calculate_region_statistics(
             src,
             feature
         )
 
-        row = worksheet.max_row + 1
-
-        worksheet.append([
+        values = [
             index,
-            region_type,
             name,
-            stats["min"],
-            stats["max"],
-            stats["mean"],
-            stats["risk"],
-        ])
+            region_label,
+            (
+                round(
+                    statistics["mean"],
+                    2
+                )
+                if statistics["mean"] is not None
+                else None
+            ),
+            (
+                round(
+                    statistics["min"],
+                    2
+                )
+                if statistics["min"] is not None
+                else None
+            ),
+            (
+                round(
+                    statistics["max"],
+                    2
+                )
+                if statistics["max"] is not None
+                else None
+            ),
+            statistics["count"],
+            statistics["risk"],
+        ]
+
+        for column_number, value in enumerate(
+            values,
+            start=1
+        ):
+
+            worksheet.cell(
+                row_number,
+                column_number,
+                value
+            )
 
         risk_cell = worksheet.cell(
-            row=row,
-            column=7
+            row_number,
+            8
         )
 
-        apply_risk_style(
-            risk_cell,
-            stats["risk"]
+        risk_label = statistics[
+            "risk"
+        ]
+
+        risk_cell.fill = risk_fill(
+            risk_label
         )
 
-    # --------------------------------------------------------
-    # قالب عمومی
-    # --------------------------------------------------------
+        risk_cell.font = Font(
+            name="B Nazanin",
+            size=11,
+            bold=True,
+            color=(
+                "000000"
+                if risk_label == "متوسط"
+                else "FFFFFF"
+            ),
+        )
+
+        row_number += 1
 
     apply_sheet_format(
         worksheet,
         styles
     )
 
-    # --------------------------------------------------------
-    # Header را دوباره اعمال می‌کنیم
-    # --------------------------------------------------------
-
     style_header_row(
         worksheet,
-        3,
+        1,
         styles
     )
 
-    # --------------------------------------------------------
-    # رنگ طبقه خطر را بعد از قالب عمومی دوباره اعمال می‌کنیم
-    # --------------------------------------------------------
+    worksheet.freeze_panes = "A2"
 
-    for row in range(
-        4,
-        worksheet.max_row + 1
-    ):
+    if worksheet.max_row >= 2:
 
-        risk_cell = worksheet.cell(
-            row=row,
-            column=7
+        worksheet.auto_filter.ref = (
+            worksheet.dimensions
         )
 
-        if risk_cell.value:
-
-            label = str(
-                risk_cell.value
-            )
-
-            apply_risk_style(
-                risk_cell,
-                label
-            )
-
-            risk_cell.border = styles[
-                "border"
-            ]
-
     auto_fit_columns(
-        worksheet,
-        minimum=12,
-        maximum=40
+        worksheet
     )
 
 
@@ -1324,110 +1159,126 @@ def build_region_sheet(
 # RISK CLASS SHEET
 # ============================================================
 
-def build_risk_class_sheet(
+def build_class_sheet(
     workbook,
-    values,
+    data,
     styles
 ):
 
     worksheet = workbook.create_sheet(
-        "طبقات_خطر"
+        title="طبقات_خطر"
     )
 
-    add_sheet_title(
-        worksheet,
-        "توزیع مکانی طبقات خطر FLI",
-        styles,
-        5
-    )
-
-    worksheet.append([])
-
-    worksheet.append([
+    headers = [
         "طبقه خطر",
         "حداقل FLI",
         "حداکثر FLI",
         "تعداد سلول",
-        "درصد از محدوده معتبر",
-    ])
+        "درصد از کل",
+    ]
+
+    for column_number, value in enumerate(
+        headers,
+        start=1
+    ):
+
+        worksheet.cell(
+            1,
+            column_number,
+            value
+        )
 
     style_header_row(
         worksheet,
-        3,
+        1,
         styles
     )
 
     rows = calculate_class_statistics(
-        values
+        data
     )
 
-    for item in rows:
+    for row_number, item in enumerate(
+        rows,
+        start=2
+    ):
 
-        worksheet.append([
-            item["label"],
-            item["min"],
-            item["max"],
-            item["count"],
-            item["percent"],
-        ])
-
-        row = worksheet.max_row
-
-        cell = worksheet.cell(
-            row=row,
-            column=1
-        )
-
-        apply_risk_style(
-            cell,
+        worksheet.cell(
+            row_number,
+            1,
             item["label"]
         )
 
-        percent_cell = worksheet.cell(
-            row=row,
-            column=5
+        worksheet.cell(
+            row_number,
+            2,
+            item["min"]
         )
 
-        percent_cell.number_format = "0.00"
+        worksheet.cell(
+            row_number,
+            3,
+            item["max"]
+        )
+
+        worksheet.cell(
+            row_number,
+            4,
+            item["count"]
+        )
+
+        worksheet.cell(
+            row_number,
+            5,
+            round(
+                item["percent"],
+                2
+            )
+        )
+
+        risk_cell = worksheet.cell(
+            row_number,
+            1
+        )
+
+        risk_label = item[
+            "label"
+        ]
+
+        risk_cell.fill = risk_fill(
+            risk_label
+        )
+
+        risk_cell.font = Font(
+            name="B Nazanin",
+            size=11,
+            bold=True,
+            color=(
+                "000000"
+                if risk_label == "متوسط"
+                else "FFFFFF"
+            ),
+        )
 
     apply_sheet_format(
         worksheet,
         styles
     )
 
-    # Header
     style_header_row(
         worksheet,
-        3,
+        1,
         styles
     )
 
-    # Risk colors
-    for row in range(
-        4,
-        worksheet.max_row + 1
-    ):
+    worksheet.freeze_panes = "A2"
 
-        cell = worksheet.cell(
-            row=row,
-            column=1
-        )
-
-        if cell.value:
-
-            apply_risk_style(
-                cell,
-                str(cell.value)
-            )
-
-            cell.border = styles[
-                "border"
-            ]
+    worksheet.auto_filter.ref = (
+        worksheet.dimensions
+    )
 
     auto_fit_columns(
-        worksheet,
-        minimum=14,
-        maximum=35
+        worksheet
     )
 
 
@@ -1438,90 +1289,94 @@ def build_risk_class_sheet(
 def build_technical_sheet(
     workbook,
     metadata,
-    input_path,
-    protected_path,
-    hunting_path,
-    run_date,
     styles
 ):
 
     worksheet = workbook.create_sheet(
-        "اطلاعات_فنی"
+        title="اطلاعات_فنی"
     )
 
-    add_sheet_title(
-        worksheet,
-        "اطلاعات فنی و منابع داده",
-        styles,
-        3
-    )
-
-    worksheet.append([])
-
-    worksheet.append([
-        "پارامتر",
-        "مقدار",
-        "توضیح",
-    ])
-
-    style_header_row(
-        worksheet,
-        3,
-        styles
-    )
-
-    technical_rows = [
-        (
-            "تاریخ پیش‌بینی",
-            run_date or "نامشخص",
-            "تاریخ FLI مورد استفاده در گزارش",
-        ),
-        (
-            "Raster ورودی FLI",
-            str(input_path),
-            "Raster نهایی شاخص خطر حریق",
-        ),
-        (
-            "مرجع مناطق چهارگانه",
-            str(protected_path),
-            "protected_areas.geojson",
-        ),
-        (
-            "مرجع مناطق شکار ممنوع",
-            str(hunting_path),
-            "hunting_banned.geojson",
-        ),
+    rows = [
         (
             "CRS",
-            metadata["crs"],
-            "سیستم مختصات Raster",
+            metadata["crs"]
         ),
         (
-            "عرض Raster",
-            metadata["width"],
-            "تعداد ستون‌ها",
+            "Width",
+            metadata["width"]
         ),
         (
-            "ارتفاع Raster",
-            metadata["height"],
-            "تعداد ردیف‌ها",
+            "Height",
+            metadata["height"]
         ),
         (
-            "تفکیک X",
-            metadata["resolution_x"],
-            "تفکیک مکانی Raster",
+            "Resolution X",
+            metadata["resolution_x"]
         ),
         (
-            "تفکیک Y",
-            metadata["resolution_y"],
-            "تفکیک مکانی Raster",
+            "Resolution Y",
+            metadata["resolution_y"]
+        ),
+        (
+            "Left",
+            metadata["bounds"]["left"]
+        ),
+        (
+            "Bottom",
+            metadata["bounds"]["bottom"]
+        ),
+        (
+            "Right",
+            metadata["bounds"]["right"]
+        ),
+        (
+            "Top",
+            metadata["bounds"]["top"]
+        ),
+        (
+            "Transform a",
+            metadata["transform"][0]
+        ),
+        (
+            "Transform b",
+            metadata["transform"][1]
+        ),
+        (
+            "Transform c",
+            metadata["transform"][2]
+        ),
+        (
+            "Transform d",
+            metadata["transform"][3]
+        ),
+        (
+            "Transform e",
+            metadata["transform"][4]
+        ),
+        (
+            "Transform f",
+            metadata["transform"][5]
         ),
     ]
 
-    for row_data in technical_rows:
+    for row_number, (
+        label,
+        value
+    ) in enumerate(
+        rows,
+        start=1
+    ):
 
-        worksheet.append(
-            list(row_data)
+        worksheet.cell(
+            row_number,
+            1,
+            label
+        )
+
+        worksheet.cell(
+            row_number,
+            2,
+            value
         )
 
     apply_sheet_format(
@@ -1529,51 +1384,9 @@ def build_technical_sheet(
         styles
     )
 
-    style_header_row(
-        worksheet,
-        3,
-        styles
-    )
-
     auto_fit_columns(
-        worksheet,
-        minimum=15,
-        maximum=60
+        worksheet
     )
-
-
-# ============================================================
-# VALIDATE REGION MAPPING
-# ============================================================
-
-def validate_region_mapping(
-    protected_path: Path,
-    hunting_path: Path
-):
-
-    protected_name = (
-        protected_path.name.lower()
-    )
-
-    hunting_name = (
-        hunting_path.name.lower()
-    )
-
-    if "protected" not in protected_name:
-
-        raise ValueError(
-            "Protected areas input does not appear "
-            "to be protected_areas.geojson: "
-            f"{protected_path}"
-        )
-
-    if "hunting" not in hunting_name:
-
-        raise ValueError(
-            "Hunting input does not appear "
-            "to be hunting_banned.geojson: "
-            f"{hunting_path}"
-        )
 
 
 # ============================================================
@@ -1584,331 +1397,306 @@ def main():
 
     args = parse_args()
 
-    print("")
-    print("=" * 70)
-    print("FIRIS EXCEL REPORT")
-    print("=" * 70)
-    print("")
-
-    # --------------------------------------------------------
-    # Validate files
-    # --------------------------------------------------------
+    input_path = args.input
+    output_path = args.output
+    protected_path = args.protected
+    hunting_path = args.hunting
 
     require_file(
-        args.input,
+        input_path,
         "FLI raster"
     )
 
     require_file(
-        args.protected,
+        protected_path,
         "Protected areas GeoJSON"
     )
 
     require_file(
-        args.hunting,
+        hunting_path,
         "Hunting banned GeoJSON"
     )
 
-    validate_region_mapping(
-        args.protected,
-        args.hunting
+    if args.run_date:
+
+        run_date = args.run_date
+
+    else:
+
+        stem_parts = (
+            input_path.stem.split(
+                "_"
+            )
+        )
+
+        run_date = stem_parts[-1]
+
+    print("")
+    print("=" * 70)
+    print("FIRIS DETAILED EXCEL REPORT")
+    print("=" * 70)
+
+    print(
+        f"FLI raster       : {input_path}"
     )
 
-    # --------------------------------------------------------
-    # Load FLI
-    # --------------------------------------------------------
+    print(
+        f"Forecast date    : {run_date}"
+    )
 
+    print(
+        f"Protected source : {protected_path}"
+    )
+
+    print(
+        f"Hunting source   : {hunting_path}"
+    )
+
+    print("")
     print(
         "Reading FLI raster..."
     )
 
-    (
-        fli_data,
-        fli_stats,
-        metadata
-    ) = load_fli(
-        args.input
+    data, statistics, metadata = load_fli(
+        input_path
     )
 
-    # --------------------------------------------------------
-    # Load protected areas
-    # --------------------------------------------------------
+    print(
+        f"FLI min          : "
+        f"{statistics['min']:.2f}"
+    )
 
     print(
-        "Reading protected areas..."
+        f"FLI max          : "
+        f"{statistics['max']:.2f}"
+    )
+
+    print(
+        f"FLI mean         : "
+        f"{statistics['mean']:.2f}"
+    )
+
+    print(
+        f"Valid pixels     : "
+        f"{statistics['count']:,}"
+    )
+
+    print("")
+    print(
+        "Loading regional boundaries..."
     )
 
     protected_geojson = load_geojson(
-        args.protected
-    )
-
-    # --------------------------------------------------------
-    # Load hunting banned areas
-    # --------------------------------------------------------
-
-    print(
-        "Reading hunting banned areas..."
+        protected_path
     )
 
     hunting_geojson = load_geojson(
-        args.hunting
-    )
-
-    # --------------------------------------------------------
-    # Check if both source files are identical
-    # --------------------------------------------------------
-
-    check_geojson_sources(
-        protected_geojson,
-        hunting_geojson,
-        args.protected,
-        args.hunting
-    )
-
-    # --------------------------------------------------------
-    # Province risk
-    # --------------------------------------------------------
-
-    province_risk = risk_class(
-        fli_stats["mean"]
-    )
-
-    print("")
-    print(
-        "Province FLI statistics:"
+        hunting_path
     )
 
     print(
-        f'  Min:  {fli_stats["min"]:.4f}'
+        f"Protected features: "
+        f"{len(protected_geojson['features'])}"
     )
 
     print(
-        f'  Max:  {fli_stats["max"]:.4f}'
+        f"Hunting features : "
+        f"{len(hunting_geojson['features'])}"
     )
-
-    print(
-        f'  Mean: {fli_stats["mean"]:.4f}'
-    )
-
-    print(
-        f"  Risk: {province_risk}"
-    )
-
-    print("")
-
-    # --------------------------------------------------------
-    # Create workbook
-    # --------------------------------------------------------
-
-    workbook = Workbook()
-
-    default_sheet = workbook.active
-
-    if default_sheet is not None:
-
-        workbook.remove(
-            default_sheet
-        )
 
     styles = create_styles()
 
-    # ========================================================
-    # 1. SUMMARY
-    # ========================================================
+    workbook = Workbook()
 
-    build_summary_sheet(
-        workbook=workbook,
-        fli_stats=fli_stats,
-        metadata=metadata,
-        run_date=args.run_date,
-        styles=styles,
-    )
-
-    # ========================================================
-    # Open raster for regional statistics
-    # ========================================================
+    # --------------------------------------------------------
+    # IMPORTANT:
+    # A fresh rasterio dataset is opened for regional statistics.
+    # --------------------------------------------------------
 
     with rasterio.open(
-        args.input
+        input_path
     ) as src:
 
-        # ====================================================
-        # 2. FOUR PROTECTED AREAS
-        # ====================================================
+        if src.crs is None:
 
-        build_region_sheet(
-            workbook=workbook,
-            sheet_name="مناطق_چهارگانه",
-            region_type="مناطق چهارگانه",
-            geojson=protected_geojson,
-            src=src,
-            styles=styles,
+            raise ValueError(
+                "FLI raster has no CRS."
+            )
+
+        # ----------------------------------------------------
+        # SUMMARY
+        # ----------------------------------------------------
+
+        build_summary_sheet(
+            workbook,
+            run_date,
+            input_path,
+            statistics,
+            metadata,
+            styles
         )
 
-        # ====================================================
-        # 3. HUNTING BANNED
-        # ====================================================
+        # ----------------------------------------------------
+        # REQUESTED DISPLAY MAPPING
+        #
+        # protected_areas.geojson
+        #     -> مناطق چهارگانه
+        #
+        # hunting_banned.geojson
+        #     -> مناطق شکار ممنوع
+        # ----------------------------------------------------
 
         build_region_sheet(
-            workbook=workbook,
-            sheet_name="مناطق_شکار_ممنوع",
-            region_type="مناطق شکار ممنوع",
-            geojson=hunting_geojson,
-            src=src,
-            styles=styles,
+            workbook,
+            "مناطق_چهارگانه",
+            "مناطق چهارگانه",
+            protected_geojson,
+            src,
+            styles
         )
 
-    # ========================================================
-    # 4. RISK CLASSES
-    # ========================================================
+        build_region_sheet(
+            workbook,
+            "مناطق_شکار_ممنوع",
+            "مناطق شکار ممنوع",
+            hunting_geojson,
+            src,
+            styles
+        )
 
-    build_risk_class_sheet(
-        workbook=workbook,
-        values=fli_data,
-        styles=styles,
+    # --------------------------------------------------------
+    # RISK CLASSES
+    # --------------------------------------------------------
+
+    build_class_sheet(
+        workbook,
+        data,
+        styles
     )
 
-    # ========================================================
-    # 5. TECHNICAL INFORMATION
-    # ========================================================
+    # --------------------------------------------------------
+    # TECHNICAL INFORMATION
+    # --------------------------------------------------------
 
     build_technical_sheet(
-        workbook=workbook,
-        metadata=metadata,
-        input_path=args.input,
-        protected_path=args.protected,
-        hunting_path=args.hunting,
-        run_date=args.run_date,
-        styles=styles,
+        workbook,
+        metadata,
+        styles
     )
 
-    # ========================================================
-    # Sheet order
-    # ========================================================
+    # --------------------------------------------------------
+    # FINAL GENERAL FORMATTING
+    # --------------------------------------------------------
 
-    desired_order = [
-        "خلاصه",
-        "مناطق_چهارگانه",
-        "مناطق_شکار_ممنوع",
-        "طبقات_خطر",
-        "اطلاعات_فنی",
-    ]
+    for worksheet in workbook.worksheets:
 
-    workbook._sheets = [
-        workbook[name]
-        for name in desired_order
-        if name in workbook.sheetnames
-    ]
+        worksheet.sheet_view.rightToLeft = True
 
-    # ========================================================
-    # Final styling pass
-    #
-    # این مرحله عمداً در آخر انجام می‌شود تا رنگ‌های خطر
-    # تحت تأثیر قالب‌بندی عمومی قرار نگیرند.
-    # ========================================================
+        for row in worksheet.iter_rows():
 
-    summary_sheet = workbook["خلاصه"]
+            for cell in row:
 
-    # پیدا کردن طبقه خطر استان
-    for row in range(
-        1,
-        summary_sheet.max_row + 1
-    ):
+                if isinstance(
+                    cell,
+                    MergedCell
+                ):
 
-        title_cell = summary_sheet.cell(
-            row=row,
-            column=1
+                    continue
+
+                if cell.value is None:
+
+                    continue
+
+                bold_value = bool(
+                    cell.font.bold
+                )
+
+                italic_value = bool(
+                    cell.font.italic
+                )
+
+                color_value = None
+
+                if (
+                    cell.font.color
+                    and
+                    cell.font.color.type
+                    == "rgb"
+                ):
+
+                    color_value = (
+                        cell.font.color.rgb
+                    )
+
+                cell.font = Font(
+                    name="B Nazanin",
+                    size=(
+                        cell.font.sz
+                        or 11
+                    ),
+                    bold=bold_value,
+                    italic=italic_value,
+                    color=color_value,
+                )
+
+        auto_fit_columns(
+            worksheet
         )
 
-        if title_cell.value == "طبقه خطر استان":
+    # --------------------------------------------------------
+    # SAVE
+    # --------------------------------------------------------
 
-            risk_cell = summary_sheet.cell(
-                row=row,
-                column=2
-            )
-
-            apply_risk_style(
-                risk_cell,
-                province_risk
-            )
-
-            risk_cell.border = styles[
-                "border"
-            ]
-
-            break
-
-    # ========================================================
-    # Save
-    # ========================================================
-
-    args.output.parent.mkdir(
+    output_path.parent.mkdir(
         parents=True,
         exist_ok=True
     )
 
     workbook.save(
-        args.output
+        output_path
     )
 
-    # ========================================================
-    # Verification
-    # ========================================================
+    # --------------------------------------------------------
+    # FINAL LOG
+    # --------------------------------------------------------
 
     print("")
     print("=" * 70)
-    print("VERIFYING EXCEL")
+    print("FIRIS EXCEL REPORT CREATED SUCCESSFULLY")
     print("=" * 70)
-    print("")
 
     print(
-        "Output:",
-        args.output
+        f"Output : {output_path}"
     )
 
     print("")
-    print(
-        "Sheets:"
-    )
+    print("Sheets:")
 
-    for sheet in workbook.sheetnames:
+    for number, name in enumerate(
+        workbook.sheetnames,
+        start=1
+    ):
 
         print(
-            f"  ✓ {sheet}"
+            f"  {number}. {name}"
         )
 
     print("")
     print(
-        "Region mapping:"
+        f"Province mean FLI : "
+        f"{statistics['mean']:.2f}"
     )
 
     print(
-        "  protected_areas.geojson"
-        " -> مناطق چهارگانه"
-    )
-
-    print(
-        "  hunting_banned.geojson"
-        " -> مناطق شکار ممنوع"
+        f"Province risk     : "
+        f"{risk_class(statistics['mean'])}"
     )
 
     print("")
     print(
-        f"Province risk: {province_risk}"
+        "✓ Excel report completed."
     )
 
-    print("")
-    print(
-        "FIRIS EXCEL REPORT CREATED SUCCESSFULLY"
-    )
-
-    print("=" * 70)
-    print("")
-
-
-# ============================================================
-# ENTRY POINT
-# ============================================================
 
 if __name__ == "__main__":
 
