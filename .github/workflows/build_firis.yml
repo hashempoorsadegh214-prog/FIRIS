@@ -14,30 +14,41 @@ permissions:
 
 jobs:
   build-firis:
+
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
     runs-on: ubuntu-latest
+
     timeout-minutes: 30
 
     steps:
 
       # ============================================================
-      # 1. Checkout
+      # 1. CHECKOUT
       # ============================================================
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+
       # ============================================================
-      # 2. Python
+      # 2. PYTHON
       # ============================================================
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+
       # ============================================================
-      # 3. Dependencies
+      # 3. DEPENDENCIES
       # ============================================================
+
       - name: Install dependencies
         shell: bash
         run: |
@@ -45,7 +56,7 @@ jobs:
 
           python -m pip install --upgrade pip
 
-          pip install \
+          python -m pip install \
             numpy \
             pandas \
             rasterio \
@@ -56,9 +67,21 @@ jobs:
             requests \
             Pillow
 
+          echo ""
+          echo "============================================================"
+          echo "VERIFYING PILLOW"
+          echo "============================================================"
+
+          python -c "from PIL import Image; print('Pillow OK - version:', Image.__version__)"
+
+          echo ""
+          echo "Pillow import test passed."
+
+
       # ============================================================
-      # 4. Determine Iran dates
+      # 4. DETERMINE IRAN DATES
       # ============================================================
+
       - name: Determine Iran dates
         shell: bash
         run: |
@@ -69,9 +92,9 @@ jobs:
           from datetime import datetime, timedelta
           from zoneinfo import ZoneInfo
 
-          now_iran = datetime.now(
-              ZoneInfo("Asia/Tehran")
-          )
+          iran = ZoneInfo("Asia/Tehran")
+
+          now_iran = datetime.now(iran)
 
           today = now_iran.date()
 
@@ -81,6 +104,7 @@ jobs:
           )
 
           today_str = today.isoformat()
+
           tomorrow_str = tomorrow.isoformat()
 
           print("")
@@ -116,15 +140,18 @@ jobs:
 
           PY
 
+
       # ============================================================
-      # 5. Locate ONLY tomorrow FWI
+      # 5. LOCATE TOMORROW FWI ONLY
       # ============================================================
+
       - name: Locate tomorrow FWI
         shell: bash
         run: |
           set -euo pipefail
 
           FWI_JSON="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.json"
+
           FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif"
 
           echo ""
@@ -152,10 +179,14 @@ jobs:
 
             echo ""
             echo "ERROR: Tomorrow FWI metadata was not found."
+
+            echo ""
             echo "Expected:"
             echo "${FWI_JSON}"
+
             echo ""
             echo "No older FWI will be used."
+
             exit 1
 
           fi
@@ -164,10 +195,14 @@ jobs:
 
             echo ""
             echo "ERROR: Tomorrow FWI raster was not found."
+
+            echo ""
             echo "Expected:"
             echo "${FWI_RASTER}"
+
             echo ""
             echo "No older FWI will be used."
+
             exit 1
 
           fi
@@ -175,9 +210,11 @@ jobs:
           echo ""
           echo "✓ Tomorrow FWI files found."
 
+
       # ============================================================
-      # 6. Validate FWI metadata date
+      # 6. VALIDATE FWI DATE
       # ============================================================
+
       - name: Validate tomorrow FWI
         shell: bash
         run: |
@@ -191,6 +228,7 @@ jobs:
           import sys
 
           path = os.environ["FWI_JSON"]
+
           expected = os.environ["TOMORROW_DATE"]
 
           with open(
@@ -235,9 +273,11 @@ jobs:
 
           PY
 
+
       # ============================================================
-      # 7. Build FLI
+      # 7. BUILD FLI
       # ============================================================
+
       - name: Build FIRIS FLI
         shell: bash
         run: |
@@ -248,6 +288,7 @@ jobs:
           FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.tif"
 
           mkdir -p data/outputs
+
           mkdir -p data/report
 
           echo ""
@@ -272,9 +313,11 @@ jobs:
             --output-dir "data/outputs" \
             --run-date "${FWI_DATE}"
 
+
       # ============================================================
-      # 8. Verify FLI
+      # 8. VERIFY FLI
       # ============================================================
+
       - name: Verify FLI output
         shell: bash
         run: |
@@ -305,9 +348,11 @@ jobs:
 
           ls -lh "${FLI_RASTER}"
 
+
       # ============================================================
-      # 9. Build Excel report
+      # 9. BUILD EXCEL REPORT
       # ============================================================
+
       - name: Build FIRIS Excel report
         shell: bash
         run: |
@@ -334,8 +379,15 @@ jobs:
           echo "Output Excel:"
           echo "${REPORT_FILE}"
 
-          # Remove previous Excel before rebuilding.
+          # --------------------------------------------------------
+          # Remove previous Excel completely.
+          # --------------------------------------------------------
+
           rm -f "${REPORT_FILE}"
+
+          # --------------------------------------------------------
+          # Build report from TOMORROW FLI only.
+          # --------------------------------------------------------
 
           python scripts/build_report.py \
             --input "${FLI_RASTER}" \
@@ -364,24 +416,19 @@ jobs:
           echo ""
           echo "✓ Excel report generated."
 
+
       # ============================================================
-      # 10. STRICT Excel validation
-      #
-      # build_report.py writes:
-      #
-      # B3 = forecast date
-      # B4 = FLI filename
-      #
-      # Both MUST match tomorrow.
+      # 10. STRICT EXCEL VALIDATION
       # ============================================================
+
       - name: Verify Excel report
         shell: bash
         run: |
           set -euo pipefail
 
           python - <<'PY'
-          from openpyxl import load_workbook
           from pathlib import Path
+          from openpyxl import load_workbook
           import os
           import sys
 
@@ -438,11 +485,8 @@ jobs:
 
               ws = wb["خلاصه"]
 
-              # build_report.py writes these values:
-              # B3 = forecast date
-              # B4 = FLI filename
-
               actual_date = ws["B3"].value
+
               actual_fli = ws["B4"].value
 
               print("")
@@ -508,9 +552,11 @@ jobs:
 
               wb.close()
 
+
       # ============================================================
-      # 11. Build Web GIS
+      # 11. BUILD WEB GIS
       # ============================================================
+
       - name: Build Web GIS map
         shell: bash
         run: |
@@ -520,20 +566,31 @@ jobs:
 
           echo ""
           echo "============================================================"
-          echo "BUILD WEB GIS"
+          echo "BUILDING WEB GIS"
           echo "============================================================"
 
           echo ""
           echo "Input FLI:"
           echo "${FLI_RASTER}"
 
+          echo ""
+
+          # Explicit Pillow runtime check immediately before
+          # build_web_map.py.
+
+          python -c "from PIL import Image; print('Pillow runtime OK:', Image.__version__)"
+
+          echo ""
+
           python scripts/build_web_map.py \
             --input "${FLI_RASTER}" \
             --output-dir "data/web"
 
+
       # ============================================================
-      # 12. Verify Web GIS
+      # 12. VERIFY WEB GIS
       # ============================================================
+
       - name: Verify Web GIS outputs
         shell: bash
         run: |
@@ -569,6 +626,7 @@ jobs:
 
           echo ""
           echo "Tomorrow archive:"
+
           find \
             "data/web/archive/${TOMORROW_DATE}" \
             -maxdepth 2 \
@@ -578,9 +636,11 @@ jobs:
           echo ""
           echo "✓ Web GIS validation passed."
 
+
       # ============================================================
-      # 13. Update Archive Index
+      # 13. UPDATE ARCHIVE INDEX
       # ============================================================
+
       - name: Update Archive Index
         shell: bash
         run: |
@@ -614,13 +674,8 @@ jobs:
                       and p.name[4] == "-"
                       and p.name[7] == "-"
                   )
-              ],
-              reverse=True
+              ]
           )
-
-          data = {
-              "dates": dates
-          }
 
           with index_file.open(
               "w",
@@ -628,11 +683,13 @@ jobs:
           ) as file:
 
               json.dump(
-                  data,
+                  dates,
                   file,
                   ensure_ascii=False,
                   indent=2
               )
+
+              file.write("\n")
 
           print("")
           print("Archive dates:")
@@ -645,9 +702,11 @@ jobs:
 
           PY
 
+
       # ============================================================
-      # 14. Final consistency check
+      # 14. FINAL DATE CONSISTENCY CHECK
       # ============================================================
+
       - name: Final date consistency check
         shell: bash
         run: |
@@ -697,9 +756,11 @@ jobs:
           echo "${TOMORROW_DATE}"
           echo "============================================================"
 
+
       # ============================================================
-      # 15. Commit and Push
+      # 15. COMMIT AND PUSH
       # ============================================================
+
       - name: Commit FIRIS outputs
         shell: bash
         run: |
