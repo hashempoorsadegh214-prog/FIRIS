@@ -1,3 +1,4 @@
+```yaml
 name: Build FIRIS
 
 on:
@@ -10,7 +11,7 @@ on:
 
   workflow_run:
     workflows:
-      - "Update FWI"
+      - "Update FIRIS FWI"
     types:
       - completed
 
@@ -999,22 +1000,30 @@ jobs:
 
           echo ""
 
+
           echo "Forecast date:"
           echo "${FWI_DATE}"
 
+
           echo ""
+
 
           echo "FLI:"
           echo \
             "data/outputs/fli_fars_${FWI_DATE}.tif"
 
+
           echo ""
+
 
           echo "Web:"
           echo "data/web/fli_latest.json"
           echo "data/web/fli_latest_grid.json"
           echo "data/web/fli_polygons.geojson"
 
+
           echo ""
 
+
           echo "✓ Done."
+```
