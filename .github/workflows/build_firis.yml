@@ -18,8 +18,9 @@ jobs:
     timeout-minutes: 30
 
     steps:
+
       # ============================================================
-      # 1. دریافت مخزن
+      # 1. Checkout
       # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,7 +28,7 @@ jobs:
           fetch-depth: 0
 
       # ============================================================
-      # 2. نصب Python
+      # 2. Python
       # ============================================================
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -35,11 +36,12 @@ jobs:
           python-version: "3.11"
 
       # ============================================================
-      # 3. نصب وابستگی‌ها
+      # 3. Dependencies
       # ============================================================
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+
           pip install \
             numpy \
             pandas \
@@ -48,10 +50,11 @@ jobs:
             shapely \
             pyproj \
             fiona \
-            requests
+            requests \
+            Pillow
 
       # ============================================================
-      # 4. تعیین تاریخ ایران
+      # 4. Determine Iran dates
       # ============================================================
       - name: Determine Iran dates
         shell: bash
@@ -77,7 +80,7 @@ jobs:
           cat date.env >> "$GITHUB_ENV"
 
       # ============================================================
-      # 5. بررسی فایل FWI فردا
+      # 5. Locate tomorrow FWI
       # ============================================================
       - name: Locate tomorrow FWI
         shell: bash
@@ -104,7 +107,7 @@ jobs:
           echo "FWI files found successfully."
 
       # ============================================================
-      # 6. اعتبارسنجی تاریخ FWI
+      # 6. Validate tomorrow FWI
       # ============================================================
       - name: Validate tomorrow FWI
         shell: bash
@@ -143,15 +146,14 @@ jobs:
 
                       collect_dates(v)
 
-                  return
-
-              if isinstance(obj, list):
+              elif isinstance(obj, list):
                   for item in obj:
                       collect_dates(item)
 
           collect_dates(data)
 
           print("Date-like metadata:")
+
           for k, v in candidates:
               print(f"  {k}: {v}")
 
@@ -172,7 +174,7 @@ jobs:
           PY
 
       # ============================================================
-      # 7. ساخت FLI
+      # 7. Build FLI
       # ============================================================
       - name: Build FIRIS FLI
         shell: bash
@@ -180,13 +182,19 @@ jobs:
           FWI_DATE="${TOMORROW_DATE}"
 
           FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.tif"
-          FLI_RASTER="data/outputs/fli_fars_${FWI_DATE}.tif"
 
           mkdir -p data/outputs
           mkdir -p data/report
 
-          echo "Building FIRIS for:"
+          echo "=============================================="
+          echo "BUILD FIRIS FLI"
+          echo "=============================================="
+          echo "Forecast date:"
           echo "$FWI_DATE"
+          echo ""
+          echo "FWI raster:"
+          echo "$FWI_RASTER"
+          echo "=============================================="
 
           python scripts/build_firis.py \
             --fwi-raster "$FWI_RASTER" \
@@ -198,7 +206,7 @@ jobs:
             --run-date "$FWI_DATE"
 
       # ============================================================
-      # 8. بررسی FLI تولیدشده
+      # 8. Verify FLI
       # ============================================================
       - name: Verify FLI output
         shell: bash
@@ -218,7 +226,7 @@ jobs:
           echo "FLI output validation: OK"
 
       # ============================================================
-      # 9. تولید گزارش Excel
+      # 9. Build Excel report
       # ============================================================
       - name: Build FIRIS Excel report
         shell: bash
@@ -226,14 +234,18 @@ jobs:
           FLI_RASTER="data/outputs/fli_fars_${TOMORROW_DATE}.tif"
           REPORT_FILE="data/report/firis_report.xlsx"
 
-          echo "Building Excel report for:"
+          echo "=============================================="
+          echo "BUILD FIRIS EXCEL REPORT"
+          echo "=============================================="
+          echo "Forecast date:"
           echo "$TOMORROW_DATE"
-
+          echo ""
           echo "Input FLI:"
           echo "$FLI_RASTER"
-
+          echo ""
           echo "Output Excel:"
           echo "$REPORT_FILE"
+          echo "=============================================="
 
           python scripts/build_report.py \
             --input "$FLI_RASTER" \
@@ -252,7 +264,7 @@ jobs:
           echo "Excel report generated successfully."
 
       # ============================================================
-      # 10. کنترل نهایی تاریخ Excel
+      # 10. Verify Excel date
       # ============================================================
       - name: Verify Excel report
         shell: bash
@@ -266,86 +278,116 @@ jobs:
           report = Path("data/report/firis_report.xlsx")
           expected = os.environ["TOMORROW_DATE"]
 
+          print("Checking Excel:")
+          print(report)
+
           if not report.exists():
               print("ERROR: Excel report does not exist.")
               sys.exit(1)
 
-          wb = load_workbook(report, read_only=True, data_only=True)
+          wb = load_workbook(
+              report,
+              read_only=True,
+              data_only=True
+          )
 
+          print("")
           print("Excel sheets:")
+
           for sheet in wb.sheetnames:
               print(" -", sheet)
 
           if "خلاصه" not in wb.sheetnames:
-              print("WARNING: Sheet 'خلاصه' not found.")
-          else:
-              ws = wb["خلاصه"]
+              print("ERROR: Sheet 'خلاصه' not found.")
+              wb.close()
+              sys.exit(1)
 
-              print("\nChecking summary sheet...")
+          ws = wb["خلاصه"]
 
-              found_expected = False
+          print("")
+          print("Expected forecast date:")
+          print(expected)
 
-              for row in ws.iter_rows():
-                  for cell in row:
-                      if cell.value is not None:
-                          value = str(cell.value)
+          found_expected = False
 
-                          if expected in value:
-                              found_expected = True
-                              print(
-                                  "Expected forecast date found:",
-                                  value
-                              )
+          for row in ws.iter_rows():
+              for cell in row:
+                  if cell.value is not None:
+                      value = str(cell.value)
 
-              if not found_expected:
-                  print(
-                      "ERROR: Expected tomorrow date "
-                      f"{expected} was not found in Excel."
-                  )
-                  sys.exit(1)
+                      if expected in value:
+                          found_expected = True
+                          print(
+                              "Expected date found in Excel:",
+                              value
+                          )
 
           wb.close()
 
+          if not found_expected:
+              print(
+                  "ERROR: Expected tomorrow date "
+                  f"{expected} was not found in Excel."
+              )
+              sys.exit(1)
+
+          print("")
           print("Excel date validation: OK")
-          PY
 
       # ============================================================
-      # 11. ساخت Web GIS
+      # 11. Build Web GIS
       # ============================================================
       - name: Build Web GIS map
         shell: bash
         run: |
           FLI_RASTER="data/outputs/fli_fars_${TOMORROW_DATE}.tif"
 
+          echo "=============================================="
+          echo "BUILD WEB GIS"
+          echo "=============================================="
+          echo "Input FLI:"
+          echo "$FLI_RASTER"
+          echo "=============================================="
+
           python scripts/build_web_map.py \
             --input "$FLI_RASTER" \
             --output-dir "data/web"
 
       # ============================================================
-      # 12. بررسی خروجی Web GIS
+      # 12. Verify Web GIS
       # ============================================================
       - name: Verify Web GIS outputs
         shell: bash
         run: |
           echo "Checking Web GIS outputs..."
 
-          test -f "data/web/fli_latest.json" || {
+          if [ ! -f "data/web/fli_latest.json" ]; then
             echo "ERROR: fli_latest.json not found."
             exit 1
-          }
+          fi
 
-          test -d "data/web/archive/${TOMORROW_DATE}" || {
+          if [ ! -d "data/web/archive/${TOMORROW_DATE}" ]; then
             echo "ERROR: Tomorrow archive directory not found."
             exit 1
-          }
+          fi
 
-          echo "Web GIS outputs:"
-          find "data/web/archive/${TOMORROW_DATE}" -maxdepth 2 -type f -print
+          echo ""
+          echo "Latest JSON:"
+          ls -lh "data/web/fli_latest.json"
 
+          echo ""
+          echo "Tomorrow archive:"
+          find \
+            "data/web/archive/${TOMORROW_DATE}" \
+            -maxdepth 2 \
+            -type f \
+            -print
+
+          echo ""
           echo "Web GIS validation: OK"
 
       # ============================================================
-      # 13. بروزرسانی Archive Index
+      # 13. Update Archive Index
       # ============================================================
       - name: Update Archive Index
         shell: bash
@@ -357,16 +399,21 @@ jobs:
           archive_dir = Path("data/web/archive")
           index_file = archive_dir / "index.json"
 
-          archive_dir.mkdir(parents=True, exist_ok=True)
+          archive_dir.mkdir(
+              parents=True,
+              exist_ok=True
+          )
 
           dates = sorted(
               [
                   p.name
                   for p in archive_dir.iterdir()
-                  if p.is_dir()
-                  and len(p.name) == 10
-                  and p.name[4] == "-"
-                  and p.name[7] == "-"
+                  if (
+                      p.is_dir()
+                      and len(p.name) == 10
+                      and p.name[4] == "-"
+                      and p.name[7] == "-"
+                  )
               ],
               reverse=True
           )
@@ -375,7 +422,10 @@ jobs:
               "dates": dates
           }
 
-          with index_file.open("w", encoding="utf-8") as f:
+          with index_file.open(
+              "w",
+              encoding="utf-8"
+          ) as f:
               json.dump(
                   data,
                   f,
@@ -384,58 +434,70 @@ jobs:
               )
 
           print("Archive index updated.")
+
           print("Dates:")
+
           for date in dates:
               print(" -", date)
           PY
 
       # ============================================================
-      # 14. بررسی نهایی تاریخ کل زنجیره
+      # 14. Final consistency check
       # ============================================================
       - name: Final date consistency check
         shell: bash
         run: |
+          echo ""
           echo "=============================================="
           echo "FINAL FIRIS DATE CHECK"
           echo "=============================================="
 
-          echo "TODAY_IRAN     = ${TODAY_IRAN}"
-          echo "TOMORROW_DATE  = ${TOMORROW_DATE}"
+          echo "TODAY_IRAN    = ${TODAY_IRAN}"
+          echo "TOMORROW_DATE = ${TOMORROW_DATE}"
 
           echo ""
           echo "FWI:"
-          ls -lh "data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif"
+          ls -lh \
+            "data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif"
 
           echo ""
           echo "FLI:"
-          ls -lh "data/outputs/fli_fars_${TOMORROW_DATE}.tif"
+          ls -lh \
+            "data/outputs/fli_fars_${TOMORROW_DATE}.tif"
 
           echo ""
           echo "Excel:"
-          ls -lh "data/report/firis_report.xlsx"
+          ls -lh \
+            "data/report/firis_report.xlsx"
 
           echo ""
           echo "Web latest:"
-          ls -lh "data/web/fli_latest.json"
+          ls -lh \
+            "data/web/fli_latest.json"
 
           echo ""
           echo "Web archive:"
-          find "data/web/archive/${TOMORROW_DATE}" -maxdepth 2 -type f -print
+          find \
+            "data/web/archive/${TOMORROW_DATE}" \
+            -maxdepth 2 \
+            -type f \
+            -print
 
           echo ""
           echo "=============================================="
-          echo "ALL FIRIS OUTPUTS ARE FOR TOMORROW:"
+          echo "FIRIS OUTPUT DATE:"
           echo "${TOMORROW_DATE}"
           echo "=============================================="
 
       # ============================================================
-      # 15. Commit و Push
+      # 15. Commit and Push
       # ============================================================
       - name: Commit FIRIS outputs
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add \
             data/outputs \
@@ -447,5 +509,7 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Update FIRIS forecast ${TOMORROW_DATE}"
+          git commit \
+            -m "Update FIRIS forecast ${TOMORROW_DATE}"
+
           git push
