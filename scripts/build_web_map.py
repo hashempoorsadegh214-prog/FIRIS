@@ -603,6 +603,29 @@ def main():
 
 
     # ========================================================
+    # DAILY ARCHIVE
+    # ========================================================
+
+    archive_dir = (
+        output_dir
+        /
+        "archive"
+        /
+        forecast_date
+    )
+
+    archive_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    archive_png_path = archive_dir / "fli.png"
+    archive_metadata_path = archive_dir / "fli.json"
+    archive_grid_path = archive_dir / "fli_grid.json"
+    archive_polygons_path = archive_dir / "fli_polygons.geojson"
+
+
+    # ========================================================
     # OPEN FLI
     # ========================================================
 
@@ -1032,20 +1055,22 @@ def main():
     # WRITE POLYGON GEOJSON
     # ========================================================
 
+    polygon_text = json.dumps(
+        polygon_geojson,
+        ensure_ascii=False,
+        separators=(
+            ",",
+            ":"
+        )
+    )
+
     polygons_path.write_text(
+        polygon_text,
+        encoding="utf-8"
+    )
 
-        json.dumps(
-
-            polygon_geojson,
-
-            ensure_ascii=False,
-
-            separators=(
-                ",",
-                ":"
-            )
-        ),
-
+    archive_polygons_path.write_text(
+        polygon_text,
         encoding="utf-8"
     )
 
@@ -1054,20 +1079,22 @@ def main():
     # WRITE GRID JSON
     # ========================================================
 
+    grid_text = json.dumps(
+        grid,
+        ensure_ascii=False,
+        separators=(
+            ",",
+            ":"
+        )
+    )
+
     grid_path.write_text(
+        grid_text,
+        encoding="utf-8"
+    )
 
-        json.dumps(
-
-            grid,
-
-            ensure_ascii=False,
-
-            separators=(
-                ",",
-                ":"
-            )
-        ),
-
+    archive_grid_path.write_text(
+        grid_text,
         encoding="utf-8"
     )
 
@@ -1171,23 +1198,42 @@ def main():
                 "excluded",
 
             "spatial_resampling":
-                False
+                False,
+
+            "archive": {
+                "directory":
+                    f"archive/{forecast_date}",
+                "polygon":
+                    f"archive/{forecast_date}/fli_polygons.geojson",
+                "png":
+                    f"archive/{forecast_date}/fli.png",
+                "grid":
+                    f"archive/{forecast_date}/fli_grid.json",
+                "metadata":
+                    f"archive/{forecast_date}/fli.json"
+            }
         }
     }
 
 
+    metadata_text = json.dumps(
+        metadata,
+        ensure_ascii=False,
+        indent=2
+    )
+
     metadata_path.write_text(
-
-        json.dumps(
-
-            metadata,
-
-            ensure_ascii=False,
-
-            indent=2
-        ),
-
+        metadata_text,
         encoding="utf-8"
+    )
+
+    archive_metadata_path.write_text(
+        metadata_text,
+        encoding="utf-8"
+    )
+
+    archive_png_path.write_bytes(
+        png_path.read_bytes()
     )
 
 
@@ -1237,6 +1283,11 @@ def main():
     print(
         f"Grid JSON       : "
         f"{grid_path}"
+    )
+
+    print(
+        f"Archive dir     : "
+        f"{archive_dir}"
     )
 
     print("")
