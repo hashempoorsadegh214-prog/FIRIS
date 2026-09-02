@@ -5,7 +5,7 @@
   "source_file": "fli_fars_2026-09-03.tif",
   "forecast_date": "2026-09-03",
   "forecast_definition": "Forecast target date encoded in the FLI filename.",
-  "generated_at_utc": "2026-09-02T21:02:58.626566+00:00",
+  "generated_at_utc": "2026-09-02T21:03:48.711357+00:00",
   "crs": "EPSG:4326",
   "primary_web_layer": "fli_polygons.geojson",
   "preview_image": "fli_latest.png",
