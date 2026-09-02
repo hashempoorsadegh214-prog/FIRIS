@@ -77,109 +77,188 @@ jobs:
             matplotlib
 
       # ============================================================
-      # FIND LATEST FWI
+      # CALCULATE TOMORROW DATE IN IRAN
       # ============================================================
 
-      - name: Find latest FWI
-        id: find_fwi
+      - name: Calculate tomorrow date
+        id: dates
         shell: bash
         run: |
           set -euo pipefail
 
           echo "============================================================"
-          echo "SEARCHING FOR LATEST FWI"
+          echo "CALCULATING TOMORROW DATE"
           echo "============================================================"
 
           python - <<'PY'
-          import json
-          import glob
           import os
-          import re
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
 
-          files = glob.glob(
-              "data/raw/fwi/fwi_ecmwf_fars_*.json"
-          )
+          iran = ZoneInfo("Asia/Tehran")
 
-          if not files:
-              raise SystemExit(
-                  "ERROR: No FWI metadata files found."
-              )
+          now_iran = datetime.now(iran)
+          tomorrow = now_iran.date() + timedelta(days=1)
 
-          candidates = []
-
-          for path in files:
-
-              try:
-                  with open(path, "r", encoding="utf-8") as f:
-                      meta = json.load(f)
-              except Exception as e:
-                  print(
-                      f"Skipping invalid JSON: {path} ({e})"
-                  )
-                  continue
-
-              date = (
-                  meta.get("target_date")
-                  or meta.get("forecast_date")
-              )
-
-              if not date:
-                  m = re.search(
-                      r"fwi_ecmwf_fars_(\d{4}-\d{2}-\d{2})\.json$",
-                      path
-                  )
-
-                  if m:
-                      date = m.group(1)
-
-              if not date:
-                  continue
-
-              raster = (
-                  f"data/raw/fwi/"
-                  f"fwi_ecmwf_fars_{date}.tif"
-              )
-
-              if not os.path.exists(raster):
-                  print(
-                      f"Skipping {date}: raster not found."
-                  )
-                  continue
-
-              candidates.append(
-                  (date, path, raster)
-              )
-
-          if not candidates:
-              raise SystemExit(
-                  "ERROR: No valid FWI raster/metadata pair found."
-              )
-
-          candidates.sort(
-              key=lambda x: x[0],
-              reverse=True
-          )
-
-          date, meta_path, raster = candidates[0]
+          today = now_iran.date().isoformat()
+          tomorrow_date = tomorrow.isoformat()
 
           print("")
-          print("Latest FWI:")
-          print(f"Date:   {date}")
-          print(f"JSON:   {meta_path}")
-          print(f"Raster: {raster}")
+          print("Iran current datetime:")
+          print(now_iran.isoformat())
+
           print("")
+          print("Today in Iran:")
+          print(today)
+
+          print("")
+          print("Tomorrow in Iran:")
+          print(tomorrow_date)
 
           with open(
               os.environ["GITHUB_OUTPUT"],
               "a",
               encoding="utf-8"
           ) as out:
+              out.write(f"today={today}\n")
+              out.write(f"tomorrow={tomorrow_date}\n")
 
-              out.write(f"fwi_date={date}\n")
-              out.write(f"fwi_json={meta_path}\n")
-              out.write(f"fwi_raster={raster}\n")
+          with open(
+              os.environ["GITHUB_ENV"],
+              "a",
+              encoding="utf-8"
+          ) as env:
+              env.write(f"TODAY_IRAN={today}\n")
+              env.write(f"TOMORROW_DATE={tomorrow_date}\n")
 
           PY
+
+      # ============================================================
+      # FIND ONLY TOMORROW FWI
+      # ============================================================
+
+      - name: Find tomorrow FWI
+        id: find_fwi
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "SEARCHING FOR TOMORROW FWI ONLY"
+          echo "============================================================"
+
+          echo ""
+          echo "Today in Iran:"
+          echo "${TODAY_IRAN}"
+
+          echo ""
+          echo "Required forecast date:"
+          echo "${TOMORROW_DATE}"
+
+          FWI_JSON="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.json"
+          FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif"
+
+          echo ""
+          echo "Required FWI metadata:"
+          echo "${FWI_JSON}"
+
+          echo ""
+          echo "Required FWI raster:"
+          echo "${FWI_RASTER}"
+
+          # --------------------------------------------------------
+          # IMPORTANT:
+          # DO NOT FALL BACK TO AN OLDER FWI.
+          # FIRIS MUST ALWAYS USE TOMORROW'S FORECAST.
+          # --------------------------------------------------------
+
+          if [ ! -f "${FWI_JSON}" ]; then
+            echo ""
+            echo "ERROR: Tomorrow FWI metadata was not found."
+            echo ""
+            echo "Expected:"
+            echo "${FWI_JSON}"
+            echo ""
+            echo "FIRIS build stopped."
+            echo "No older FWI will be used as a fallback."
+            exit 1
+          fi
+
+          if [ ! -f "${FWI_RASTER}" ]; then
+            echo ""
+            echo "ERROR: Tomorrow FWI raster was not found."
+            echo ""
+            echo "Expected:"
+            echo "${FWI_RASTER}"
+            echo ""
+            echo "FIRIS build stopped."
+            echo "No older FWI will be used as a fallback."
+            exit 1
+          fi
+
+          echo ""
+          echo "✓ Tomorrow FWI files found."
+
+          echo ""
+          echo "Validating metadata date..."
+
+          python - <<PY
+          import json
+
+          path = "${FWI_JSON}"
+          expected = "${TOMORROW_DATE}"
+
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as f:
+              meta = json.load(f)
+
+          target = (
+              meta.get("target_date")
+              or meta.get("forecast_date")
+          )
+
+          print("")
+          print("Expected forecast date:")
+          print(expected)
+
+          print("")
+          print("Metadata forecast date:")
+          print(target)
+
+          if target != expected:
+              raise SystemExit(
+                  "ERROR: FWI metadata date does not match "
+                  "tomorrow's Iran date."
+              )
+
+          print("")
+          print("✓ FWI metadata date is correct.")
+
+          PY
+
+          echo ""
+          echo "Tomorrow FWI selected successfully."
+
+          echo ""
+          echo "Date:"
+          echo "${TOMORROW_DATE}"
+
+          echo ""
+          echo "JSON:"
+          echo "${FWI_JSON}"
+
+          echo ""
+          echo "Raster:"
+          echo "${FWI_RASTER}"
+
+          {
+            echo "fwi_date=${TOMORROW_DATE}"
+            echo "fwi_json=${FWI_JSON}"
+            echo "fwi_raster=${FWI_RASTER}"
+          } >> "${GITHUB_OUTPUT}"
 
       # ============================================================
       # VERIFY FWI DATE
@@ -198,50 +277,38 @@ jobs:
           echo "FWI DATE VERIFICATION"
           echo "============================================================"
 
-          echo "FWI_DATE:"
+          echo ""
+          echo "Today in Iran:"
+          echo "${TODAY_IRAN}"
+
+          echo ""
+          echo "Required forecast date:"
+          echo "${TOMORROW_DATE}"
+
+          echo ""
+          echo "Selected FWI date:"
           echo "${FWI_DATE}"
 
           echo ""
-
           echo "FWI JSON:"
           echo "${FWI_JSON}"
 
           echo ""
-
           echo "FWI Raster:"
           echo "${FWI_RASTER}"
-
-          echo ""
 
           test -f "${FWI_JSON}"
           test -f "${FWI_RASTER}"
 
-          python - <<PY
-          import json
+          if [ "${FWI_DATE}" != "${TOMORROW_DATE}" ]; then
+            echo ""
+            echo "ERROR: Selected FWI is not tomorrow's forecast."
+            exit 1
+          fi
 
-          path = "${FWI_JSON}"
-          expected = "${FWI_DATE}"
-
-          with open(path, "r", encoding="utf-8") as f:
-              meta = json.load(f)
-
-          target = (
-              meta.get("target_date")
-              or meta.get("forecast_date")
-          )
-
-          print("Metadata target date:", target)
-          print("Expected date:", expected)
-
-          if target != expected:
-              raise SystemExit(
-                  f"ERROR: FWI metadata date mismatch: "
-                  f"{target} != {expected}"
-              )
-
-          print("")
-          print("✓ FWI date verified.")
-          PY
+          echo ""
+          echo "✓ FWI date verified."
+          echo "✓ FIRIS will use tomorrow's forecast only."
 
       # ============================================================
       # BUILD FIRIS
@@ -263,36 +330,43 @@ jobs:
           echo "BUILDING FIRIS"
           echo "============================================================"
 
-          echo "Forecast date:"
+          echo ""
+          echo "Today in Iran:"
+          echo "${TODAY_IRAN}"
+
+          echo ""
+          echo "Forecast target:"
           echo "${FWI_DATE}"
 
           echo ""
-
           echo "FWI raster:"
           echo "${FWI_RASTER}"
 
           echo ""
-
           echo "Fuel raster:"
           echo "${FUEL_RASTER}"
 
           echo ""
-
           echo "DEM raster:"
           echo "${DEM_RASTER}"
 
           echo ""
-
           echo "Fuel Excel:"
           echo "${FUEL_EXCEL}"
 
-          echo ""
+          # --------------------------------------------------------
+          # REQUIRED INPUTS
+          # --------------------------------------------------------
 
           test -f "${FWI_RASTER}"
           test -f "${FUEL_RASTER}"
           test -f "${DEM_RASTER}"
           test -f "${FUEL_EXCEL}"
           test -f "fars.geojson"
+
+          # --------------------------------------------------------
+          # BUILD FLI
+          # --------------------------------------------------------
 
           python scripts/build_firis.py \
             --fwi-raster "${FWI_RASTER}" \
@@ -320,16 +394,21 @@ jobs:
           echo "VERIFYING FLI"
           echo "============================================================"
 
+          echo ""
+          echo "Expected forecast date:"
+          echo "${FWI_DATE}"
+
+          echo ""
           echo "Expected FLI:"
           echo "${FLI_RASTER}"
 
-          echo ""
-
           if [ ! -f "${FLI_RASTER}" ]; then
-              echo "ERROR: FLI raster was not generated."
-              exit 1
+            echo ""
+            echo "ERROR: FLI raster was not generated."
+            exit 1
           fi
 
+          echo ""
           echo "✓ FLI raster exists."
 
       # ============================================================
@@ -348,6 +427,14 @@ jobs:
           echo "============================================================"
           echo "BUILDING WEB MAP"
           echo "============================================================"
+
+          echo ""
+          echo "Forecast target:"
+          echo "${FWI_DATE}"
+
+          echo ""
+          echo "Input FLI:"
+          echo "${FLI_RASTER}"
 
           python scripts/build_web_map.py \
             --input "${FLI_RASTER}" \
@@ -382,17 +469,19 @@ jobs:
 
           for file in "${REQUIRED_FILES[@]}"; do
 
-              if [ ! -f "${file}" ]; then
-                  echo "ERROR: Missing:"
-                  echo "${file}"
-                  exit 1
-              fi
+            if [ ! -f "${file}" ]; then
+              echo ""
+              echo "ERROR: Missing:"
+              echo "${file}"
+              exit 1
+            fi
 
-              echo "✓ ${file}"
+            echo "✓ ${file}"
 
           done
 
           echo ""
+          echo "Validating web forecast date..."
 
           python - <<PY
           import json
@@ -400,7 +489,11 @@ jobs:
           path = "data/web/fli_latest.json"
           expected = "${FWI_DATE}"
 
-          with open(path, "r", encoding="utf-8") as f:
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as f:
               data = json.load(f)
 
           actual = (
@@ -409,17 +502,23 @@ jobs:
               or data.get("date")
           )
 
-          print("Expected date:", expected)
-          print("Web latest date:", actual)
+          print("")
+          print("Expected forecast date:")
+          print(expected)
+
+          print("")
+          print("Web latest date:")
+          print(actual)
 
           if actual != expected:
               raise SystemExit(
-                  f"ERROR: Web map date mismatch: "
-                  f"{actual} != {expected}"
+                  "ERROR: Web map date does not match "
+                  "tomorrow's forecast."
               )
 
           print("")
           print("✓ Web map date verified.")
+
           PY
 
       # ============================================================
@@ -461,8 +560,9 @@ jobs:
             data/report
 
           if git diff --cached --quiet; then
-              echo "No generated changes."
-              exit 0
+            echo ""
+            echo "No generated changes."
+            exit 0
           fi
 
           git commit \
@@ -486,9 +586,8 @@ jobs:
           echo ""
           echo "Merging latest main..."
 
-          # Merge latest remote changes.
-          # If generated FIRIS files conflict, keep the
-          # files generated by this build.
+          # Keep the outputs generated by this build
+          # when generated FIRIS files conflict.
           git merge origin/main \
             -X ours \
             --no-edit \
@@ -513,23 +612,23 @@ jobs:
           echo "============================================================"
 
           echo ""
+          echo "Today in Iran:"
+          echo "${TODAY_IRAN}"
 
-          echo "Forecast date:"
+          echo ""
+          echo "Tomorrow forecast:"
           echo "${{ steps.find_fwi.outputs.fwi_date }}"
 
           echo ""
-
           echo "FLI:"
           echo \
             "data/outputs/fli_fars_${{ steps.find_fwi.outputs.fwi_date }}.tif"
 
           echo ""
-
           echo "Web:"
           echo "data/web/fli_latest.json"
           echo "data/web/fli_latest_grid.json"
           echo "data/web/fli_polygons.geojson"
 
           echo ""
-
-          echo "✓ Done."
+          echo "✓ FIRIS built exclusively for tomorrow's forecast."
