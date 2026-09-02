@@ -122,12 +122,40 @@ a {
   font-size: 11px;
 }
 
+/* ============================================================
+   FORECAST LED
+   ============================================================ */
+
 .header-subtitle-badge .bullet {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   background: #4ade80;
   border-radius: 50%;
-  box-shadow: 0 0 6px #4ade80;
+  box-shadow:
+    0 0 5px #4ade80,
+    0 0 10px rgba(74, 222, 128, .85);
+  animation: forecastLedBlink 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes forecastLedBlink {
+  0%,
+  100% {
+    opacity: .35;
+    transform: scale(.85);
+    box-shadow:
+      0 0 3px #4ade80,
+      0 0 6px rgba(74, 222, 128, .35);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+    box-shadow:
+      0 0 7px #4ade80,
+      0 0 14px rgba(74, 222, 128, .95),
+      0 0 20px rgba(74, 222, 128, .55);
+  }
 }
 
 /* ============================================================
@@ -2502,6 +2530,7 @@ function getRegionName(
   return found
     ? String(found)
     : fallback;
+
 
 }
 
