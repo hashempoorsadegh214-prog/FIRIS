@@ -1,6 +1,6 @@
 {
   "project": "FIRIS - Fars Integrated Fire Information System",
-  "generated_at_utc": "2026-09-02T22:15:38.305973+00:00",
+  "generated_at_utc": "2026-09-03T20:17:20.337032+00:00",
   "run_date": "2026-09-04",
   "boundary": "fars.geojson",
   "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
@@ -306,16 +306,16 @@
     "FWI": {
       "count": 1820658,
       "min": 0.0,
-      "max": 0.883981,
-      "mean": 0.555502,
-      "std": 0.261999
+      "max": 0.890376,
+      "mean": 0.573479,
+      "std": 0.268485
     },
     "F_FWI": {
       "count": 1820658,
       "min": 0.0,
-      "max": 0.883981,
-      "mean": 0.555502,
-      "std": 0.261999
+      "max": 0.890376,
+      "mean": 0.573479,
+      "std": 0.268485
     },
     "F_Fuel": {
       "count": 904755,
@@ -341,9 +341,9 @@
     "FLI": {
       "count": 904753,
       "min": 0.0,
-      "max": 63.764454,
-      "mean": 37.62719,
-      "std": 8.843381
+      "max": 65.792732,
+      "mean": 38.394127,
+      "std": 8.841479
     }
   },
   "fuel": {
