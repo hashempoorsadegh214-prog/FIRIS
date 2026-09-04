@@ -1374,7 +1374,6 @@ const APP_STATE = {
  *
  * بنابراین timezone سیستم کاربر هیچ تأثیری ندارد.
  */
-
 function setupTomorrowDate() {
 
   const badge =
@@ -1389,7 +1388,7 @@ function setupTomorrowDate() {
   try {
 
     /*
-     * استخراج سال، ماه و روز فعلی بر اساس ایران
+     * دریافت تاریخ فعلی ایران
      */
     const iranParts =
       new Intl.DateTimeFormat(
@@ -1429,11 +1428,7 @@ function setupTomorrowDate() {
       );
 
     /*
-     * ساخت تاریخ مستقل از timezone مرورگر
-     *
-     * استفاده از UTC باعث می‌شود اگر کاربر خارج از ایران
-     * باشد یا timezone سیستم چیز دیگری باشد،
-     * محاسبه تاریخ فردا تغییر نکند.
+     * ساخت فردا به‌صورت مستقل از timezone مرورگر
      */
     const tomorrow =
       new Date(
@@ -1448,9 +1443,9 @@ function setupTomorrowDate() {
       );
 
     /*
-     * تبدیل تاریخ فردا به تقویم شمسی ایران
+     * دریافت اجزای تاریخ شمسی فردا
      */
-    const dateStr =
+    const persianParts =
       new Intl.DateTimeFormat(
         "fa-IR-u-ca-persian",
         {
@@ -1460,12 +1455,41 @@ function setupTomorrowDate() {
           month: "long",
           year: "numeric"
         }
-      ).format(
+      ).formatToParts(
         tomorrow
       );
 
+    const weekday =
+      persianParts.find(
+        part =>
+          part.type === "weekday"
+      )?.value || "";
+
+    const persianDay =
+      persianParts.find(
+        part =>
+          part.type === "day"
+      )?.value || "";
+
+    const persianMonth =
+      persianParts.find(
+        part =>
+          part.type === "month"
+      )?.value || "";
+
+    const persianYear =
+      persianParts.find(
+        part =>
+          part.type === "year"
+      )?.value || "";
+
+    /*
+     * ترتیب نمایش کاملاً دستی:
+     *
+     * پیش‌بینی برای یکشنبه ۱۵ شهریور ۱۴۰۵
+     */
     badge.textContent =
-      `پیش‌بینی برای ${dateStr}`;
+      `پیش‌بینی برای ${weekday} ${persianDay} ${persianMonth} ${persianYear}`;
 
   } catch (error) {
 
@@ -1480,7 +1504,6 @@ function setupTomorrowDate() {
   }
 
 }
-
 /* ============================================================
    FETCH
    ============================================================ */
