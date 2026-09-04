@@ -1,0 +1,375 @@
+{
+  "project": "FIRIS - Fars Integrated Fire Information System",
+  "generated_at_utc": "2026-09-04T22:25:10.636332+00:00",
+  "run_date": "2026-09-06",
+  "boundary": "fars.geojson",
+  "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
+  "weights": {
+    "F_FWI": 0.45,
+    "F_Fuel": 0.35,
+    "F_Topo": 0.2
+  },
+  "fuel_formula": {
+    "FineFuel": 0.35,
+    "DeadWood": 0.3,
+    "WoodyCover": 0.15,
+    "Litter": 0.2,
+    "CanopyStructure": null,
+    "WoodyCover_used_once": true,
+    "weights_sum": 1.0
+  },
+  "slope_method": {
+    "calculation": "Native DEM central finite differences",
+    "nodata_filling": false,
+    "nodata_policy": "Slope is calculated only where center, north, south, west and east DEM cells are valid.",
+    "units": "degrees",
+    "reference_degrees": 45.0,
+    "normalization": "clip(slope_degrees / 45, 0, 1)"
+  },
+  "target_grid": {
+    "reference": "FWI",
+    "crs": "EPSG:4326",
+    "width": 2000,
+    "height": 2000,
+    "cell_size_x": 0.002588441050000003,
+    "cell_size_y": 0.002411990949999999,
+    "bounds": {
+      "left": 50.5031831,
+      "bottom": 26.945617,
+      "right": 55.68006520000001,
+      "top": 31.7695989
+    },
+    "transform": [
+      0.002588441050000003,
+      0.0,
+      50.5031831,
+      0.0,
+      -0.002411990949999999,
+      31.7695989
+    ]
+  },
+  "input_metadata": {
+    "FWI": {
+      "crs": "EPSG:4326",
+      "width": 2000,
+      "height": 2000,
+      "cell_size_x": 0.002588441050000003,
+      "cell_size_y": 0.002411990949999999,
+      "bounds": {
+        "left": 50.5031831,
+        "bottom": 26.945617,
+        "right": 55.68006520000001,
+        "top": 31.7695989
+      },
+      "nodata": null,
+      "transform": [
+        0.002588441050000003,
+        0.0,
+        50.5031831,
+        0.0,
+        -0.002411990949999999,
+        31.7695989
+      ]
+    },
+    "Fuel": {
+      "crs": "EPSG:4326",
+      "width": 2506,
+      "height": 1619,
+      "cell_size_x": 0.0027769971134153806,
+      "cell_size_y": 0.0027769971134153806,
+      "bounds": {
+        "left": 49.45121465613049,
+        "bottom": 26.832288289763955,
+        "right": 56.41036942234943,
+        "top": 31.328246616383456
+      },
+      "nodata": 2147483647.0,
+      "transform": [
+        0.0027769971134153806,
+        0.0,
+        49.45121465613049,
+        0.0,
+        -0.0027769971134153806,
+        31.328246616383456
+      ]
+    },
+    "DEM": {
+      "crs": "EPSG:4326",
+      "width": 5540,
+      "height": 5146,
+      "cell_size_x": 0.0008983152841195214,
+      "cell_size_y": 0.0008983152841195214,
+      "bounds": {
+        "left": 50.60188612101285,
+        "bottom": 27.048137636816605,
+        "right": 55.578552795035,
+        "top": 31.670868088895663
+      },
+      "nodata": null,
+      "transform": [
+        0.0008983152841195214,
+        0.0,
+        50.60188612101285,
+        0.0,
+        -0.0008983152841195214,
+        31.670868088895663
+      ]
+    }
+  },
+  "alignment": {
+    "FWI": "reference grid",
+    "Fuel": "nearest-neighbour to FWI",
+    "DEM": "native slope calculation without artificial NoData filling, then bilinear alignment to FWI"
+  },
+  "normalization": {
+    "F_FWI": "clip(FWI / 100, 0, 1)",
+    "F_Fuel": "0.35 FineFuel + 0.30 DeadWood + 0.15 WoodyCover + 0.20 Litter",
+    "F_Topo": "clip(slope_degrees / 45, 0, 1)"
+  },
+  "grid_validation": {
+    "F_FWI": {
+      "path": "data/outputs/f_fwi_fars_2026-09-06.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.002588441050000003,
+        "cell_size_y": 0.002411990949999999,
+        "bounds": {
+          "left": 50.5031831,
+          "bottom": 26.945617,
+          "right": 55.68006520000001,
+          "top": 31.7695989
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.002588441050000003,
+          0.0,
+          50.5031831,
+          0.0,
+          -0.002411990949999999,
+          31.7695989
+        ]
+      }
+    },
+    "F_Fuel": {
+      "path": "data/outputs/f_fuel_fars_2026-09-06.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.002588441050000003,
+        "cell_size_y": 0.002411990949999999,
+        "bounds": {
+          "left": 50.5031831,
+          "bottom": 26.945617,
+          "right": 55.68006520000001,
+          "top": 31.7695989
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.002588441050000003,
+          0.0,
+          50.5031831,
+          0.0,
+          -0.002411990949999999,
+          31.7695989
+        ]
+      }
+    },
+    "Slope": {
+      "path": "data/outputs/slope_fars_2026-09-06.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.002588441050000003,
+        "cell_size_y": 0.002411990949999999,
+        "bounds": {
+          "left": 50.5031831,
+          "bottom": 26.945617,
+          "right": 55.68006520000001,
+          "top": 31.7695989
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.002588441050000003,
+          0.0,
+          50.5031831,
+          0.0,
+          -0.002411990949999999,
+          31.7695989
+        ]
+      }
+    },
+    "F_Topo": {
+      "path": "data/outputs/f_topo_fars_2026-09-06.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.002588441050000003,
+        "cell_size_y": 0.002411990949999999,
+        "bounds": {
+          "left": 50.5031831,
+          "bottom": 26.945617,
+          "right": 55.68006520000001,
+          "top": 31.7695989
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.002588441050000003,
+          0.0,
+          50.5031831,
+          0.0,
+          -0.002411990949999999,
+          31.7695989
+        ]
+      }
+    },
+    "FLI": {
+      "path": "data/outputs/fli_fars_2026-09-06.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.002588441050000003,
+        "cell_size_y": 0.002411990949999999,
+        "bounds": {
+          "left": 50.5031831,
+          "bottom": 26.945617,
+          "right": 55.68006520000001,
+          "top": 31.7695989
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.002588441050000003,
+          0.0,
+          50.5031831,
+          0.0,
+          -0.002411990949999999,
+          31.7695989
+        ]
+      }
+    },
+    "FuelCoverage": {
+      "path": "data/outputs/fuel_coverage_fars_2026-09-06.tif",
+      "matches_fwi_grid": true,
+      "reasons": [],
+      "metadata": {
+        "crs": "EPSG:4326",
+        "width": 2000,
+        "height": 2000,
+        "cell_size_x": 0.002588441050000003,
+        "cell_size_y": 0.002411990949999999,
+        "bounds": {
+          "left": 50.5031831,
+          "bottom": 26.945617,
+          "right": 55.68006520000001,
+          "top": 31.7695989
+        },
+        "nodata": -9999.0,
+        "transform": [
+          0.002588441050000003,
+          0.0,
+          50.5031831,
+          0.0,
+          -0.002411990949999999,
+          31.7695989
+        ]
+      }
+    }
+  },
+  "coverage_inside_fars": {
+    "province_pixels": 1820658,
+    "FWI_valid_pixels": 1820658,
+    "FWI_valid_percent": 100.0,
+    "Fuel_valid_pixels": 904755,
+    "Fuel_valid_percent": 49.6938,
+    "Topo_valid_pixels": 1820636,
+    "Topo_valid_percent": 99.9988,
+    "common_valid_pixels": 904753,
+    "common_valid_percent": 49.6937,
+    "common_valid_percent_of_FWI": 49.6937
+  },
+  "statistics": {
+    "FWI": {
+      "count": 1820658,
+      "min": 0.0,
+      "max": 0.925799,
+      "mean": 0.573582,
+      "std": 0.269563
+    },
+    "F_FWI": {
+      "count": 1820658,
+      "min": 0.0,
+      "max": 0.925799,
+      "mean": 0.573582,
+      "std": 0.269563
+    },
+    "F_Fuel": {
+      "count": 904755,
+      "min": 0.0,
+      "max": 0.232112,
+      "mean": 0.099255,
+      "std": 0.062829
+    },
+    "Slope_degrees": {
+      "count": 1820636,
+      "min": 0.0,
+      "max": 67.927628,
+      "mean": 9.031106,
+      "std": 8.334291
+    },
+    "F_Topo": {
+      "count": 1820636,
+      "min": 0.0,
+      "max": 1.0,
+      "mean": 0.20061,
+      "std": 0.184821
+    },
+    "FLI": {
+      "count": 904753,
+      "min": 0.0,
+      "max": 62.398712,
+      "mean": 37.632183,
+      "std": 8.490971
+    }
+  },
+  "fuel": {
+    "unmapped_code_count": 0,
+    "unmapped_codes": []
+  },
+  "inputs": {
+    "FWI": "data/raw/fwi/fwi_ecmwf_fars_2026-09-06.tif",
+    "Fuel": "data/raw/fuel/fars_fuel.tif",
+    "DEM": "data/raw/topography/dem_fars.tif",
+    "FuelExcel": "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx",
+    "Boundary": "fars.geojson"
+  },
+  "outputs": {
+    "F_FWI": "data/outputs/f_fwi_fars_2026-09-06.tif",
+    "F_Fuel": "data/outputs/f_fuel_fars_2026-09-06.tif",
+    "Slope": "data/outputs/slope_fars_2026-09-06.tif",
+    "F_Topo": "data/outputs/f_topo_fars_2026-09-06.tif",
+    "FLI": "data/outputs/fli_fars_2026-09-06.tif",
+    "FuelCoverage": "data/outputs/fuel_coverage_fars_2026-09-06.tif"
+  },
+  "interpretation": {
+    "NoData_policy": "NoData is preserved; missing source coverage is never extrapolated.",
+    "coverage_warning": true,
+    "grid_policy": "All final rasters use the exact FWI reference profile.",
+    "woody_policy": "Woody Cover is included exactly once.",
+    "canopy_policy": "Canopy Structure is not included because it is absent from Fuelbeds_metric."
+  }
+}
