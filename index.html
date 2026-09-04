@@ -1365,12 +1365,14 @@ const APP_STATE = {
    ============================================================ */
 
 /*
- * این تابع تاریخ فردا را فقط بر اساس زمان ایران
+ * این تابع تاریخ فردا را فقط بر اساس تاریخ ایران
  * (Asia/Tehran) محاسبه می‌کند.
  *
- * نکته مهم:
- * این تابع نباید بعداً توسط metadata مربوط به
- * fli_latest.json بازنویسی شود.
+ * تاریخ میلادی ابتدا از ساعت ایران استخراج می‌شود،
+ * سپس یک روز به آن اضافه می‌شود و در نهایت با تقویم
+ * فارسی نمایش داده می‌شود.
+ *
+ * بنابراین timezone سیستم کاربر هیچ تأثیری ندارد.
  */
 
 function setupTomorrowDate() {
@@ -1387,76 +1389,79 @@ function setupTomorrowDate() {
   try {
 
     /*
-     * دریافت تاریخ و ساعت فعلی ایران
+     * استخراج سال، ماه و روز فعلی بر اساس ایران
      */
-    const iranDateString =
+    const iranParts =
       new Intl.DateTimeFormat(
         "en-US",
         {
           timeZone: "Asia/Tehran",
           year: "numeric",
-          month: "2-digit",
-          day: "2-digit"
+          month: "numeric",
+          day: "numeric"
         }
-      ).format(
+      ).formatToParts(
         new Date()
       );
 
-    /*
-     * استخراج سال، ماه و روز
-     */
-    const parts =
-      iranDateString.match(
-        /(\d{2})\/(\d{2})\/(\d{4})/
+    const year =
+      Number(
+        iranParts.find(
+          part =>
+            part.type === "year"
+        ).value
       );
-
-    if (!parts) {
-      throw new Error(
-        "Unable to determine Iran date."
-      );
-    }
 
     const month =
-      Number(parts[1]);
+      Number(
+        iranParts.find(
+          part =>
+            part.type === "month"
+        ).value
+      );
 
     const day =
-      Number(parts[2]);
-
-    const year =
-      Number(parts[3]);
-
-    /*
-     * ساخت تاریخ میلادی بر اساس تاریخ ایران
-     */
-    const iranToday =
-      new Date(
-        year,
-        month - 1,
-        day,
-        12,
-        0,
-        0
+      Number(
+        iranParts.find(
+          part =>
+            part.type === "day"
+        ).value
       );
 
     /*
-     * فردا
+     * ساخت تاریخ مستقل از timezone مرورگر
+     *
+     * استفاده از UTC باعث می‌شود اگر کاربر خارج از ایران
+     * باشد یا timezone سیستم چیز دیگری باشد،
+     * محاسبه تاریخ فردا تغییر نکند.
      */
-    iranToday.setDate(
-      iranToday.getDate() + 1
-    );
+    const tomorrow =
+      new Date(
+        Date.UTC(
+          year,
+          month - 1,
+          day + 1,
+          12,
+          0,
+          0
+        )
+      );
 
     /*
-     * تبدیل به شمسی
+     * تبدیل تاریخ فردا به تقویم شمسی ایران
      */
     const dateStr =
-      iranToday.toLocaleDateString(
+      new Intl.DateTimeFormat(
         "fa-IR-u-ca-persian",
         {
+          timeZone: "Asia/Tehran",
           weekday: "long",
-          year: "numeric",
+          day: "numeric",
           month: "long",
-          day: "numeric"
+          year: "numeric"
         }
+      ).format(
+        tomorrow
       );
 
     badge.textContent =
