@@ -5,7 +5,7 @@
   "source_file": "fli_fars_2026-09-05.tif",
   "forecast_date": "2026-09-05",
   "forecast_definition": "Forecast target date encoded in the FLI filename.",
-  "generated_at_utc": "2026-09-03T20:58:51.078649+00:00",
+  "generated_at_utc": "2026-09-04T20:02:08.255643+00:00",
   "crs": "EPSG:4326",
   "primary_web_layer": "fli_polygons.geojson",
   "preview_image": "fli_latest.png",
@@ -44,8 +44,8 @@
   },
   "statistics": {
     "min": 0.0,
-    "max": 63.59,
-    "mean": 37.07,
+    "max": 65.95,
+    "mean": 37.03,
     "valid_pixels": 904753
   },
   "legend": [
