@@ -1,1359 +1,603 @@
+name: Update FIRIS FWI
 
-#!/usr/bin/env python3
-
-"""
-FIRIS - Web Map Builder
-=======================
-
-Build web-ready FIRIS outputs from the EXISTING FLI raster.
-
-IMPORTANT
----------
-This script does NOT recalculate FLI.
-
-It:
-1. Reads the final FLI GeoTIFF.
-2. Applies fars.geojson as the authoritative province mask.
-3. Creates fli_polygons.geojson for the main web display.
-4. Creates fli_latest_grid.json for lightweight popup values.
-5. Creates fli_latest.png as a preview/backup.
-6. Writes fli_latest.json metadata.
-7. Extracts forecast_date from the FLI filename.
-
-Expected FLI filename:
-    fli_fars_YYYY-MM-DD.tif
-
-Example:
-    fli_fars_2026-08-29.tif
-
-The forecast date is therefore the actual forecast target date,
-not the file generation time.
-"""
-
-from __future__ import annotations
-
-import argparse
-import json
-from datetime import datetime, timezone
-from pathlib import Path
-
-import numpy as np
-import rasterio
-from PIL import Image
-from rasterio.features import geometry_mask, shapes
-from rasterio.warp import transform_geom
-
-
-# ============================================================
-# LEGEND
-# ============================================================
-
-LEGEND = [
-    {
-        "min": 0,
-        "max": 20,
-        "label": "کم",
-        "color": "#2e7d32",
-    },
-    {
-        "min": 20,
-        "max": 40,
-        "label": "متوسط",
-        "color": "#fdd835",
-    },
-    {
-        "min": 40,
-        "max": 60,
-        "label": "زیاد",
-        "color": "#fb8c00",
-    },
-    {
-        "min": 60,
-        "max": 80,
-        "label": "خیلی زیاد",
-        "color": "#e53935",
-    },
-    {
-        "min": 80,
-        "max": 100,
-        "label": "بحرانی",
-        "color": "#880e4f",
-    },
-]
+on:
 
+  workflow_dispatch:
 
-# ============================================================
-# ARGUMENTS
-# ============================================================
+  schedule:
 
-def parse_args():
+    # ----------------------------------------------------------
+    # RUN 1
+    #
+    # 18:00 UTC
+    # = 21:30 Iran
+    #
+    # Prepare tomorrow's forecast in advance.
+    # ----------------------------------------------------------
+    - cron: "0 18 * * *"
 
-    parser = argparse.ArgumentParser(
-        description="Build FIRIS web map files"
-    )
-
-    parser.add_argument(
-        "--input",
-        required=True,
-        type=Path,
-    )
+    # ----------------------------------------------------------
+    # RUN 2
+    #
+    # 20:35 UTC
+    # = 00:05 Iran
+    #
+    # After midnight in Iran, tomorrow changes to the new date.
+    # ----------------------------------------------------------
+    - cron: "35 20 * * *"
 
-    parser.add_argument(
-        "--output-dir",
-        required=True,
-        type=Path,
-    )
+  push:
 
-    parser.add_argument(
-        "--boundary",
-        required=False,
-        type=Path,
-        default=Path("fars.geojson"),
-    )
+    paths:
 
-    return parser.parse_args()
+      - "scripts/update_fwi.py"
+      - "fars.geojson"
+      - ".github/workflows/update_fwi.yml"
 
 
-# ============================================================
-# FORECAST DATE FROM FLI FILENAME
-# ============================================================
+permissions:
+  contents: write
 
-def extract_forecast_date(
-    input_path: Path
-):
 
-    """
-    Extract YYYY-MM-DD from:
+concurrency:
 
-        fli_fars_2026-08-29.tif
+  group: firis-fwi-update
 
-    Returns:
-        "2026-08-29"
+  cancel-in-progress: false
 
-    or:
-        None
-    """
 
-    stem = input_path.stem
+jobs:
 
-    parts = stem.split("_")
+  update-fwi:
 
-    if not parts:
+    runs-on: ubuntu-latest
 
-        return None
+    steps:
 
-    candidate = parts[-1]
+      # ========================================================
+      # CHECKOUT
+      # ========================================================
 
-    try:
+      - name: Checkout repository
 
-        parsed = datetime.strptime(
-            candidate,
-            "%Y-%m-%d",
-        )
+        uses: actions/checkout@v4
 
-        return parsed.strftime(
-            "%Y-%m-%d"
-        )
+        with:
 
-    except ValueError:
+          fetch-depth: 0
+          persist-credentials: true
 
-        return None
 
+      # ========================================================
+      # SETUP PYTHON
+      # ========================================================
 
-# ============================================================
-# LOAD BOUNDARY
-# ============================================================
+      - name: Setup Python
 
-def load_boundary(
-    boundary_path: Path,
-    target_crs,
-):
+        uses: actions/setup-python@v5
 
-    if not boundary_path.is_file():
+        with:
 
-        raise FileNotFoundError(
-            f"Boundary not found: {boundary_path}"
-        )
+          python-version: "3.11"
 
-    with boundary_path.open(
-        "r",
-        encoding="utf-8",
-    ) as file:
 
-        geojson = json.load(file)
+      # ========================================================
+      # INSTALL DEPENDENCIES
+      # ========================================================
 
-    if (
-        geojson.get("type")
-        != "FeatureCollection"
-    ):
+      - name: Install dependencies
 
-        raise ValueError(
-            "Boundary must be a "
-            "GeoJSON FeatureCollection."
-        )
+        shell: bash
 
-    features = geojson.get(
-        "features",
-        [],
-    )
+        run: |
 
-    if not features:
+          set -euo pipefail
 
-        raise ValueError(
-            "Boundary contains no features."
-        )
+          python -m pip install --upgrade pip
 
-    geometries = []
+          pip install \
+            numpy \
+            rasterio \
+            requests \
+            shapely \
+            pyproj
 
-    for feature in features:
 
-        geometry = feature.get(
-            "geometry"
-        )
+      # ========================================================
+      # CALCULATE IRAN DATE
+      # ========================================================
 
-        if geometry:
+      - name: Calculate Iran dates
 
-            geometries.append(
-                geometry
-            )
+        shell: bash
 
-    if not geometries:
+        run: |
 
-        raise ValueError(
-            "Boundary contains no valid geometries."
-        )
+          set -euo pipefail
 
-    source_crs = "EPSG:4326"
+          python - <<'PY'
 
-    crs_obj = geojson.get(
-        "crs"
-    )
+          import os
 
-    if isinstance(
-        crs_obj,
-        dict,
-    ):
+          from datetime import (
+              datetime,
+              timedelta
+          )
 
-        properties = crs_obj.get(
-            "properties",
-            {},
-        )
+          from zoneinfo import ZoneInfo
 
-        name = (
-            properties.get("name")
-            or
-            properties.get("href")
-        )
 
-        if (
-            isinstance(name, str)
-            and
-            name.strip()
-        ):
+          IRAN = ZoneInfo(
+              "Asia/Tehran"
+          )
 
-            source_crs = name.strip()
 
-    if (
-        str(target_crs)
-        != source_crs
-    ):
+          now_iran = datetime.now(
+              IRAN
+          )
 
-        geometries = [
 
-            transform_geom(
-                source_crs,
-                target_crs,
-                geometry,
-                precision=12,
-            )
+          today = now_iran.date()
 
-            for geometry in geometries
-        ]
+          tomorrow = (
+              today
+              +
+              timedelta(days=1)
+          )
 
-    return geometries
 
+          today_str = today.isoformat()
 
-# ============================================================
-# CLASSIFY FLI
-# ============================================================
+          tomorrow_str = tomorrow.isoformat()
 
-def classify(
-    values: np.ndarray,
-):
 
-    result = np.full(
-        values.shape,
-        -1,
-        dtype=np.int8,
-    )
+          print("")
+          print("=" * 70)
+          print("FIRIS IRAN DATE CALCULATION")
+          print("=" * 70)
 
-    valid = (
-        np.isfinite(values)
-        &
-        (values >= 0)
-        &
-        (values <= 100)
-    )
+          print("")
+          print("Current Iran datetime:")
+          print(now_iran.isoformat())
 
-    result[
-        valid & (values < 20)
-    ] = 0
+          print("")
+          print("Today in Iran:")
+          print(today_str)
 
-    result[
-        valid
-        &
-        (values >= 20)
-        &
-        (values < 40)
-    ] = 1
+          print("")
+          print("Forecast target:")
+          print(tomorrow_str)
 
-    result[
-        valid
-        &
-        (values >= 40)
-        &
-        (values < 60)
-    ] = 2
 
-    result[
-        valid
-        &
-        (values >= 60)
-        &
-        (values < 80)
-    ] = 3
+          with open(
+              os.environ["GITHUB_ENV"],
+              "a",
+              encoding="utf-8"
+          ) as env:
 
-    result[
-        valid
-        &
-        (values >= 80)
-    ] = 4
+              env.write(
+                  f"TODAY_IRAN={today_str}\n"
+              )
 
-    return result
+              env.write(
+                  f"EXPECTED_DATE={tomorrow_str}\n"
+              )
 
+          PY
 
-# ============================================================
-# BUILD FLI POLYGON GEOJSON
-# ============================================================
 
-def build_polygon_geojson(
-    class_raster: np.ndarray,
-    transform,
-    fars_mask: np.ndarray,
-):
+      # ========================================================
+      # DOWNLOAD TOMORROW FWI
+      # ========================================================
 
-    features = []
+      - name: Download FWI for tomorrow
 
-    for class_id in range(5):
+        shell: bash
 
-        class_mask = (
-            (class_raster == class_id)
-            &
-            fars_mask
-        )
+        run: |
 
-        if not np.any(
-            class_mask
-        ):
+          set -euo pipefail
 
-            continue
+          echo ""
+          echo "=" * 70
+          echo "DOWNLOADING FIRIS FWI"
+          echo "=" * 70
 
-        masked_classes = np.where(
-            class_mask,
-            class_id,
-            -1,
-        ).astype(
-            np.int16
-        )
+          echo ""
+          echo "Today in Iran:"
+          echo "${TODAY_IRAN}"
 
-        for geometry, value in shapes(
-            masked_classes,
-            mask=class_mask,
-            transform=transform,
-        ):
+          echo ""
+          echo "Target forecast:"
+          echo "${EXPECTED_DATE}"
 
-            if int(value) != class_id:
 
-                continue
+          python scripts/update_fwi.py \
+            --boundary "fars.geojson" \
+            --overwrite
 
-            legend_item = (
-                LEGEND[class_id]
-            )
 
-            features.append({
+      # ========================================================
+      # VERIFY TOMORROW FWI
+      # ========================================================
 
-                "type":
-                    "Feature",
+      - name: Verify tomorrow FWI
 
-                "properties": {
+        shell: bash
 
-                    "class_id":
-                        class_id,
+        run: |
 
-                    "risk":
-                        legend_item["label"],
+          set -euo pipefail
 
-                    "min":
-                        legend_item["min"],
-
-                    "max":
-                        legend_item["max"],
-
-                    "color":
-                        legend_item["color"],
-                },
-
-                "geometry":
-                    geometry,
-            })
-
-    return {
-
-        "type":
-            "FeatureCollection",
-
-        "name":
-            "FIRIS FLI Risk Classes",
-
-        "crs": {
-
-            "type":
-                "name",
-
-            "properties": {
-
-                "name":
-                    "EPSG:4326"
-            },
-        },
+          FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${EXPECTED_DATE}.tif"
 
-        "features":
-            features,
-    }
+          FWI_METADATA="data/raw/fwi/fwi_ecmwf_fars_${EXPECTED_DATE}.json"
 
 
-# ============================================================
-# COLORIZE PNG
-# ============================================================
+          if [ ! -f "${FWI_FILE}" ]; then
 
-def colorize(
-    values: np.ndarray,
-    valid: np.ndarray,
-):
+            echo ""
+            echo "ERROR: Tomorrow FWI raster was not created:"
+            echo "${FWI_FILE}"
 
-    rgba = np.zeros(
-        (
-            values.shape[0],
-            values.shape[1],
-            4,
-        ),
-        dtype=np.uint8,
-    )
+            exit 1
 
-    rgba[
-        valid
-        &
-        (values < 20)
-    ] = (
-        46,
-        125,
-        50,
-        215,
-    )
+          fi
 
-    rgba[
-        valid
-        &
-        (values >= 20)
-        &
-        (values < 40)
-    ] = (
-        253,
-        216,
-        53,
-        220,
-    )
 
-    rgba[
-        valid
-        &
-        (values >= 40)
-        &
-        (values < 60)
-    ] = (
-        251,
-        140,
-        0,
-        225,
-    )
+          if [ ! -f "${FWI_METADATA}" ]; then
 
-    rgba[
-        valid
-        &
-        (values >= 60)
-        &
-        (values < 80)
-    ] = (
-        229,
-        57,
-        53,
-        230,
-    )
+            echo ""
+            echo "ERROR: Tomorrow FWI metadata was not created:"
+            echo "${FWI_METADATA}"
 
-    rgba[
-        valid
-        &
-        (values >= 80)
-    ] = (
-        136,
-        14,
-        79,
-        235,
-    )
+            exit 1
 
-    return rgba
+          fi
 
 
-# ============================================================
-# MAIN
-# ============================================================
+          echo ""
+          echo "✓ Tomorrow FWI raster exists."
 
-def main():
+          echo "✓ Tomorrow FWI metadata exists."
 
-    args = parse_args()
 
-    input_path = args.input
+      # ========================================================
+      # VERIFY METADATA DATE
+      # ========================================================
 
-    output_dir = args.output_dir
+      - name: Verify FWI metadata date
 
-    boundary_path = args.boundary
+        shell: bash
 
+        run: |
 
-    # ========================================================
-    # CHECK INPUT
-    # ========================================================
+          set -euo pipefail
 
-    if not input_path.is_file():
+          python - <<'PY'
 
-        raise FileNotFoundError(
-            f"FLI raster not found: "
-            f"{input_path}"
-        )
+          import json
+          import os
+          import sys
 
 
-    output_dir.mkdir(
-        parents=True,
-        exist_ok=True
-    )
+          expected = os.environ["EXPECTED_DATE"]
 
 
-    # ========================================================
-    # OUTPUT FILES
-    # ========================================================
+          path = (
+              "data/raw/fwi/"
+              f"fwi_ecmwf_fars_{expected}.json"
+          )
 
-    png_path = (
-        output_dir
-        /
-        "fli_latest.png"
-    )
 
-    metadata_path = (
-        output_dir
-        /
-        "fli_latest.json"
-    )
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as file:
 
-    grid_path = (
-        output_dir
-        /
-        "fli_latest_grid.json"
-    )
+              metadata = json.load(file)
 
-    polygons_path = (
-        output_dir
-        /
-        "fli_polygons.geojson"
-    )
 
+          actual = (
+              metadata.get("target_date")
+              or
+              metadata.get("forecast_date")
+          )
 
-    # ========================================================
-    # FORECAST DATE
-    # ========================================================
 
-    forecast_date = (
-        extract_forecast_date(
-            input_path
-        )
-    )
+          print("")
+          print("=" * 70)
+          print("FWI DATE VALIDATION")
+          print("=" * 70)
 
+          print("")
+          print("Expected:")
+          print(expected)
 
-    if not forecast_date:
+          print("")
+          print("Metadata:")
+          print(actual)
 
-        raise ValueError(
 
-            "Could not extract forecast date "
-            "from FLI filename.\n"
+          if actual != expected:
 
-            f"Expected format:\n"
-            "fli_fars_YYYY-MM-DD.tif\n"
+              print("")
+              print(
+                  "ERROR: FWI target date does not "
+                  "match EXPECTED_DATE."
+              )
 
-            f"Received:\n"
-            f"{input_path.name}"
-        )
+              sys.exit(1)
 
 
-    # ========================================================
-    # DAILY ARCHIVE
-    # ========================================================
+          print("")
+          print("✓ FWI target date is correct.")
 
-    archive_dir = (
-        output_dir
-        /
-        "archive"
-        /
-        forecast_date
-    )
+          PY
 
-    archive_dir.mkdir(
-        parents=True,
-        exist_ok=True
-    )
 
-    archive_png_path = archive_dir / "fli.png"
-    archive_metadata_path = archive_dir / "fli.json"
-    archive_grid_path = archive_dir / "fli_grid.json"
-    archive_polygons_path = archive_dir / "fli_polygons.geojson"
+      # ========================================================
+      # VALIDATE GEOTIFF
+      # ========================================================
 
+      - name: Validate FWI GeoTIFF
 
-    # ========================================================
-    # OPEN FLI
-    # ========================================================
+        shell: bash
 
-    with rasterio.open(
-        input_path
-    ) as src:
+        run: |
 
-        if src.crs is None:
+          set -euo pipefail
 
-            raise ValueError(
-                "FLI raster has no CRS."
-            )
+          python - <<'PY'
 
-        if (
-            src.crs.to_epsg()
-            != 4326
-        ):
+          import os
+          import rasterio
 
-            raise ValueError(
-                "FLI CRS must be EPSG:4326. "
-                f"Current CRS: {src.crs}"
-            )
 
+          expected = os.environ["EXPECTED_DATE"]
 
-        values = np.asarray(
 
-            src.read(
-                1,
-                masked=True,
-            ).filled(np.nan),
+          path = (
+              "data/raw/fwi/"
+              f"fwi_ecmwf_fars_{expected}.tif"
+          )
 
-            dtype=np.float32,
-        )
 
+          with rasterio.open(path) as src:
 
-        valid = (
-            np.isfinite(values)
-            &
-            (values >= 0)
-            &
-            (values <= 100)
-        )
+              print("")
+              print("=" * 70)
+              print("FWI GEOTIFF VALIDATION")
+              print("=" * 70)
 
+              print("")
+              print("CRS:")
+              print(src.crs)
 
-        if not np.any(valid):
+              print("")
+              print("Size:")
+              print(
+                  src.width,
+                  "x",
+                  src.height
+              )
 
-            raise ValueError(
-                "No valid FLI pixels found."
-            )
+              print("")
+              print("Resolution:")
+              print(src.res)
 
+              print("")
+              print("Bounds:")
+              print(src.bounds)
 
-        # ====================================================
-        # FARS MASK
-        # ====================================================
 
-        boundary_geometries = (
-            load_boundary(
-                boundary_path,
-                src.crs,
-            )
-        )
+              if src.crs is None:
 
+                  raise SystemExit(
+                      "ERROR: FWI has no CRS."
+                  )
 
-        fars_mask = geometry_mask(
 
-            boundary_geometries,
+              if src.crs.to_epsg() != 4326:
 
-            out_shape=(
-                src.height,
-                src.width,
-            ),
+                  raise SystemExit(
+                      "ERROR: FWI CRS is not EPSG:4326."
+                  )
 
-            transform=
-                src.transform,
 
-            invert=True,
+              data = src.read(
+                  1,
+                  masked=True
+              )
 
-            all_touched=False,
-        )
 
+              if data.count() == 0:
 
-        web_valid = (
-            valid
-            &
-            fars_mask
-        )
+                  raise SystemExit(
+                      "ERROR: FWI contains no valid pixels."
+                  )
 
 
-        if not np.any(
-            web_valid
-        ):
+              print("")
+              print("Valid pixels:")
+              print(int(data.count()))
 
-            raise RuntimeError(
-                "No valid FLI pixels remain "
-                "inside Fars."
-            )
+              print("")
+              print("Minimum:")
+              print(float(data.min()))
 
+              print("")
+              print("Maximum:")
+              print(float(data.max()))
 
-        # ====================================================
-        # CLASS RASTER
-        # ====================================================
+              print("")
+              print("Mean:")
+              print(float(data.mean()))
 
-        class_raster = classify(
-            values
-        )
 
+          print("")
+          print("✓ FWI GeoTIFF is valid.")
 
-        # ====================================================
-        # POLYGONS
-        # ====================================================
+          PY
 
-        polygon_geojson = (
-            build_polygon_geojson(
 
-                class_raster,
+      # ========================================================
+      # FINAL FORECAST VALIDATION
+      # ========================================================
 
-                src.transform,
+      - name: Final forecast validation
 
-                fars_mask,
-            )
-        )
+        shell: bash
 
+        run: |
 
-        # ====================================================
-        # PNG PREVIEW
-        # ====================================================
+          set -euo pipefail
 
-        rgba = colorize(
-            values,
-            web_valid,
-        )
+          python - <<'PY'
 
+          import json
+          import os
+          import sys
 
-        Image.fromarray(
-            rgba,
-            "RGBA",
-        ).save(
-            png_path,
-            optimize=True,
-        )
 
+          expected = os.environ["EXPECTED_DATE"]
 
-        # ====================================================
-        # STATISTICS
-        # ====================================================
 
-        province_values = (
-            values[web_valid]
-        )
+          path = (
+              "data/raw/fwi/"
+              f"fwi_ecmwf_fars_{expected}.json"
+          )
 
 
-        statistics = {
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as file:
 
-            "min":
-                round(
-                    float(
-                        province_values.min()
-                    ),
-                    2,
-                ),
+              metadata = json.load(file)
 
-            "max":
-                round(
-                    float(
-                        province_values.max()
-                    ),
-                    2,
-                ),
 
-            "mean":
-                round(
-                    float(
-                        province_values.mean()
-                    ),
-                    2,
-                ),
+          target = (
+              metadata.get("target_date")
+              or
+              metadata.get("forecast_date")
+          )
 
-            "valid_pixels":
-                int(
-                    province_values.size
-                ),
-        }
 
+          print("")
+          print("=" * 70)
+          print("FINAL FIRIS FWI FORECAST")
+          print("=" * 70)
 
-        # ====================================================
-        # RASTER BOUNDS
-        # ====================================================
+          print("")
+          print("Iran datetime:")
+          print(
+              metadata.get(
+                  "current_iran_datetime"
+              )
+          )
 
-        left = float(
-            src.bounds.left
-        )
+          print("")
+          print("Today in Iran:")
+          print(
+              os.environ["TODAY_IRAN"]
+          )
 
-        bottom = float(
-            src.bounds.bottom
-        )
+          print("")
+          print("Target forecast:")
+          print(target)
 
-        right = float(
-            src.bounds.right
-        )
 
-        top = float(
-            src.bounds.top
-        )
+          if target != expected:
 
+              print("")
+              print(
+                  "ERROR: Final target date "
+                  "is not tomorrow."
+              )
 
-        # ====================================================
-        # LIGHTWEIGHT GRID
-        # ====================================================
+              sys.exit(1)
 
-        max_dimension = 350
 
+          print("")
+          print("✓ Forecast target is correct.")
+          print("✓ Tomorrow FWI validated.")
 
-        row_step = max(
+          PY
 
-            1,
 
-            int(
-                np.ceil(
-                    src.height
-                    /
-                    max_dimension
-                )
-            )
-        )
+      # ========================================================
+      # COMMIT
+      # ========================================================
 
+      - name: Commit FWI
 
-        col_step = max(
+        shell: bash
 
-            1,
+        run: |
 
-            int(
-                np.ceil(
-                    src.width
-                    /
-                    max_dimension
-                )
-            )
-        )
+          set -euo pipefail
 
+          git config \
+            user.name \
+            "github-actions[bot]"
 
-        sample = values[
-            ::row_step,
-            ::col_step
-        ]
+          git config \
+            user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
 
 
-        sample_mask = web_valid[
-            ::row_step,
-            ::col_step
-        ]
+          git add \
+            data/raw/fwi
 
 
-        sample = np.where(
+          if git diff --cached --quiet; then
 
-            np.isfinite(
-                sample
-            )
-            &
-            sample_mask,
+            echo ""
+            echo "No FWI changes to commit."
 
-            sample,
+            exit 0
 
-            -9999,
-        )
+          fi
 
 
-        grid = {
+          git commit \
+            -m \
+            "chore(fwi): update forecast ${EXPECTED_DATE} [skip ci]"
 
-            "bounds": [
 
-                [
-                    bottom,
-                    left
-                ],
+      # ========================================================
+      # PUSH
+      # ========================================================
 
-                [
-                    top,
-                    right
-                ]
-            ],
+      - name: Push FWI
 
-            "rows":
-                int(
-                    sample.shape[0]
-                ),
+        shell: bash
 
-            "cols":
-                int(
-                    sample.shape[1]
-                ),
+        run: |
 
-            "row_step":
-                int(
-                    row_step
-                ),
+          set -euo pipefail
 
-            "col_step":
-                int(
-                    col_step
-                ),
+          git fetch origin main
 
-            "origin": {
+          git merge origin/main \
+            -X ours \
+            --no-edit
 
-                "left":
-                    left,
+          git push origin HEAD:main
 
-                "top":
-                    top
-            },
 
-            "cell_size": {
+          echo ""
+          echo "=" * 70
+          echo "FIRIS FWI UPDATE COMPLETED"
+          echo "=" * 70
 
-                "x":
-                    float(
-                        src.res[0]
-                    ),
+          echo ""
+          echo "Today in Iran:"
+          echo "${TODAY_IRAN}"
 
-                "y":
-                    float(
-                        abs(
-                            src.res[1]
-                        )
-                    )
-            },
-
-            "values":
-                np.round(
-                    sample,
-                    2
-                ).tolist(),
-
-            "boundary_masked":
-                True,
-
-            "boundary_file":
-                str(
-                    boundary_path
-                ),
-
-            "forecast_date":
-                forecast_date,
-        }
-
-
-        # ====================================================
-        # RASTER METADATA
-        # ====================================================
-
-        raster_information = {
-
-            "crs":
-                str(src.crs),
-
-            "epsg":
-                src.crs.to_epsg(),
-
-            "width":
-                int(src.width),
-
-            "height":
-                int(src.height),
-
-            "cell_size_x":
-                float(src.res[0]),
-
-            "cell_size_y":
-                float(
-                    abs(src.res[1])
-                ),
-
-            "bounds": {
-
-                "left":
-                    left,
-
-                "bottom":
-                    bottom,
-
-                "right":
-                    right,
-
-                "top":
-                    top
-            },
-
-            "transform": [
-
-                float(src.transform.a),
-
-                float(src.transform.b),
-
-                float(src.transform.c),
-
-                float(src.transform.d),
-
-                float(src.transform.e),
-
-                float(src.transform.f)
-            ]
-        }
-
-
-        # ====================================================
-        # MASK COUNTS
-        # ====================================================
-
-        total_valid_pixels = int(
-            np.count_nonzero(valid)
-        )
-
-        valid_inside_fars = int(
-            np.count_nonzero(
-                web_valid
-            )
-        )
-
-        valid_outside_fars = int(
-            np.count_nonzero(
-                valid
-                &
-                ~fars_mask
-            )
-        )
-
-
-    # ========================================================
-    # WRITE POLYGON GEOJSON
-    # ========================================================
-
-    polygon_text = json.dumps(
-        polygon_geojson,
-        ensure_ascii=False,
-        separators=(
-            ",",
-            ":"
-        )
-    )
-
-    polygons_path.write_text(
-        polygon_text,
-        encoding="utf-8"
-    )
-
-    archive_polygons_path.write_text(
-        polygon_text,
-        encoding="utf-8"
-    )
-
-
-    # ========================================================
-    # WRITE GRID JSON
-    # ========================================================
-
-    grid_text = json.dumps(
-        grid,
-        ensure_ascii=False,
-        separators=(
-            ",",
-            ":"
-        )
-    )
-
-    grid_path.write_text(
-        grid_text,
-        encoding="utf-8"
-    )
-
-    archive_grid_path.write_text(
-        grid_text,
-        encoding="utf-8"
-    )
-
-
-    # ========================================================
-    # WRITE METADATA
-    # ========================================================
-
-    metadata = {
-
-        "title":
-            "FIRIS - Fars Fire Risk Index",
-
-        "project":
-            "FIRIS",
-
-        "indicator":
-            "Fire Likelihood Index (FLI)",
-
-        "source_file":
-            input_path.name,
-
-        "forecast_date":
-            forecast_date,
-
-        "forecast_definition":
-            "Forecast target date encoded in "
-            "the FLI filename.",
-
-        "generated_at_utc":
-            datetime.now(
-                timezone.utc
-            ).isoformat(),
-
-        "crs":
-            "EPSG:4326",
-
-        "primary_web_layer":
-            "fli_polygons.geojson",
-
-        "preview_image":
-            "fli_latest.png",
-
-        "grid":
-            "fli_latest_grid.json",
-
-        "bounds": [
-
-            [
-                bottom,
-                left
-            ],
-
-            [
-                top,
-                right
-            ]
-        ],
-
-        "raster":
-            raster_information,
-
-        "statistics":
-            statistics,
-
-        "legend":
-            LEGEND,
-
-        "boundary": {
-
-            "file":
-                str(
-                    boundary_path
-                ),
-
-            "mask_applied":
-                True,
-
-            "input_valid_pixels":
-                total_valid_pixels,
-
-            "valid_pixels_inside_fars":
-                valid_inside_fars,
-
-            "valid_pixels_removed_outside_fars":
-                valid_outside_fars
-        },
-
-        "web_display": {
-
-            "method":
-                "classified GeoJSON polygons",
-
-            "polygon_layer":
-                "fli_polygons.geojson",
-
-            "png_is_primary":
-                False,
-
-            "outside_fars":
-                "excluded",
-
-            "spatial_resampling":
-                False,
-
-            "archive": {
-                "directory":
-                    f"archive/{forecast_date}",
-                "polygon":
-                    f"archive/{forecast_date}/fli_polygons.geojson",
-                "png":
-                    f"archive/{forecast_date}/fli.png",
-                "grid":
-                    f"archive/{forecast_date}/fli_grid.json",
-                "metadata":
-                    f"archive/{forecast_date}/fli.json"
-            }
-        }
-    }
-
-
-    metadata_text = json.dumps(
-        metadata,
-        ensure_ascii=False,
-        indent=2
-    )
-
-    metadata_path.write_text(
-        metadata_text,
-        encoding="utf-8"
-    )
-
-    archive_metadata_path.write_text(
-        metadata_text,
-        encoding="utf-8"
-    )
-
-    archive_png_path.write_bytes(
-        png_path.read_bytes()
-    )
-
-
-    # ========================================================
-    # FINAL LOG
-    # ========================================================
-
-    print("")
-    print("=" * 70)
-    print("FIRIS WEB MAP BUILD")
-    print("=" * 70)
-
-    print("")
-    print(
-        f"Input           : "
-        f"{input_path}"
-    )
-
-    print(
-        f"Forecast date   : "
-        f"{forecast_date}"
-    )
-
-    print(
-        f"Boundary        : "
-        f"{boundary_path}"
-    )
-
-    print("")
-    print("OUTPUT")
-
-    print(
-        f"Polygon         : "
-        f"{polygons_path}"
-    )
-
-    print(
-        f"PNG             : "
-        f"{png_path}"
-    )
-
-    print(
-        f"Metadata        : "
-        f"{metadata_path}"
-    )
-
-    print(
-        f"Grid JSON       : "
-        f"{grid_path}"
-    )
-
-    print(
-        f"Archive dir     : "
-        f"{archive_dir}"
-    )
-
-    print("")
-    print("RASTER GRID")
-
-    print(
-        f"Size            : "
-        f"{src.width} x {src.height}"
-    )
-
-    print(
-        f"Resolution      : "
-        f"{src.res}"
-    )
-
-    print(
-        f"Bounds          : "
-        f"{src.bounds}"
-    )
-
-    print("")
-    print("FARS MASK")
-
-    print(
-        f"Valid input     : "
-        f"{total_valid_pixels:,}"
-    )
-
-    print(
-        f"Inside Fars     : "
-        f"{valid_inside_fars:,}"
-    )
-
-    print(
-        f"Outside removed : "
-        f"{valid_outside_fars:,}"
-    )
-
-    print("")
-    print(
-        f"FLI statistics  : "
-        f"{statistics}"
-    )
-
-    print("")
-    print(
-        "Primary web layer : "
-        "fli_polygons.geojson"
-    )
-
-    print(
-        "Boundary mask     : APPLIED"
-    )
-
-    print(
-        "Forecast date     : "
-        f"{forecast_date}"
-    )
-
-    print(
-        "FLI calculation   : UNCHANGED"
-    )
-
-    print("=" * 70)
-
-
-if __name__ == "__main__":
-
-    main()
+          echo ""
+          echo "Forecast target:"
+          echo "${EXPECTED_DATE}"
