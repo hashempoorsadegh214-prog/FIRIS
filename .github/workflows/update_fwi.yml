@@ -9,35 +9,23 @@ on:
     # ----------------------------------------------------------
     # RUN 1
     #
-    # 18:00 UTC
-    # = 21:30 Iran time
+    # 20:35 UTC
+    # = 00:05 Iran
     #
-    # This prepares tomorrow's forecast in advance.
+    # Immediately after midnight in Iran.
     # ----------------------------------------------------------
-    - cron: "0 18 * * *"
+    - cron: "35 20 * * *"
 
     # ----------------------------------------------------------
     # RUN 2
     #
-    # 20:35 UTC
-    # = 00:05 Iran time
+    # 21:35 UTC
+    # = 01:05 Iran
     #
-    # IMPORTANT:
-    # This second run guarantees that immediately after
-    # midnight in Iran, the new "tomorrow" becomes the target.
-    #
-    # Example:
-    #
-    # 2026-09-03 21:30 Iran
-    #     -> target = 2026-09-04
-    #
-    # 2026-09-04 00:05 Iran
-    #     -> target = 2026-09-05
-    #
-    # Therefore the system does not remain stuck on 2026-09-04
-    # until the next evening.
+    # Backup run in case the first scheduled execution
+    # is delayed or missed.
     # ----------------------------------------------------------
-    - cron: "35 20 * * *"
+    - cron: "35 21 * * *"
 
   push:
 
@@ -49,7 +37,6 @@ on:
 
 
 permissions:
-
   contents: write
 
 
@@ -57,7 +44,7 @@ concurrency:
 
   group: firis-fwi-update
 
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 
 jobs:
@@ -213,9 +200,9 @@ jobs:
           set -euo pipefail
 
           echo ""
-          echo "=" * 70
+          echo "======================================================================"
           echo "DOWNLOADING FIRIS FWI"
-          echo "=" * 70
+          echo "======================================================================"
 
           echo ""
           echo "Today in Iran:"
@@ -227,6 +214,7 @@ jobs:
 
           echo ""
           echo "Running update_fwi.py..."
+
 
           python scripts/update_fwi.py \
             --boundary "fars.geojson" \
@@ -251,9 +239,9 @@ jobs:
 
 
           echo ""
-          echo "=" * 70
+          echo "======================================================================"
           echo "VERIFYING TOMORROW FWI"
-          echo "=" * 70
+          echo "======================================================================"
 
           echo ""
           echo "Today in Iran:"
@@ -335,9 +323,13 @@ jobs:
 
 
           actual = (
-              metadata.get("target_date")
+              metadata.get(
+                  "target_date"
+              )
               or
-              metadata.get("forecast_date")
+              metadata.get(
+                  "forecast_date"
+              )
           )
 
 
@@ -642,9 +634,9 @@ jobs:
 
 
           echo ""
-          echo "=" * 70
+          echo "======================================================================"
           echo "FIRIS FWI UPDATE COMPLETED"
-          echo "=" * 70
+          echo "======================================================================"
 
           echo ""
           echo "Today in Iran:"
