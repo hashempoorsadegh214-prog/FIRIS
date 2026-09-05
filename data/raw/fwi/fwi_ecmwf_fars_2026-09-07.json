@@ -5,7 +5,7 @@
   "source_url": "https://maps.effis.emergency.copernicus.eu/gwis",
   "layer": "ecmwf.fwi",
   "timezone": "Asia/Tehran",
-  "current_iran_datetime": "2026-09-06T01:40:29.854693+03:30",
+  "current_iran_datetime": "2026-09-06T02:38:24.344585+03:30",
   "forecast_date": "2026-09-07",
   "forecast_definition": "Tomorrow according to Iran local date",
   "boundary_file": "fars.geojson",
@@ -31,7 +31,7 @@
     "TIME": "2026-09-07"
   },
   "request_url": "https://maps.effis.emergency.copernicus.eu/gwis?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=ecmwf.fwi&STYLES=&SRS=EPSG%3A4326&BBOX=50.50318310%2C26.94561700%2C55.68006520%2C31.76959890&WIDTH=2000&HEIGHT=2000&FORMAT=image%2Ftiff&TRANSPARENT=FALSE&TIME=2026-09-07",
-  "downloaded_at_utc": "2026-09-05T22:10:32.863428+00:00",
+  "downloaded_at_utc": "2026-09-05T23:08:26.859797+00:00",
   "raster": {
     "crs": "EPSG:4326",
     "width": 2000,
