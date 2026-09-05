@@ -2,21 +2,21 @@ name: Build FIRIS Fire Likelihood Index
 
 on:
 
-  workflow_run:
-
-    workflows:
-      - "Update FIRIS FWI"
-
-    types:
-      - completed
-
   # ------------------------------------------------------------
-  # مستقل از workflow_run
+  # DAILY FIRIS BUILD
   #
   # 21:35 UTC = 01:05 Iran
   #
-  # این اجرای پشتیبان باعث می‌شود بعد از نیمه‌شب ایران،
-  # latest دوباره برای فردای جدید ساخته شود.
+  # At this time the Iran local date has already changed.
+  # Therefore TOMORROW_DATE is always the forecast date
+  # for the new Iran day + 1.
+  #
+  # Example:
+  #
+  # 2026-09-06 01:05 Iran
+  #        ↓
+  # TOMORROW_DATE = 2026-09-07
+  #
   # ------------------------------------------------------------
 
   schedule:
@@ -40,10 +40,6 @@ concurrency:
 jobs:
 
   build-firis:
-
-    if: >
-      github.event_name != 'workflow_run' ||
-      github.event.workflow_run.conclusion == 'success'
 
     runs-on: ubuntu-latest
 
@@ -1146,7 +1142,7 @@ jobs:
           ]
 
 
-          path = Path = "data/web/fli_latest.json"
+          path = "data/web/fli_latest.json"
 
 
           with open(
