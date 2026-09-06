@@ -1,4 +1,4 @@
-```yaml
+
 name: Rebuild FIRIS Historical Archive
 
 on:
@@ -1005,4 +1005,3 @@ jobs:
 
           echo ""
           echo "✓ DONE"
-```
