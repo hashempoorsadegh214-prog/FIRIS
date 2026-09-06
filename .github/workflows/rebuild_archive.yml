@@ -1,0 +1,1008 @@
+```yaml
+name: Rebuild FIRIS Historical Archive
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rebuild-firis-historical-archive
+  cancel-in-progress: false
+
+jobs:
+
+  rebuild-archive:
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 30
+
+    steps:
+
+      # ============================================================
+      # 1. CHECKOUT
+      # ============================================================
+
+      - name: Checkout repository
+
+        uses: actions/checkout@v4
+
+        with:
+          fetch-depth: 0
+
+
+      # ============================================================
+      # 2. PYTHON
+      # ============================================================
+
+      - name: Set up Python
+
+        uses: actions/setup-python@v5
+
+        with:
+          python-version: "3.11"
+
+
+      # ============================================================
+      # 3. INSTALL DEPENDENCIES
+      # ============================================================
+
+      - name: Install dependencies
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          python -m pip install --upgrade pip
+
+          python -m pip install \
+            numpy \
+            pandas \
+            rasterio \
+            openpyxl \
+            shapely \
+            pyproj \
+            fiona \
+            requests \
+            Pillow \
+            affine
+
+
+      # ============================================================
+      # 4. DEFINE HISTORICAL DATES
+      #
+      # 2026-09-03 = 12 شهریور 1405
+      # 2026-09-04 = 13 شهریور 1405
+      # 2026-09-05 = 14 شهریور 1405
+      # 2026-09-06 = 15 شهریور 1405
+      #
+      # 2026-09-07 = 16 شهریور 1405
+      # این تاریخ پیش‌بینی روز بعد است و در این Workflow بازسازی
+      # تاریخی قرار ندارد.
+      # ============================================================
+
+      - name: Define historical dates
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          echo "ARCHIVE_DATE_1=2026-09-03" >> "${GITHUB_ENV}"
+          echo "ARCHIVE_DATE_2=2026-09-04" >> "${GITHUB_ENV}"
+          echo "ARCHIVE_DATE_3=2026-09-05" >> "${GITHUB_ENV}"
+          echo "ARCHIVE_DATE_4=2026-09-06" >> "${GITHUB_ENV}"
+
+          echo ""
+          echo "============================================================"
+          echo "FIRIS HISTORICAL ARCHIVE"
+          echo "============================================================"
+
+          echo ""
+          echo "12 شهریور 1405 -> 2026-09-03"
+          echo "13 شهریور 1405 -> 2026-09-04"
+          echo "14 شهریور 1405 -> 2026-09-05"
+          echo "15 شهریور 1405 -> 2026-09-06"
+
+          echo ""
+          echo "16 شهریور 1405 -> 2026-09-07"
+          echo "این تاریخ پیش‌بینی روز بعد است و در این Workflow بازسازی نمی‌شود."
+
+
+      # ============================================================
+      # 5. VERIFY HISTORICAL FLI RASTERS
+      # ============================================================
+
+      - name: Verify historical FLI rasters
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          DATES=(
+
+            "2026-09-03"
+            "2026-09-04"
+            "2026-09-05"
+            "2026-09-06"
+
+          )
+
+          echo ""
+          echo "============================================================"
+          echo "VERIFYING HISTORICAL FLI RASTERS"
+          echo "============================================================"
+
+          for DATE in "${DATES[@]}"; do
+
+            FLI_RASTER="data/outputs/fli_fars_${DATE}.tif"
+
+            echo ""
+            echo "Checking:"
+            echo "${FLI_RASTER}"
+
+            if [ ! -f "${FLI_RASTER}" ]; then
+
+              echo ""
+              echo "ERROR: Historical FLI raster not found:"
+              echo "${FLI_RASTER}"
+
+              exit 1
+
+            fi
+
+            ls -lh "${FLI_RASTER}"
+
+          done
+
+          echo ""
+          echo "✓ All four historical FLI rasters exist."
+
+
+      # ============================================================
+      # 6. CREATE TEMPORARY WORKSPACE
+      #
+      # build_web_map.py creates latest products.
+      #
+      # بنابراین برای تاریخ‌های قدیمی مستقیماً روی data/web اجرا
+      # نمی‌شود.
+      # ============================================================
+
+      - name: Create temporary workspace
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          rm -rf .firis_archive_rebuild
+
+          mkdir -p .firis_archive_rebuild
+
+
+      # ============================================================
+      # 7. REBUILD HISTORICAL WEB GIS
+      #
+      # برای هر تاریخ:
+      #
+      # data/outputs/fli_fars_YYYY-MM-DD.tif
+      #        ↓
+      # temporary web
+      #        ↓
+      # archive/YYYY-MM-DD
+      #
+      # فایل‌های latest واقعی اصلاً لمس نمی‌شوند.
+      # ============================================================
+
+      - name: Rebuild historical Web GIS products
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          DATES=(
+
+            "2026-09-03"
+            "2026-09-04"
+            "2026-09-05"
+            "2026-09-06"
+
+          )
+
+          for DATE in "${DATES[@]}"; do
+
+            echo ""
+            echo "============================================================"
+            echo "REBUILDING WEB GIS"
+            echo "DATE: ${DATE}"
+            echo "============================================================"
+
+            FLI_RASTER="data/outputs/fli_fars_${DATE}.tif"
+
+            TEMP_ROOT=".firis_archive_rebuild/${DATE}"
+
+            TEMP_WEB="${TEMP_ROOT}/web"
+
+            TEMP_ARCHIVE="${TEMP_ROOT}/archive"
+
+            LIVE_ARCHIVE="data/web/archive/${DATE}"
+
+
+            rm -rf "${TEMP_ROOT}"
+
+            mkdir -p "${TEMP_WEB}"
+
+            mkdir -p "${TEMP_ARCHIVE}"
+
+            mkdir -p "${LIVE_ARCHIVE}"
+
+
+            echo ""
+            echo "Input FLI:"
+            echo "${FLI_RASTER}"
+
+            echo ""
+            echo "Temporary Web:"
+            echo "${TEMP_WEB}"
+
+            echo ""
+            echo "Temporary Archive:"
+            echo "${TEMP_ARCHIVE}"
+
+
+            python scripts/build_web_map.py \
+              --input "${FLI_RASTER}" \
+              --output-dir "${TEMP_WEB}" \
+              --archive-dir "${TEMP_ARCHIVE}"
+
+
+            SOURCE_ARCHIVE="${TEMP_ARCHIVE}/${DATE}"
+
+
+            if [ ! -f "${SOURCE_ARCHIVE}/fli.json" ]; then
+
+              echo ""
+              echo "ERROR: Temporary fli.json not created."
+
+              exit 1
+
+            fi
+
+
+            if [ ! -f "${SOURCE_ARCHIVE}/fli_grid.json" ]; then
+
+              echo ""
+              echo "ERROR: Temporary fli_grid.json not created."
+
+              exit 1
+
+            fi
+
+
+            if [ ! -f "${SOURCE_ARCHIVE}/fli_polygons.geojson" ]; then
+
+              echo ""
+              echo "ERROR: Temporary fli_polygons.geojson not created."
+
+              exit 1
+
+            fi
+
+
+            cp -f \
+              "${SOURCE_ARCHIVE}/fli.json" \
+              "${LIVE_ARCHIVE}/fli.json"
+
+
+            cp -f \
+              "${SOURCE_ARCHIVE}/fli_grid.json" \
+              "${LIVE_ARCHIVE}/fli_grid.json"
+
+
+            cp -f \
+              "${SOURCE_ARCHIVE}/fli_polygons.geojson" \
+              "${LIVE_ARCHIVE}/fli_polygons.geojson"
+
+
+            echo ""
+            echo "✓ Historical Web GIS archive rebuilt:"
+            echo "${DATE}"
+
+          done
+
+
+      # ============================================================
+      # 8. REBUILD HISTORICAL EXCEL REPORTS
+      # ============================================================
+
+      - name: Rebuild historical Excel reports
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          DATES=(
+
+            "2026-09-03"
+            "2026-09-04"
+            "2026-09-05"
+            "2026-09-06"
+
+          )
+
+          TEMP_REPORT_DIR=".firis_archive_rebuild/reports"
+
+          mkdir -p "${TEMP_REPORT_DIR}"
+
+
+          for DATE in "${DATES[@]}"; do
+
+            echo ""
+            echo "============================================================"
+            echo "REBUILDING EXCEL"
+            echo "DATE: ${DATE}"
+            echo "============================================================"
+
+            FLI_RASTER="data/outputs/fli_fars_${DATE}.tif"
+
+            REPORT_FILE="${TEMP_REPORT_DIR}/firis_report_${DATE}.xlsx"
+
+            LIVE_ARCHIVE="data/web/archive/${DATE}"
+
+
+            rm -f "${REPORT_FILE}"
+
+
+            python scripts/build_report.py \
+              --input "${FLI_RASTER}" \
+              --output "${REPORT_FILE}" \
+              --run-date "${DATE}" \
+              --protected "protected_areas.geojson" \
+              --hunting "hunting_banned.geojson"
+
+
+            if [ ! -f "${REPORT_FILE}" ]; then
+
+              echo ""
+              echo "ERROR: Excel report was not created:"
+
+              echo "${DATE}"
+
+              exit 1
+
+            fi
+
+
+            cp -f \
+              "${REPORT_FILE}" \
+              "${LIVE_ARCHIVE}/firis_report.xlsx"
+
+
+            echo ""
+            echo "✓ Historical Excel rebuilt:"
+            echo "${DATE}"
+
+          done
+
+
+      # ============================================================
+      # 9. VALIDATE ARCHIVE WEB GIS PRODUCTS
+      # ============================================================
+
+      - name: Validate historical Web GIS
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          python - <<'PY'
+
+          import json
+          from pathlib import Path
+
+
+          dates = [
+
+              "2026-09-03",
+              "2026-09-04",
+              "2026-09-05",
+              "2026-09-06",
+
+          ]
+
+
+          for date in dates:
+
+              root = (
+                  Path("data/web/archive")
+                  / date
+              )
+
+
+              print("")
+              print("=" * 70)
+              print(f"VALIDATING WEB GIS: {date}")
+              print("=" * 70)
+
+
+              required = [
+
+                  "fli.json",
+                  "fli_grid.json",
+                  "fli_polygons.geojson",
+
+              ]
+
+
+              for name in required:
+
+                  path = root / name
+
+                  if not path.is_file():
+
+                      raise RuntimeError(
+                          f"Missing archive file: {path}"
+                      )
+
+                  if path.stat().st_size == 0:
+
+                      raise RuntimeError(
+                          f"Empty archive file: {path}"
+                      )
+
+
+              with (
+                  root / "fli.json"
+              ).open(
+                  "r",
+                  encoding="utf-8",
+              ) as file:
+
+                  metadata = json.load(file)
+
+
+              actual_date = (
+                  metadata.get("forecast_date")
+                  or
+                  metadata.get("target_date")
+              )
+
+
+              expected_source = (
+                  f"fli_fars_{date}.tif"
+              )
+
+
+              actual_source = metadata.get(
+                  "source_file",
+                  ""
+              )
+
+
+              if str(actual_date) != date:
+
+                  raise RuntimeError(
+                      f"Wrong FLI date: "
+                      f"expected {date}, "
+                      f"got {actual_date}"
+                  )
+
+
+              if actual_source != expected_source:
+
+                  raise RuntimeError(
+                      f"Wrong FLI source: "
+                      f"expected {expected_source}, "
+                      f"got {actual_source}"
+                  )
+
+
+              with (
+                  root / "fli_grid.json"
+              ).open(
+                  "r",
+                  encoding="utf-8",
+              ) as file:
+
+                  grid = json.load(file)
+
+
+              grid_date = (
+                  grid.get("forecast_date")
+                  or
+                  grid.get("target_date")
+              )
+
+
+              if str(grid_date) != date:
+
+                  raise RuntimeError(
+                      f"Wrong grid date: "
+                      f"expected {date}, "
+                      f"got {grid_date}"
+                  )
+
+
+              with (
+                  root / "fli_polygons.geojson"
+              ).open(
+                  "r",
+                  encoding="utf-8",
+              ) as file:
+
+                  polygons = json.load(file)
+
+
+              if polygons.get(
+                  "type"
+              ) != "FeatureCollection":
+
+                  raise RuntimeError(
+                      f"Invalid polygon GeoJSON: {date}"
+                  )
+
+
+              polygon_date = (
+                  polygons
+                  .get("properties", {})
+                  .get("forecast_date")
+              )
+
+
+              if str(polygon_date) != date:
+
+                  raise RuntimeError(
+                      f"Wrong polygon date: "
+                      f"expected {date}, "
+                      f"got {polygon_date}"
+                  )
+
+
+              print(
+                  f"✓ Web GIS valid: {date}"
+              )
+
+
+          print("")
+          print("=" * 70)
+          print("ALL HISTORICAL WEB GIS PRODUCTS ARE VALID")
+          print("=" * 70)
+
+          PY
+
+
+      # ============================================================
+      # 10. VALIDATE HISTORICAL EXCEL
+      # ============================================================
+
+      - name: Validate historical Excel reports
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          python - <<'PY'
+
+          from pathlib import Path
+
+          from openpyxl import load_workbook
+
+
+          dates = [
+
+              "2026-09-03",
+              "2026-09-04",
+              "2026-09-05",
+              "2026-09-06",
+
+          ]
+
+
+          for date in dates:
+
+              report = (
+                  Path("data/web/archive")
+                  / date
+                  / "firis_report.xlsx"
+              )
+
+
+              print("")
+              print("=" * 70)
+              print(f"VALIDATING EXCEL: {date}")
+              print("=" * 70)
+
+
+              if not report.is_file():
+
+                  raise RuntimeError(
+                      f"Excel report missing: {report}"
+                  )
+
+
+              if report.stat().st_size == 0:
+
+                  raise RuntimeError(
+                      f"Excel report empty: {report}"
+                  )
+
+
+              wb = load_workbook(
+                  report,
+                  read_only=True,
+                  data_only=True,
+              )
+
+
+              try:
+
+                  if "خلاصه" not in wb.sheetnames:
+
+                      raise RuntimeError(
+                          f"Sheet خلاصه missing: {report}"
+                      )
+
+
+                  ws = wb["خلاصه"]
+
+
+                  actual_date = ws["B3"].value
+
+                  actual_fli = ws["B4"].value
+
+
+                  expected_fli = (
+                      f"fli_fars_{date}.tif"
+                  )
+
+
+                  if str(actual_date) != date:
+
+                      raise RuntimeError(
+                          f"Wrong Excel date: "
+                          f"expected {date}, "
+                          f"got {actual_date}"
+                      )
+
+
+                  if str(actual_fli) != expected_fli:
+
+                      raise RuntimeError(
+                          f"Wrong Excel FLI filename: "
+                          f"expected {expected_fli}, "
+                          f"got {actual_fli}"
+                      )
+
+
+                  print(
+                      f"✓ Excel valid: {date}"
+                  )
+
+
+              finally:
+
+                  wb.close()
+
+
+          print("")
+          print("=" * 70)
+          print("ALL HISTORICAL EXCEL REPORTS ARE VALID")
+          print("=" * 70)
+
+          PY
+
+
+      # ============================================================
+      # 11. PROTECT LATEST
+      #
+      # این Workflow نباید:
+      #
+      # data/web/fli_latest.json
+      # data/web/fli_latest_grid.json
+      # data/web/fli_polygons.geojson
+      #
+      # را تغییر دهد.
+      # ============================================================
+
+      - name: Verify latest was not replaced
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          echo ""
+          echo "============================================================"
+          echo "LATEST PROTECTION CHECK"
+          echo "============================================================"
+
+          if [ ! -f "data/web/fli_latest.json" ]; then
+
+            echo ""
+            echo "No latest JSON currently exists."
+
+            echo ""
+            echo "That is acceptable for historical rebuild."
+
+            exit 0
+
+          fi
+
+
+          python - <<'PY'
+
+          import json
+          from pathlib import Path
+
+
+          path = Path(
+              "data/web/fli_latest.json"
+          )
+
+
+          with path.open(
+              "r",
+              encoding="utf-8",
+          ) as file:
+
+              metadata = json.load(file)
+
+
+          latest_date = (
+              metadata.get("forecast_date")
+              or
+              metadata.get("target_date")
+          )
+
+
+          historical_dates = {
+
+              "2026-09-03",
+              "2026-09-04",
+              "2026-09-05",
+              "2026-09-06",
+
+          }
+
+
+          print("")
+          print("Current latest date:")
+          print(latest_date)
+
+
+          if str(latest_date) in historical_dates:
+
+              raise RuntimeError(
+                  "ERROR: latest currently points to a historical "
+                  f"archive date: {latest_date}"
+              )
+
+
+          print("")
+          print("✓ latest is not one of the four historical dates.")
+
+          PY
+
+
+      # ============================================================
+      # 12. UPDATE ARCHIVE INDEX
+      #
+      # این مرحله تمام پوشه‌های تاریخ‌دار موجود را می‌خواند.
+      # ============================================================
+
+      - name: Update archive index
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          python - <<'PY'
+
+          import json
+
+          from pathlib import Path
+
+
+          root = Path(
+              "data/web/archive"
+          )
+
+
+          root.mkdir(
+              parents=True,
+              exist_ok=True
+          )
+
+
+          dates = sorted(
+
+              p.name
+
+              for p in root.iterdir()
+
+              if (
+                  p.is_dir()
+                  and
+                  len(p.name) == 10
+                  and
+                  p.name[4] == "-"
+                  and
+                  p.name[7] == "-"
+              )
+
+          )
+
+
+          output = (
+              root
+              / "index.json"
+          )
+
+
+          output.write_text(
+
+              json.dumps(
+                  dates,
+                  ensure_ascii=False,
+                  indent=2
+              )
+              + "\n",
+
+              encoding="utf-8"
+
+          )
+
+
+          print("")
+          print("Archive dates:")
+
+          for date in dates:
+
+              print(
+                  f"  {date}"
+              )
+
+
+          print("")
+          print("✓ Archive index updated.")
+
+          PY
+
+
+      # ============================================================
+      # 13. SHOW FINAL RESULT
+      # ============================================================
+
+      - name: Show final historical archive
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          echo ""
+          echo "============================================================"
+          echo "HISTORICAL ARCHIVE RESULT"
+          echo "============================================================"
+
+          echo ""
+          echo "12 شهریور 1405:"
+          echo "data/web/archive/2026-09-03"
+
+          echo ""
+          echo "13 شهریور 1405:"
+          echo "data/web/archive/2026-09-04"
+
+          echo ""
+          echo "14 شهریور 1405:"
+          echo "data/web/archive/2026-09-05"
+
+          echo ""
+          echo "15 شهریور 1405:"
+          echo "data/web/archive/2026-09-06"
+
+          echo ""
+          echo "16 شهریور 1405 / 2026-09-07:"
+          echo "این تاریخ توسط build_firis.yml به‌عنوان پیش‌بینی روز بعد ساخته می‌شود."
+
+
+      # ============================================================
+      # 14. CLEAN TEMPORARY FILES
+      # ============================================================
+
+      - name: Clean temporary workspace
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          rm -rf \
+            .firis_archive_rebuild
+
+          echo ""
+          echo "✓ Temporary workspace removed."
+
+
+      # ============================================================
+      # 15. COMMIT HISTORICAL ARCHIVE
+      # ============================================================
+
+      - name: Commit historical archive
+
+        shell: bash
+
+        run: |
+
+          set -euo pipefail
+
+          git config \
+            user.name \
+            "github-actions[bot]"
+
+          git config \
+            user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+
+          git add \
+            data/web/archive
+
+
+          if git diff --cached --quiet; then
+
+            echo ""
+            echo "No archive changes detected."
+
+            exit 0
+
+          fi
+
+
+          git commit \
+            -m \
+            "Rebuild FIRIS archive for 12-15 Shahrivar 1405"
+
+
+          git push
+
+
+          echo ""
+          echo "============================================================"
+          echo "HISTORICAL ARCHIVE REBUILD COMPLETED"
+          echo "============================================================"
+
+          echo ""
+          echo "12 شهریور 1405 -> 2026-09-03"
+          echo "13 شهریور 1405 -> 2026-09-04"
+          echo "14 شهریور 1405 -> 2026-09-05"
+          echo "15 شهریور 1405 -> 2026-09-06"
+
+          echo ""
+          echo "16 شهریور 1405 -> 2026-09-07"
+          echo "این تاریخ پیش‌بینی روز بعد است و توسط Workflow روزانه ساخته می‌شود."
+
+          echo ""
+          echo "✓ DONE"
+```
