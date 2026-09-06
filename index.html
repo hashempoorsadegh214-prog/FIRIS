@@ -1,6 +1,5 @@
 
 <!DOCTYPE html>
-
 <html lang="fa" dir="rtl">
 
 <head>
@@ -602,16 +601,21 @@ body.night #nightOverlay {
    POPUPS
    ============================================================ */
 
-/*
- * Leaflet popup must always be above every custom map pane.
- */
-
 .leaflet-popup-pane {
   z-index: 1000 !important;
 }
 
 .leaflet-tooltip-pane {
   z-index: 900 !important;
+}
+
+.leaflet-popup {
+  z-index: 10000 !important;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  z-index: 10000 !important;
 }
 
 .leaflet-popup-content {
@@ -1143,7 +1147,7 @@ body.night #nightOverlay {
 <span class="bullet"></span>
 
 <span id="forecastDateBadge">
-پیش‌بینی برای فردا
+در حال بارگذاری تاریخ پیش‌بینی
 </span>
 
 </div>
@@ -1368,135 +1372,10 @@ const APP_STATE = {
   },
 
   ui: {
-    nightMode: false,
-    currentPopup: null,
-    locationFilter: "all",
-    excelObjectUrl: null
+    nightMode: false
   }
 
 };
-
-
-/* ============================================================
-   DATE - IRAN TIME
-   ============================================================ */
-
-function setupTomorrowDate() {
-
-  const badge =
-    document.getElementById(
-      "forecastDateBadge"
-    );
-
-  if (!badge) {
-    return;
-  }
-
-  try {
-
-    const iranParts =
-      new Intl.DateTimeFormat(
-        "en-US",
-        {
-          timeZone: "Asia/Tehran",
-          year: "numeric",
-          month: "numeric",
-          day: "numeric"
-        }
-      ).formatToParts(
-        new Date()
-      );
-
-    const year =
-      Number(
-        iranParts.find(
-          part =>
-            part.type === "year"
-        ).value
-      );
-
-    const month =
-      Number(
-        iranParts.find(
-          part =>
-            part.type === "month"
-        ).value
-      );
-
-    const day =
-      Number(
-        iranParts.find(
-          part =>
-            part.type === "day"
-        ).value
-      );
-
-    const tomorrow =
-      new Date(
-        Date.UTC(
-          year,
-          month - 1,
-          day + 1,
-          12,
-          0,
-          0
-        )
-      );
-
-    const persianParts =
-      new Intl.DateTimeFormat(
-        "fa-IR-u-ca-persian",
-        {
-          timeZone: "Asia/Tehran",
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric"
-        }
-      ).formatToParts(
-        tomorrow
-      );
-
-    const weekday =
-      persianParts.find(
-        part =>
-          part.type === "weekday"
-      )?.value || "";
-
-    const persianDay =
-      persianParts.find(
-        part =>
-          part.type === "day"
-      )?.value || "";
-
-    const persianMonth =
-      persianParts.find(
-        part =>
-          part.type === "month"
-      )?.value || "";
-
-    const persianYear =
-      persianParts.find(
-        part =>
-          part.type === "year"
-      )?.value || "";
-
-    badge.textContent =
-      `پیش‌بینی برای ${weekday} ${persianDay} ${persianMonth} ${persianYear}`;
-
-  } catch (error) {
-
-    console.warn(
-      "Iran forecast date error:",
-      error
-    );
-
-    badge.textContent =
-      "پیش‌بینی برای فردا";
-
-  }
-
-}
 
 
 /* ============================================================
@@ -1747,18 +1626,6 @@ function initMap() {
       }
     );
 
-  /*
-   * ترتیب نهایی و قطعی Pane ها:
-   *
-   * FLI       = 400
-   * مرز فارس  = 550
-   * فیلترها   = 600
-   * Popup     = 1000
-   *
-   * فیلترها روی FLI هستند،
-   * ولی Popup همیشه بالاتر از فیلترهاست.
-   */
-
   const fliPane =
     APP_STATE.map.createPane(
       "fliRiskPane"
@@ -1922,24 +1789,30 @@ async function loadFLI() {
 
 async function loadFLIData() {
 
-  try {
+  const response =
+    await fetchWithTimeout(
+      "data/web/fli_latest.json"
+    );
 
-    const response =
-      await fetchWithTimeout(
-        "data/web/fli_latest.json"
-      );
+  const metadata =
+    await response.json();
 
-    APP_STATE.data.fliMetadata =
-      await response.json();
+  const forecastDate =
+    metadata?.forecast_date ||
+    metadata?.target_date;
 
-  } catch (error) {
+  if (!forecastDate) {
 
-    console.warn(
-      "FLI metadata:",
-      error
+    throw new Error(
+      "Latest FLI metadata has no forecast date."
     );
 
   }
+
+  APP_STATE.data.fliMetadata =
+    metadata;
+
+  return metadata;
 
 }
 
@@ -1950,41 +1823,32 @@ async function loadFLIData() {
 
 async function loadGrid() {
 
-  try {
+  const response =
+    await fetchWithTimeout(
+      "data/web/fli_latest_grid.json"
+    );
 
-    const response =
-      await fetchWithTimeout(
-        "data/web/fli_latest_grid.json"
-      );
+  const grid =
+    await response.json();
 
-    const grid =
-      await response.json();
+  if (
+    !grid ||
+    !grid.bounds ||
+    !Array.isArray(
+      grid.values
+    )
+  ) {
 
-    if (
-      grid &&
-      grid.bounds &&
-      Array.isArray(grid.values)
-    ) {
-
-      APP_STATE.data.fliGrid =
-        grid;
-
-    } else {
-
-      console.warn(
-        "Invalid FLI grid structure."
-      );
-
-    }
-
-  } catch (error) {
-
-    console.warn(
-      "FLI grid:",
-      error
+    throw new Error(
+      "Invalid FLI grid structure."
     );
 
   }
+
+  APP_STATE.data.fliGrid =
+    grid;
+
+  return grid;
 
 }
 
@@ -2010,24 +1874,28 @@ function formatArchiveDate(
 
   const date =
     new Date(
-      Number(parts[0]),
-      Number(parts[1]) - 1,
-      Number(parts[2]),
-      12,
-      0,
-      0
+      Date.UTC(
+        Number(parts[0]),
+        Number(parts[1]) - 1,
+        Number(parts[2]),
+        12,
+        0,
+        0
+      )
     );
 
   try {
 
-    return date.toLocaleDateString(
+    return new Intl.DateTimeFormat(
       "fa-IR-u-ca-persian",
       {
+        timeZone: "UTC",
         year: "numeric",
         month: "long",
-        day: "numeric"
+        day: "numeric",
+        weekday: "long"
       }
-    );
+    ).format(date);
 
   } catch (error) {
 
@@ -2053,72 +1921,30 @@ function updateForecastBadgeFromMetadata() {
     return;
   }
 
-  if (
-    APP_STATE.data.currentArchiveDate ===
-    "latest"
-  ) {
+  const metadata =
+    APP_STATE.data.fliMetadata || {};
 
-    setupTomorrowDate();
+  const forecastDate =
+    metadata.forecast_date ||
+    metadata.target_date;
 
-    return;
-
-  }
-
-  const archiveDate =
-    APP_STATE.data.currentArchiveDate;
-
-  if (
-    archiveDate &&
-    archiveDate !== "latest"
-  ) {
+  if (!forecastDate) {
 
     badge.textContent =
-      `پیش‌بینی برای ${formatArchiveDate(archiveDate)}`;
+      "تاریخ پیش‌بینی نامشخص است";
 
     return;
 
   }
 
-  setupTomorrowDate();
+  badge.textContent =
+    `پیش‌بینی برای ${formatArchiveDate(forecastDate)}`;
 
 }
 
 
 /* ============================================================
-   ARCHIVE EXCEL
-   ============================================================ */
-
-function releaseArchiveExcelObjectUrl() {
-
-  if (
-    APP_STATE.ui.excelObjectUrl
-  ) {
-
-    try {
-
-      URL.revokeObjectURL(
-        APP_STATE.ui.excelObjectUrl
-      );
-
-    } catch (error) {
-
-      console.warn(
-        "Excel object URL cleanup:",
-        error
-      );
-
-    }
-
-    APP_STATE.ui.excelObjectUrl =
-      null;
-
-  }
-
-}
-
-
-/* ============================================================
-   RESET EXCEL
+   EXCEL - LATEST
    ============================================================ */
 
 function resetExcelButtonToLatest() {
@@ -2132,13 +1958,14 @@ function resetExcelButtonToLatest() {
     return;
   }
 
-  releaseArchiveExcelObjectUrl();
-
   button.href =
     "data/report/firis_report.xlsx";
 
   button.target =
     "_blank";
+
+  button.rel =
+    "noopener";
 
   button.removeAttribute(
     "download"
@@ -2151,577 +1978,7 @@ function resetExcelButtonToLatest() {
 
 
 /* ============================================================
-   BUILD ARCHIVE EXCEL
-   ============================================================ */
-
-function buildArchiveExcelWorkbook() {
-
-  if (
-    typeof XLSX === "undefined"
-  ) {
-
-    throw new Error(
-      "کتابخانه Excel بارگذاری نشده است."
-    );
-
-  }
-
-  const metadata =
-    APP_STATE.data.fliMetadata || {};
-
-  const grid =
-    APP_STATE.data.fliGrid;
-
-  const archiveDate =
-    APP_STATE.data.currentArchiveDate;
-
-  if (
-    !archiveDate ||
-    archiveDate === "latest"
-  ) {
-
-    throw new Error(
-      "تاریخ آرشیو انتخاب نشده است."
-    );
-
-  }
-
-  if (
-    !grid ||
-    !Array.isArray(
-      grid.values
-    )
-  ) {
-
-    throw new Error(
-      "داده Grid آرشیو وجود ندارد."
-    );
-
-  }
-
-  const forecastDate =
-    metadata.forecast_date ||
-    metadata.target_date ||
-    archiveDate;
-
-  if (
-    String(forecastDate) !==
-    String(archiveDate)
-  ) {
-
-    throw new Error(
-      `تاریخ Metadata آرشیو (${forecastDate}) ` +
-      `با تاریخ انتخاب‌شده (${archiveDate}) یکسان نیست.`
-    );
-
-  }
-
-  const values = [];
-
-  for (
-    const row of grid.values
-  ) {
-
-    if (
-      !Array.isArray(row)
-    ) {
-
-      continue;
-
-    }
-
-    for (
-      const item of row
-    ) {
-
-      if (
-        item === null ||
-        item === undefined
-      ) {
-
-        continue;
-
-      }
-
-      const number =
-        Number(item);
-
-      if (
-        Number.isFinite(number) &&
-        number >= 0 &&
-        number <= 100
-      ) {
-
-        values.push(
-          number
-        );
-
-      }
-
-    }
-
-  }
-
-  if (
-    values.length === 0
-  ) {
-
-    throw new Error(
-      "هیچ مقدار معتبر FLI در آرشیو پیدا نشد."
-    );
-
-  }
-
-  const sum =
-    values.reduce(
-      (
-        total,
-        value
-      ) => total + value,
-      0
-    );
-
-  const min =
-    Math.min(
-      ...values
-    );
-
-  const max =
-    Math.max(
-      ...values
-    );
-
-  const mean =
-    sum /
-    values.length;
-
-  const bounds =
-    parseBounds(
-      grid.bounds
-    );
-
-  const rows =
-    Number(grid.rows);
-
-  const cols =
-    Number(grid.cols);
-
-  const resolutionX =
-    bounds &&
-    cols > 0
-      ?
-        (
-          bounds.east -
-          bounds.west
-        ) /
-        cols
-      :
-        null;
-
-  const resolutionY =
-    bounds &&
-    rows > 0
-      ?
-        (
-          bounds.north -
-          bounds.south
-        ) /
-        rows
-      :
-        null;
-
-  const summaryRows = [
-
-    [
-      "گزارش خطر حریق استان فارس"
-    ],
-
-    [],
-
-    [
-      "تاریخ پیش‌بینی",
-      forecastDate
-    ],
-
-    [
-      "فایل FLI",
-      `fli_fars_${forecastDate}.tif`
-    ],
-
-    [
-      "سیستم مختصات",
-      metadata.crs ||
-      "EPSG:4326"
-    ],
-
-    [
-      "تعداد سلول معتبر",
-      values.length
-    ],
-
-    [
-      "حداقل FLI",
-      Number(
-        min.toFixed(2)
-      )
-    ],
-
-    [
-      "حداکثر FLI",
-      Number(
-        max.toFixed(2)
-      )
-    ],
-
-    [
-      "میانگین FLI",
-      Number(
-        mean.toFixed(2)
-      )
-    ],
-
-    [
-      "طبقه خطر استان",
-      getRisk(mean).label
-    ],
-
-    [
-      "رزولوشن X",
-      resolutionX !== null
-        ?
-          Number(
-            resolutionX.toFixed(9)
-          )
-        :
-          null
-    ],
-
-    [
-      "رزولوشن Y",
-      resolutionY !== null
-        ?
-          Number(
-            resolutionY.toFixed(9)
-          )
-        :
-          null
-    ]
-
-  ];
-
-  const classDefinitions = [
-
-    ["کم", 0, 20],
-
-    ["متوسط", 20, 40],
-
-    ["زیاد", 40, 60],
-
-    ["خیلی زیاد", 60, 80],
-
-    ["بحرانی", 80, 100.000001]
-
-  ];
-
-  const classRows = [
-
-    [
-      "طبقه خطر",
-      "حداقل FLI",
-      "حداکثر FLI",
-      "تعداد سلول",
-      "درصد از کل"
-    ]
-
-  ];
-
-  for (
-    const item of
-    classDefinitions
-  ) {
-
-    const label =
-      item[0];
-
-    const minimum =
-      item[1];
-
-    const maximum =
-      item[2];
-
-    const count =
-      values.filter(
-        value =>
-          value >= minimum &&
-          value < maximum
-      ).length;
-
-    const percent =
-      values.length > 0
-        ?
-          (
-            100 *
-            count /
-            values.length
-          )
-        :
-          0;
-
-    classRows.push(
-      [
-        label,
-        minimum,
-        Math.min(
-          maximum,
-          100
-        ),
-        count,
-        Number(
-          percent.toFixed(2)
-        )
-      ]
-    );
-
-  }
-
-  function collectRegionRows(
-    layer,
-    regionTitle
-  ) {
-
-    const rows = [
-
-      [
-        "ردیف",
-        "نام منطقه",
-        "نوع منطقه",
-        "میانگین FLI",
-        "حداقل FLI",
-        "حداکثر FLI",
-        "تعداد سلول معتبر",
-        "طبقه خطر"
-      ]
-
-    ];
-
-    if (!layer) {
-      return rows;
-    }
-
-    const features =
-      layer
-        .getLayers()
-        .map(
-          item =>
-            item.toGeoJSON()
-        );
-
-    features.forEach(
-      (
-        feature,
-        index
-      ) => {
-
-        const name =
-          getRegionName(
-            feature,
-            `${regionTitle} ${index + 1}`
-          );
-
-        const statistics =
-          regionStatistics(
-            feature
-          );
-
-        rows.push(
-          [
-
-            index + 1,
-
-            name,
-
-            regionTitle,
-
-            statistics
-              ?
-                Number(
-                  statistics.mean.toFixed(2)
-                )
-              :
-                null,
-
-            statistics
-              ?
-                Number(
-                  statistics.min.toFixed(2)
-                )
-              :
-                null,
-
-            statistics
-              ?
-                Number(
-                  statistics.max.toFixed(2)
-                )
-              :
-                null,
-
-            statistics
-              ?
-                statistics.count
-              :
-                0,
-
-            statistics
-              ?
-                getRisk(
-                  statistics.mean
-                ).label
-              :
-                "بدون داده"
-
-          ]
-        );
-
-      }
-    );
-
-    return rows;
-
-  }
-
-  const workbook =
-    XLSX.utils.book_new();
-
-  const summarySheet =
-    XLSX.utils.aoa_to_sheet(
-      summaryRows
-    );
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    summarySheet,
-    "خلاصه"
-  );
-
-  const protectedRows =
-    collectRegionRows(
-      APP_STATE.layers.protected,
-      "مناطق چهارگانه"
-    );
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.aoa_to_sheet(
-      protectedRows
-    ),
-    "مناطق_چهارگانه"
-  );
-
-  const huntingRows =
-    collectRegionRows(
-      APP_STATE.layers.hunting,
-      "مناطق شکار ممنوع"
-    );
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.aoa_to_sheet(
-      huntingRows
-    ),
-    "مناطق_شکار_ممنوع"
-  );
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.aoa_to_sheet(
-      classRows
-    ),
-    "طبقات_خطر"
-  );
-
-  const technicalRows = [
-
-    [
-      "CRS",
-      metadata.crs ||
-      "EPSG:4326"
-    ],
-
-    [
-      "Width",
-      cols
-    ],
-
-    [
-      "Height",
-      rows
-    ],
-
-    [
-      "Resolution X",
-      resolutionX !== null
-        ?
-          Number(
-            resolutionX.toFixed(9)
-          )
-        :
-          null
-    ],
-
-    [
-      "Resolution Y",
-      resolutionY !== null
-        ?
-          Number(
-            resolutionY.toFixed(9)
-          )
-        :
-          null
-    ],
-
-    [
-      "Left",
-      bounds?.west ?? null
-    ],
-
-    [
-      "Bottom",
-      bounds?.south ?? null
-    ],
-
-    [
-      "Right",
-      bounds?.east ?? null
-    ],
-
-    [
-      "Top",
-      bounds?.north ?? null
-    ],
-
-    [
-      "Forecast date",
-      forecastDate
-    ]
-
-  ];
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.aoa_to_sheet(
-      technicalRows
-    ),
-    "اطلاعات_فنی"
-  );
-
-  return workbook;
-
-}
-
-
-/* ============================================================
-   PREPARE ARCHIVE EXCEL
+   EXCEL - ARCHIVE
    ============================================================ */
 
 function prepareArchiveExcelButton() {
@@ -2749,77 +2006,28 @@ function prepareArchiveExcelButton() {
 
   }
 
-  try {
+  /*
+   * گزارش آرشیو قبلاً توسط GitHub Actions
+   * ساخته شده است.
+   *
+   * بنابراین هیچ Excel جدیدی در مرورگر
+   * تولید نمی‌کنیم.
+   */
 
-    const workbook =
-      buildArchiveExcelWorkbook();
+  button.href =
+    `data/web/archive/${date}/firis_report.xlsx`;
 
-    const binary =
-      XLSX.write(
-        workbook,
-        {
-          bookType: "xlsx",
-          type: "array"
-        }
-      );
+  button.target =
+    "_blank";
 
-    const blob =
-      new Blob(
-        [
-          binary
-        ],
-        {
-          type:
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        }
-      );
+  button.rel =
+    "noopener";
 
-    releaseArchiveExcelObjectUrl();
+  button.download =
+    `firis_report_${date}.xlsx`;
 
-    const objectUrl =
-      URL.createObjectURL(
-        blob
-      );
-
-    APP_STATE.ui.excelObjectUrl =
-      objectUrl;
-
-    button.href =
-      objectUrl;
-
-    button.target =
-      "_blank";
-
-    button.download =
-      `firis_report_${date}.xlsx`;
-
-    button.title =
-      `گزارش Excel آرشیو ${formatArchiveDate(date)}`;
-
-  } catch (error) {
-
-    console.error(
-      "Archive Excel preparation error:",
-      error
-    );
-
-    releaseArchiveExcelObjectUrl();
-
-    button.href =
-      "#";
-
-    button.removeAttribute(
-      "download"
-    );
-
-    button.removeAttribute(
-      "target"
-    );
-
-    button.title =
-      "گزارش Excel آرشیو آماده نشد.";
-
-  }
+  button.title =
+    `دانلود گزارش Excel آرشیو ${formatArchiveDate(date)}`;
 
 }
 
@@ -2872,7 +2080,15 @@ async function loadArchiveDates() {
               :
                 item?.date
         )
-        .filter(Boolean)
+        .filter(
+          Boolean
+        )
+        .filter(
+          date =>
+            /^\d{4}-\d{2}-\d{2}$/.test(
+              String(date)
+            )
+        )
         .sort();
 
     select.innerHTML =
@@ -2926,6 +2142,24 @@ async function loadArchiveDates() {
       error
     );
 
+    select.innerHTML =
+      "";
+
+    const latestOption =
+      document.createElement(
+        "option"
+      );
+
+    latestOption.value =
+      "latest";
+
+    latestOption.textContent =
+      "آخرین پیش‌بینی";
+
+    select.appendChild(
+      latestOption
+    );
+
   }
 
 }
@@ -2939,14 +2173,19 @@ async function loadArchiveForecast(
   date
 ) {
 
+  /* ----------------------------------------------------------
+     LATEST
+     ---------------------------------------------------------- */
+
   if (
     !date ||
     date === "latest"
   ) {
 
-    await loadFLIData();
-
-    await loadGrid();
+    await Promise.all([
+      loadFLIData(),
+      loadGrid()
+    ]);
 
     if (
       APP_STATE.layers.fli &&
@@ -2973,6 +2212,11 @@ async function loadArchiveForecast(
     return;
 
   }
+
+
+  /* ----------------------------------------------------------
+     ARCHIVE
+     ---------------------------------------------------------- */
 
   const base =
     `data/web/archive/${date}/`;
@@ -3040,6 +2284,22 @@ async function loadArchiveForecast(
 
     throw new Error(
       "آرشیو FLI معتبر نیست."
+    );
+
+  }
+
+  const polygonDate =
+    polygons?.properties?.forecast_date;
+
+  if (
+    polygonDate &&
+    String(polygonDate) !==
+      String(date)
+  ) {
+
+    throw new Error(
+      `تاریخ Polygon آرشیو اشتباه است: ` +
+      `انتخاب=${date}، داده=${polygonDate}`
     );
 
   }
@@ -3208,14 +2468,19 @@ function setupArchiveFilter() {
           APP_STATE.data.currentArchiveDate ||
           "latest";
 
+        /*
+         * اگر بارگذاری latest شکست خورد،
+         * تاریخ فعلی Metadata را حفظ کن.
+         */
+
+        updateForecastBadgeFromMetadata();
+
         if (
           APP_STATE.data.currentArchiveDate ===
           "latest"
         ) {
 
           resetExcelButtonToLatest();
-
-          setupTomorrowDate();
 
         }
 
@@ -3276,19 +2541,43 @@ function setupExcelButton() {
         currentDate !== "latest"
       ) {
 
-        if (
-          !button.href ||
-          button.href === "#" ||
-          !APP_STATE.ui.excelObjectUrl
-        ) {
+        const archiveExcelUrl =
+          `data/web/archive/${currentDate}/firis_report.xlsx`;
 
-          event.preventDefault();
+        button.href =
+          archiveExcelUrl;
 
-          prepareArchiveExcelButton();
+        button.target =
+          "_blank";
 
-        }
+        button.rel =
+          "noopener";
+
+        button.download =
+          `firis_report_${currentDate}.xlsx`;
+
+        /*
+         * فایل واقعی آرشیو:
+         *
+         * archive/YYYY-MM-DD/firis_report.xlsx
+         */
+
+        return;
 
       }
+
+      button.href =
+        "data/report/firis_report.xlsx";
+
+      button.target =
+        "_blank";
+
+      button.rel =
+        "noopener";
+
+      button.removeAttribute(
+        "download"
+      );
 
     }
   );
@@ -5131,9 +4420,13 @@ async function startApp() {
 
   try {
 
-    setupTomorrowDate();
-
     initMap();
+
+    /*
+     * مهم:
+     * latest همزمان با Metadata و Grid واقعی بارگذاری می‌شود.
+     * بنابراین تاریخ تابلو از ساعت مرورگر محاسبه نمی‌شود.
+     */
 
     await Promise.all([
 
@@ -5189,7 +4482,16 @@ async function startApp() {
     APP_STATE.data.currentArchiveDate =
       "latest";
 
+    /*
+     * تاریخ تابلو از fli_latest.json
+     * می‌آید.
+     */
+
     updateForecastBadgeFromMetadata();
+
+    /*
+     * Excel آخرین پیش‌بینی.
+     */
 
     resetExcelButtonToLatest();
 
@@ -5208,6 +4510,12 @@ async function startApp() {
 
     console.log(
       "FIRIS initialized successfully."
+    );
+
+    console.log(
+      "Latest forecast date:",
+      APP_STATE.data.fliMetadata?.forecast_date ||
+      APP_STATE.data.fliMetadata?.target_date
     );
 
   } catch (error) {
@@ -5232,7 +4540,7 @@ async function startApp() {
 
       transform:translateX(-50%);
 
-      z-index:9999;
+      z-index:99999;
 
       background:#b40000;
 
@@ -5251,6 +4559,10 @@ async function startApp() {
         rgba(0,0,0,.25);
 
       direction:rtl;
+
+      max-width:90vw;
+
+      text-align:center;
 
     `;
 
