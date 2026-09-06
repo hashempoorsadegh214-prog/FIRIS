@@ -1,27 +1,33 @@
+
 name: Build FIRIS Fire Likelihood Index
 
 on:
 
   # ------------------------------------------------------------
-  # DAILY FIRIS BUILD
+  # AUTOMATIC RUN AFTER UPDATE FIRIS FWI
   #
-  # 21:35 UTC = 01:05 Iran
+  # این Workflow فقط وقتی به صورت خودکار اجرا می‌شود
+  # که Workflow مربوط به Update FIRIS FWI با موفقیت کامل
+  # شده باشد.
   #
-  # At this time the Iran local date has already changed.
-  # Therefore TOMORROW_DATE is always the forecast date
-  # for the new Iran day + 1.
-  #
-  # Example:
-  #
-  # 2026-09-06 01:05 Iran
-  #        ↓
-  # TOMORROW_DATE = 2026-09-07
-  #
+  # بنابراین دیگر وابسته به ساعت ثابت نیست و مشکل
+  # race condition بین FWI و FLI برطرف می‌شود.
   # ------------------------------------------------------------
 
-  schedule:
+  workflow_run:
 
-    - cron: "35 21 * * *"
+    workflows:
+      - "Update FIRIS FWI"
+
+    types:
+      - completed
+
+
+  # ------------------------------------------------------------
+  # MANUAL RUN
+  #
+  # اجرای دستی برای تست همچنان فعال است.
+  # ------------------------------------------------------------
 
   workflow_dispatch:
 
@@ -34,16 +40,30 @@ concurrency:
 
   group: build-firis
 
-  cancel-in-progress: true
+  # اجرای قبلی وسط کار قطع نشود.
+  cancel-in-progress: false
 
 
 jobs:
 
   build-firis:
 
+    # ----------------------------------------------------------
+    # AUTOMATIC:
+    # فقط در صورت موفقیت Update FIRIS FWI
+    #
+    # MANUAL:
+    # بدون این شرط اجرا می‌شود.
+    # ----------------------------------------------------------
+
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
     runs-on: ubuntu-latest
 
     timeout-minutes: 30
+
 
     steps:
 
@@ -96,7 +116,8 @@ jobs:
             pyproj \
             fiona \
             requests \
-            Pillow
+            Pillow \
+            affine
 
           echo ""
           echo "============================================================"
@@ -761,12 +782,12 @@ jobs:
 
           if not report.exists():
 
-              print("")
-              print(
-                  "ERROR: Archived Excel does not exist."
-              )
+            print("")
+            print(
+                "ERROR: Archived Excel does not exist."
+            )
 
-              sys.exit(1)
+            sys.exit(1)
 
 
           wb = load_workbook(
@@ -778,88 +799,88 @@ jobs:
 
           try:
 
-              if "خلاصه" not in wb.sheetnames:
-
-                  print("")
-                  print(
-                      "ERROR: Archived Excel sheet "
-                      "'خلاصه' not found."
-                  )
-
-                  sys.exit(1)
-
-
-              ws = wb["خلاصه"]
-
-
-              actual_date = ws["B3"].value
-
-              actual_fli = ws["B4"].value
-
-
-              if str(
-                  actual_date
-              ) != date:
-
-                  print("")
-                  print(
-                      "ERROR: Archived Excel date is incorrect."
-                  )
-
-                  print(
-                      "Expected:",
-                      date
-                  )
-
-                  print(
-                      "Actual:",
-                      actual_date
-                  )
-
-                  sys.exit(1)
-
-
-              if str(
-                  actual_fli
-              ) != expected_fli:
-
-                  print("")
-                  print(
-                      "ERROR: Archived Excel FLI filename "
-                      "is incorrect."
-                  )
-
-                  print(
-                      "Expected:",
-                      expected_fli
-                  )
-
-                  print(
-                      "Actual:",
-                      actual_fli
-                  )
-
-                  sys.exit(1)
-
+            if "خلاصه" not in wb.sheetnames:
 
               print("")
               print(
-                  "✓ Archived Excel date is correct."
+                  "ERROR: Archived Excel sheet "
+                  "'خلاصه' not found."
+              )
+
+              sys.exit(1)
+
+
+            ws = wb["خلاصه"]
+
+
+            actual_date = ws["B3"].value
+
+            actual_fli = ws["B4"].value
+
+
+            if str(
+                actual_date
+            ) != date:
+
+              print("")
+              print(
+                  "ERROR: Archived Excel date is incorrect."
               )
 
               print(
-                  "✓ Archived Excel FLI filename is correct."
+                  "Expected:",
+                  date
               )
 
               print(
-                  "✓ Archived Excel belongs to the "
-                  "selected forecast date."
+                  "Actual:",
+                  actual_date
               )
+
+              sys.exit(1)
+
+
+            if str(
+                actual_fli
+            ) != expected_fli:
+
+              print("")
+              print(
+                  "ERROR: Archived Excel FLI filename "
+                  "is incorrect."
+              )
+
+              print(
+                  "Expected:",
+                  expected_fli
+              )
+
+              print(
+                  "Actual:",
+                  actual_fli
+              )
+
+              sys.exit(1)
+
+
+            print("")
+            print(
+                "✓ Archived Excel date is correct."
+            )
+
+            print(
+                "✓ Archived Excel FLI filename is correct."
+            )
+
+            print(
+                "✓ Archived Excel belongs to the "
+                "selected forecast date."
+            )
 
 
           finally:
 
-              wb.close()
+            wb.close()
 
 
       # ============================================================
