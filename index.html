@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 
 <html lang="fa" dir="rtl">
@@ -1726,6 +1725,30 @@ function initMap() {
       }
     );
 
+  /*
+   * FLI در یک Pane مستقل قرار می‌گیرد.
+   */
+
+  const fliPane =
+    APP_STATE.map.createPane(
+      "fliRiskPane"
+    );
+
+  fliPane.style.zIndex =
+    "450";
+
+  /*
+   * لایه‌های فیلتر همیشه بالای FLI قرار می‌گیرند.
+   */
+
+  const filterPane =
+    APP_STATE.map.createPane(
+      "filterPane"
+    );
+
+  filterPane.style.zIndex =
+    "500";
+
   L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     {
@@ -1791,6 +1814,8 @@ async function loadFLI() {
     L.geoJSON(
       geojson,
       {
+
+        pane: "fliRiskPane",
 
         style: feature => {
 
@@ -2136,6 +2161,24 @@ function buildArchiveExcelWorkbook() {
     for (
       const item of row
     ) {
+
+      /*
+       * null = NoData
+       *
+       * بسیار مهم:
+       * Number(null) برابر 0 است،
+       * بنابراین قبل از Number باید null
+       * صریحاً حذف شود.
+       */
+
+      if (
+        item === null ||
+        item === undefined
+      ) {
+
+        continue;
+
+      }
 
       const number =
         Number(item);
@@ -2962,6 +3005,8 @@ async function loadArchiveForecast(
       polygons,
       {
 
+        pane: "fliRiskPane",
+
         style: feature => {
 
           const color =
@@ -3194,6 +3239,8 @@ async function loadProtected() {
       geojson,
       {
 
+        pane: "filterPane",
+
         style: {
 
           color: "#1565c0",
@@ -3248,6 +3295,8 @@ async function loadHunting() {
       geojson,
       {
 
+        pane: "filterPane",
+
         style: {
 
           color: "#7b1fa2",
@@ -3290,17 +3339,6 @@ async function loadHunting() {
 function parseBounds(
   bounds
 ) {
-
-  /*
-   * ساختار فعلی داده‌ها:
-   *
-   * {
-   *   "west": ...,
-   *   "south": ...,
-   *   "east": ...,
-   *   "north": ...
-   * }
-   */
 
   if (
     bounds &&
@@ -3348,15 +3386,6 @@ function parseBounds(
     }
 
   }
-
-  /*
-   * سازگاری با ساختار آرایه‌ای قدیمی:
-   *
-   * [
-   *   [south, west],
-   *   [north, east]
-   * ]
-   */
 
   if (
     Array.isArray(bounds) &&
@@ -3591,10 +3620,27 @@ function getPointValue(
       )
     );
 
+  /*
+   * بسیار مهم:
+   * null در Grid یعنی NoData.
+   * نباید Number(null) اجرا شود،
+   * چون Number(null) = 0 است.
+   */
+
+  const rawValue =
+    grid.values?.[row]?.[col];
+
+  if (
+    rawValue === null ||
+    rawValue === undefined
+  ) {
+
+    return null;
+
+  }
+
   const value =
-    Number(
-      grid.values?.[row]?.[col]
-    );
+    Number(rawValue);
 
   if (
     Number.isFinite(value) &&
@@ -3891,10 +3937,29 @@ function regionStatistics(
       col++
     ) {
 
+      /*
+       * بسیار مهم:
+       *
+       * ابتدا مقدار خام را می‌خوانیم.
+       * null = NoData
+       *
+       * نباید مستقیماً Number(null) انجام شود.
+       */
+
+      const rawValue =
+        grid.values?.[row]?.[col];
+
+      if (
+        rawValue === null ||
+        rawValue === undefined
+      ) {
+
+        continue;
+
+      }
+
       const value =
-        Number(
-          grid.values?.[row]?.[col]
-        );
+        Number(rawValue);
 
       if (
         !Number.isFinite(value) ||
