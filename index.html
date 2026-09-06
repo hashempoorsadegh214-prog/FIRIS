@@ -1360,6 +1360,7 @@ const APP_STATE = {
 
 };
 
+
 /* ============================================================
    DATE - IRAN TIME
    ============================================================ */
@@ -1481,6 +1482,7 @@ function setupTomorrowDate() {
 
 }
 
+
 /* ============================================================
    FETCH
    ============================================================ */
@@ -1546,6 +1548,7 @@ async function fetchWithTimeout(
 
 }
 
+
 /* ============================================================
    NUMBER
    ============================================================ */
@@ -1571,6 +1574,7 @@ function formatNumber(value) {
   );
 
 }
+
 
 /* ============================================================
    RISK
@@ -1634,6 +1638,7 @@ function getRisk(value) {
   };
 
 }
+
 
 /* ============================================================
    GAUGE
@@ -1709,6 +1714,7 @@ function updateGauge(
 
 }
 
+
 /* ============================================================
    MAP
    ============================================================ */
@@ -1726,9 +1732,39 @@ function initMap() {
     );
 
   /*
-   * هیچ Pane سفارشی برای FLI یا فیلترها ایجاد نمی‌شود.
-   * رفتار رندر Leaflet همان حالت اصلی باقی می‌ماند.
+   * ترتیب لایه‌ها:
+   *
+   * FLI       = 400
+   * مرز فارس  = 550
+   * فیلترها   = 700
+   *
+   * بنابراین مرز فیلترها همیشه روی لایه FLI
+   * و روی مرز استان نمایش داده می‌شود.
    */
+
+  const fliPane =
+    APP_STATE.map.createPane(
+      "fliRiskPane"
+    );
+
+  fliPane.style.zIndex =
+    "400";
+
+  const farsPane =
+    APP_STATE.map.createPane(
+      "farsPane"
+    );
+
+  farsPane.style.zIndex =
+    "550";
+
+  const filterPane =
+    APP_STATE.map.createPane(
+      "filterPane"
+    );
+
+  filterPane.style.zIndex =
+    "700";
 
   L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -1742,6 +1778,7 @@ function initMap() {
   );
 
 }
+
 
 /* ============================================================
    FARS
@@ -1761,13 +1798,19 @@ async function loadFars() {
     L.geoJSON(
       geojson,
       {
+
+        pane:
+          "farsPane",
+
         style: {
           color: "#20252a",
           weight: 2.2,
           opacity: .95,
           fill: false
         },
+
         interactive: false
+
       }
     ).addTo(
       APP_STATE.map
@@ -1776,6 +1819,7 @@ async function loadFars() {
   return geojson;
 
 }
+
 
 /* ============================================================
    FLI
@@ -1796,6 +1840,9 @@ async function loadFLI() {
       geojson,
       {
 
+        pane:
+          "fliRiskPane",
+
         style: feature => {
 
           const color =
@@ -1804,21 +1851,27 @@ async function loadFLI() {
 
           return {
 
-            color: color,
+            color:
+              color,
 
-            weight: .15,
+            weight:
+              .15,
 
-            opacity: .85,
+            opacity:
+              .85,
 
-            fillColor: color,
+            fillColor:
+              color,
 
-            fillOpacity: .72
+            fillOpacity:
+              .72
 
           };
 
         },
 
-        interactive: false
+        interactive:
+          false
 
       }
     ).addTo(
@@ -1828,6 +1881,7 @@ async function loadFLI() {
   return APP_STATE.layers.fli;
 
 }
+
 
 /* ============================================================
    FLI METADATA
@@ -1855,6 +1909,7 @@ async function loadFLIData() {
   }
 
 }
+
 
 /* ============================================================
    GRID
@@ -1899,6 +1954,7 @@ async function loadGrid() {
   }
 
 }
+
 
 /* ============================================================
    ARCHIVE DATE FORMAT
@@ -1948,6 +2004,7 @@ function formatArchiveDate(
 
 }
 
+
 /* ============================================================
    FORECAST BADGE
    ============================================================ */
@@ -1993,6 +2050,7 @@ function updateForecastBadgeFromMetadata() {
 
 }
 
+
 /* ============================================================
    ARCHIVE EXCEL
    ============================================================ */
@@ -2025,6 +2083,7 @@ function releaseArchiveExcelObjectUrl() {
 
 }
 
+
 /* ============================================================
    RESET EXCEL
    ============================================================ */
@@ -2056,6 +2115,7 @@ function resetExcelButtonToLatest() {
     "خروجی Excel آخرین پیش‌بینی";
 
 }
+
 
 /* ============================================================
    BUILD ARCHIVE EXCEL
@@ -2626,6 +2686,7 @@ function buildArchiveExcelWorkbook() {
 
 }
 
+
 /* ============================================================
    PREPARE ARCHIVE EXCEL
    ============================================================ */
@@ -2728,6 +2789,7 @@ function prepareArchiveExcelButton() {
   }
 
 }
+
 
 /* ============================================================
    LOAD ARCHIVE DATES
@@ -2834,6 +2896,7 @@ async function loadArchiveDates() {
   }
 
 }
+
 
 /* ============================================================
    LOAD ARCHIVE FORECAST
@@ -2975,6 +3038,9 @@ async function loadArchiveForecast(
       polygons,
       {
 
+        pane:
+          "fliRiskPane",
+
         style: feature => {
 
           const color =
@@ -2983,21 +3049,27 @@ async function loadArchiveForecast(
 
           return {
 
-            color: color,
+            color:
+              color,
 
-            weight: .15,
+            weight:
+              .15,
 
-            opacity: .85,
+            opacity:
+              .85,
 
-            fillColor: color,
+            fillColor:
+              color,
 
-            fillOpacity: .72
+            fillOpacity:
+              .72
 
           };
 
         },
 
-        interactive: false
+        interactive:
+          false
 
       }
     );
@@ -3011,6 +3083,7 @@ async function loadArchiveForecast(
   prepareArchiveExcelButton();
 
 }
+
 
 /* ============================================================
    ARCHIVE FILTER
@@ -3142,6 +3215,7 @@ function setupArchiveFilter() {
 
 }
 
+
 /* ============================================================
    EXCEL BUTTON
    ============================================================ */
@@ -3188,6 +3262,7 @@ function setupExcelButton() {
 
 }
 
+
 /* ============================================================
    PROTECTED
    ============================================================ */
@@ -3206,6 +3281,9 @@ async function loadProtected() {
     L.geoJSON(
       geojson,
       {
+
+        pane:
+          "filterPane",
 
         style: {
 
@@ -3242,6 +3320,7 @@ async function loadProtected() {
 
 }
 
+
 /* ============================================================
    HUNTING
    ============================================================ */
@@ -3260,6 +3339,9 @@ async function loadHunting() {
     L.geoJSON(
       geojson,
       {
+
+        pane:
+          "filterPane",
 
         style: {
 
@@ -3295,6 +3377,7 @@ async function loadHunting() {
   return APP_STATE.layers.hunting;
 
 }
+
 
 /* ============================================================
    BOUNDS
@@ -3426,6 +3509,7 @@ function parseBounds(
 
 }
 
+
 /* ============================================================
    COORDINATES
    ============================================================ */
@@ -3452,6 +3536,7 @@ function validateCoords(
   );
 
 }
+
 
 /* ============================================================
    GRID CELL
@@ -3613,6 +3698,7 @@ function getPointValue(
 
 }
 
+
 /* ============================================================
    POINT INSIDE FARS
    ============================================================ */
@@ -3671,6 +3757,7 @@ function pointInsideFars(
   return false;
 
 }
+
 
 /* ============================================================
    REGION STATISTICS
@@ -4002,6 +4089,7 @@ function regionStatistics(
 
 }
 
+
 /* ============================================================
    REGION NAME
    ============================================================ */
@@ -4051,6 +4139,7 @@ function getRegionName(
 
 }
 
+
 /* ============================================================
    REGION TYPE
    ============================================================ */
@@ -4078,6 +4167,7 @@ function getRegionTypeTitle(
   return "محدوده";
 
 }
+
 
 /* ============================================================
    REGION POPUP
@@ -4195,6 +4285,7 @@ function bindRegion(
   );
 
 }
+
 
 /* ============================================================
    MAP CLICK
@@ -4370,6 +4461,7 @@ function setupMapClick() {
 
 }
 
+
 /* ============================================================
    LAYER VISIBILITY
    ============================================================ */
@@ -4397,21 +4489,6 @@ function setLayerVisible(
 
     }
 
-    /*
-     * فقط لایه فیلتر فعال را به جلوی
-     * لایه‌های هم‌نوع خودش می‌آوریم.
-     * هیچ Pane سفارشی استفاده نمی‌شود.
-     */
-
-    if (
-      typeof layer.bringToFront ===
-      "function"
-    ) {
-
-      layer.bringToFront();
-
-    }
-
   } else {
 
     if (
@@ -4429,6 +4506,7 @@ function setLayerVisible(
   }
 
 }
+
 
 /* ============================================================
    FIT FARS
@@ -4476,6 +4554,7 @@ function fitFars() {
 
 }
 
+
 /* ============================================================
    FIT LAYER
    ============================================================ */
@@ -4515,6 +4594,7 @@ function fitLayer(
   );
 
 }
+
 
 /* ============================================================
    UPDATE FILTER GAUGE
@@ -4612,6 +4692,7 @@ function updateFilterGauge(
   );
 
 }
+
 
 /* ============================================================
    LOCATION FILTER
@@ -4722,6 +4803,7 @@ function applyLocationFilter(
 
 }
 
+
 /* ============================================================
    LOCATION FILTER UI
    ============================================================ */
@@ -4827,6 +4909,7 @@ function setupLocationFilter() {
 
 }
 
+
 /* ============================================================
    FIT BUTTON
    ============================================================ */
@@ -4866,6 +4949,7 @@ function setupFitButton() {
   );
 
 }
+
 
 /* ============================================================
    NIGHT MODE
@@ -4912,6 +4996,7 @@ function setupNightMode() {
   );
 
 }
+
 
 /* ============================================================
    ABOUT
@@ -5001,6 +5086,7 @@ function setupAbout() {
   );
 
 }
+
 
 /* ============================================================
    START
@@ -5143,6 +5229,7 @@ async function startApp() {
   }
 
 }
+
 
 /* ============================================================
    DOM READY
