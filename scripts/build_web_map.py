@@ -66,6 +66,8 @@ RISK_CODE_TO_INFO = {
 # WEB POLYGON CLEANUP
 # ============================================================
 
+# فقط برای خروجی نمایشی Web GIS.
+# روی Raster اصلی، FLI و Grid هیچ اثری ندارد.
 MIN_POLYGON_CELLS = 9
 
 
@@ -112,7 +114,10 @@ DATE_PATTERN = re.compile(
 )
 
 
-def require_file(path: Path, label: str) -> None:
+def require_file(
+    path: Path,
+    label: str
+) -> None:
 
     if not path.is_file():
 
@@ -121,7 +126,9 @@ def require_file(path: Path, label: str) -> None:
         )
 
 
-def extract_forecast_date(path: Path) -> str:
+def extract_forecast_date(
+    path: Path
+) -> str:
 
     match = DATE_PATTERN.search(
         path.name
@@ -151,10 +158,10 @@ def risk_code(
 ) -> int:
 
     for code, (
-        _,
+        _label,
         minimum,
         maximum,
-        _
+        _color
     ) in enumerate(
         RISK_CLASSES,
         start=1
@@ -169,9 +176,16 @@ def risk_code(
 
 def risk_info(
     value: float
-) -> tuple[str, float, float, str]:
+) -> tuple[
+    str,
+    float,
+    float,
+    str
+]:
 
-    if not math.isfinite(value):
+    if not math.isfinite(
+        value
+    ):
 
         return (
             "بدون داده",
@@ -221,9 +235,13 @@ def json_safe_number(
 
         return None
 
-    number = float(value)
+    number = float(
+        value
+    )
 
-    if not math.isfinite(number):
+    if not math.isfinite(
+        number
+    ):
 
         return None
 
@@ -242,19 +260,29 @@ def array_to_json_values(
     displays.
     """
 
-    result: list[list[float | None]] = []
+    result: list[
+        list[float | None]
+    ] = []
 
     for row in array:
 
-        out_row: list[float | None] = []
+        out_row: list[
+            float | None
+        ] = []
 
         for value in row:
 
-            number = float(value)
+            number = float(
+                value
+            )
 
-            if not math.isfinite(number):
+            if not math.isfinite(
+                number
+            ):
 
-                out_row.append(None)
+                out_row.append(
+                    None
+                )
 
             else:
 
@@ -294,7 +322,7 @@ def atomic_write_json(
         with os.fdopen(
             fd,
             "w",
-            encoding="utf-8",
+            encoding="utf-8"
         ) as handle:
 
             json.dump(
@@ -305,7 +333,9 @@ def atomic_write_json(
                 allow_nan=False,
             )
 
-            handle.write("\n")
+            handle.write(
+                "\n"
+            )
 
         os.replace(
             temp_name,
@@ -354,7 +384,8 @@ def read_fli(
         if src.crs.to_epsg() != 4326:
 
             raise ValueError(
-                f"FLI raster must use EPSG:4326. Found: {src.crs}"
+                "FLI raster must use EPSG:4326. "
+                f"Found: {src.crs}"
             )
 
         data = src.read(
@@ -428,14 +459,12 @@ def read_fli(
                 int(src.height),
 
             "transform": [
-
                 float(src.transform.a),
                 float(src.transform.b),
                 float(src.transform.c),
                 float(src.transform.d),
                 float(src.transform.e),
                 float(src.transform.f),
-
             ],
 
             "bounds": {
@@ -475,9 +504,7 @@ def read_fli(
             "nodata": (
 
                 None
-
                 if src.nodata is None
-
                 else json_safe_number(
                     src.nodata
                 )
@@ -498,9 +525,9 @@ def read_fli(
             "min": (
 
                 None
-
-                if not np.any(valid)
-
+                if not np.any(
+                    valid
+                )
                 else round(
                     float(
                         np.min(
@@ -515,9 +542,9 @@ def read_fli(
             "max": (
 
                 None
-
-                if not np.any(valid)
-
+                if not np.any(
+                    valid
+                )
                 else round(
                     float(
                         np.max(
@@ -532,9 +559,9 @@ def read_fli(
             "mean": (
 
                 None
-
-                if not np.any(valid)
-
+                if not np.any(
+                    valid
+                )
                 else round(
                     float(
                         np.mean(
@@ -736,16 +763,16 @@ def build_classified_raster(
     )
 
     for code, (
-        _,
+        _label,
         minimum,
         maximum,
-        _
+        _color
     ) in enumerate(
         RISK_CLASSES,
         start=1,
     ):
 
-        mask = (
+        class_mask = (
 
             finite
 
@@ -760,7 +787,7 @@ def build_classified_raster(
         )
 
         classified[
-            mask
+            class_mask
         ] = code
 
     return classified
@@ -772,11 +799,15 @@ def polygonize_classes(
 ) -> dict[int, list[Any]]:
 
     """
-    Polygonize risk classes and dissolve contiguous polygons belonging to the
-    same class. Class 0 (NoData) is omitted.
+    Polygonize risk classes and collect contiguous polygons.
+
+    Class 0 (NoData) is omitted.
     """
 
-    groups: dict[int, list[Any]] = {
+    groups: dict[
+        int,
+        list[Any]
+    ] = {
 
         code: []
 
@@ -787,13 +818,20 @@ def polygonize_classes(
     mask = classified > 0
 
     for geometry, value in shapes(
+
         classified,
+
         mask=mask,
+
         transform=transform,
+
         connectivity=4,
+
     ):
 
-        code = int(value)
+        code = int(
+            value
+        )
 
         if code <= 0:
 
@@ -843,11 +881,7 @@ def make_feature_collection(
     ] = []
 
     # --------------------------------------------------------
-    # Area of one raster cell.
-    #
-    # This is calculated directly from the affine transform.
-    # The cleanup below affects only Web GIS polygons.
-    # It does NOT modify the FLI raster or Grid.
+    # Raster cell area
     # --------------------------------------------------------
 
     pixel_area = abs(
@@ -874,14 +908,15 @@ def make_feature_collection(
         )
 
     min_polygon_area = (
-
         pixel_area *
         MIN_POLYGON_CELLS
-
     )
 
     removed_small_polygons = 0
-    kept_small_cleanup_polygons = 0
+
+    original_polygon_count = 0
+
+    kept_polygon_count = 0
 
     # --------------------------------------------------------
     # Process each risk class
@@ -894,6 +929,10 @@ def make_feature_collection(
             continue
 
         filtered_geometries = []
+
+        original_polygon_count += len(
+            geometries
+        )
 
         for geom in geometries:
 
@@ -912,10 +951,9 @@ def make_feature_collection(
                 continue
 
             # ------------------------------------------------
-            # Remove only very small isolated polygons.
-            #
-            # Nine raster-cell areas is the cleanup threshold.
-            # Risk classification itself remains unchanged.
+            # IMPORTANT:
+            # This only removes tiny Web GIS polygons.
+            # It does NOT modify the original FLI values.
             # ------------------------------------------------
 
             if geom.area < min_polygon_area:
@@ -931,6 +969,14 @@ def make_feature_collection(
         if not filtered_geometries:
 
             continue
+
+        kept_polygon_count += len(
+            filtered_geometries
+        )
+
+        # ----------------------------------------------------
+        # Dissolve polygons belonging to the same risk class.
+        # ----------------------------------------------------
 
         dissolved = unary_union(
             filtered_geometries
@@ -1025,8 +1071,16 @@ def make_feature_collection(
         f"{MIN_POLYGON_CELLS}"
     )
     print(
+        f"Original polygons     : "
+        f"{original_polygon_count}"
+    )
+    print(
         f"Removed small polygons: "
         f"{removed_small_polygons}"
+    )
+    print(
+        f"Remaining polygons    : "
+        f"{kept_polygon_count}"
     )
     print(
         f"Final class features  : "
@@ -1328,7 +1382,11 @@ def write_product_set(
     reference: dict[str, Any],
     stats: dict[str, Any],
     forecast_date: str,
-) -> tuple[Path, Path, Path]:
+) -> tuple[
+    Path,
+    Path,
+    Path
+]:
 
     destination.mkdir(
         parents=True,
@@ -1336,16 +1394,32 @@ def write_product_set(
     )
 
     metadata = build_metadata_json(
-        input_path=input_path,
-        reference=reference,
-        stats=stats,
-        forecast_date=forecast_date,
+
+        input_path=
+            input_path,
+
+        reference=
+            reference,
+
+        stats=
+            stats,
+
+        forecast_date=
+            forecast_date,
+
     )
 
     grid = build_grid_json(
-        array=array,
-        reference=reference,
-        forecast_date=forecast_date,
+
+        array=
+            array,
+
+        reference=
+            reference,
+
+        forecast_date=
+            forecast_date,
+
     )
 
     classified = build_classified_raster(
@@ -1353,11 +1427,18 @@ def write_product_set(
     )
 
     polygons = make_feature_collection(
-        classified=classified,
-        transform=_transform_from_reference(
-            reference
-        ),
-        metadata=metadata,
+
+        classified=
+            classified,
+
+        transform=
+            _transform_from_reference(
+                reference
+            ),
+
+        metadata=
+            metadata,
+
     )
 
     metadata_path =
@@ -1371,23 +1452,23 @@ def write_product_set(
 
     atomic_write_json(
         metadata_path,
-        metadata,
+        metadata
     )
 
     atomic_write_json(
         grid_path,
-        grid,
+        grid
     )
 
     atomic_write_json(
         polygon_path,
-        polygons,
+        polygons
     )
 
     return (
         metadata_path,
         grid_path,
-        polygon_path,
+        polygon_path
     )
 
 
@@ -1402,12 +1483,14 @@ def _transform_from_reference(
     ]
 
     return Affine(
+
         values[0],
         values[1],
         values[2],
         values[3],
         values[4],
         values[5],
+
     )
 
 
@@ -1430,24 +1513,33 @@ def archive_product_set(
     )
 
     shutil.copy2(
+
         latest_dir /
         "fli_latest.json",
+
         archive_dir /
-        "fli.json",
+        "fli.json"
+
     )
 
     shutil.copy2(
+
         latest_dir /
         "fli_latest_grid.json",
+
         archive_dir /
-        "fli_grid.json",
+        "fli_grid.json"
+
     )
 
     shutil.copy2(
+
         latest_dir /
         "fli_polygons.geojson",
+
         archive_dir /
-        "fli_polygons.geojson",
+        "fli_polygons.geojson"
+
     )
 
     return archive_dir
@@ -1484,7 +1576,9 @@ def validate_archive(
         raise RuntimeError(
 
             "Archive is incomplete. Missing: "
+
             +
+
             ", ".join(
                 missing
             )
@@ -1539,16 +1633,14 @@ def main() -> None:
 
     require_file(
         args.input,
-        "Input FLI raster",
+        "Input FLI raster"
     )
 
-    forecast_date =
-        extract_forecast_date(
-            args.input
-        )
+    forecast_date = extract_forecast_date(
+        args.input
+    )
 
-    output_dir =
-        args.output_dir.resolve()
+    output_dir = args.output_dir.resolve()
 
     archive_root = (
 
@@ -1556,9 +1648,7 @@ def main() -> None:
 
         if args.archive_dir is not None
 
-        else
-            output_dir /
-            "archive"
+        else output_dir / "archive"
 
     )
 
@@ -1569,23 +1659,19 @@ def main() -> None:
     print()
 
     print(
-        f"Input FLI        : "
-        f"{args.input}"
+        f"Input FLI        : {args.input}"
     )
 
     print(
-        f"Forecast date    : "
-        f"{forecast_date}"
+        f"Forecast date    : {forecast_date}"
     )
 
     print(
-        f"Web output       : "
-        f"{output_dir}"
+        f"Web output       : {output_dir}"
     )
 
     print(
-        f"Archive root     : "
-        f"{archive_root}"
+        f"Archive root     : {archive_root}"
     )
 
     # --------------------------------------------------------
@@ -1643,12 +1729,12 @@ def main() -> None:
 
     output_dir.mkdir(
         parents=True,
-        exist_ok=True,
+        exist_ok=True
     )
 
     archive_root.mkdir(
         parents=True,
-        exist_ok=True,
+        exist_ok=True
     )
 
     staging_parent =
@@ -1664,22 +1750,19 @@ def main() -> None:
         )
 
         temp_latest =
-            temp_root /
-            "latest"
+            temp_root / "latest"
 
         temp_archive =
-            temp_root /
-            "archive" /
-            forecast_date
+            temp_root / "archive" / forecast_date
 
         temp_latest.mkdir(
             parents=True,
-            exist_ok=True,
+            exist_ok=True
         )
 
         temp_archive.mkdir(
             parents=True,
-            exist_ok=True,
+            exist_ok=True
         )
 
         # ----------------------------------------------------
@@ -1815,7 +1898,7 @@ def main() -> None:
 
         output_dir.mkdir(
             parents=True,
-            exist_ok=True,
+            exist_ok=True
         )
 
         for name in (
@@ -1832,7 +1915,7 @@ def main() -> None:
                 name,
 
                 output_dir /
-                name,
+                name
 
             )
 
@@ -1846,7 +1929,7 @@ def main() -> None:
 
         live_archive.mkdir(
             parents=True,
-            exist_ok=True,
+            exist_ok=True
         )
 
         for name in (
@@ -1863,7 +1946,7 @@ def main() -> None:
                 name,
 
                 live_archive /
-                name,
+                name
 
             )
 
