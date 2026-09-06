@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 
 <html lang="fa" dir="rtl">
@@ -6,7 +7,10 @@
 
 <meta charset="UTF-8">
 
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0"
+>
 
 <title>
 سامانه پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی
@@ -1732,14 +1736,17 @@ function initMap() {
     );
 
   /*
-   * ترتیب لایه‌ها:
+   * ترتیب قطعی لایه‌ها:
    *
    * FLI       = 400
    * مرز فارس  = 550
    * فیلترها   = 700
+   * Popup     = 1000
    *
-   * بنابراین مرز فیلترها همیشه روی لایه FLI
-   * و روی مرز استان نمایش داده می‌شود.
+   * بنابراین:
+   * - FLI همیشه زیر مرزهاست
+   * - مرزهای فیلتر همیشه روی FLI هستند
+   * - Popup همیشه روی تمام لایه‌های نقشه است
    */
 
   const fliPane =
@@ -1750,6 +1757,7 @@ function initMap() {
   fliPane.style.zIndex =
     "400";
 
+
   const farsPane =
     APP_STATE.map.createPane(
       "farsPane"
@@ -1758,6 +1766,7 @@ function initMap() {
   farsPane.style.zIndex =
     "550";
 
+
   const filterPane =
     APP_STATE.map.createPane(
       "filterPane"
@@ -1765,6 +1774,20 @@ function initMap() {
 
   filterPane.style.zIndex =
     "700";
+
+
+  const popupPane =
+    APP_STATE.map.getPane(
+      "popupPane"
+    );
+
+  if (popupPane) {
+
+    popupPane.style.zIndex =
+      "1000";
+
+  }
+
 
   L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -5245,3 +5268,4 @@ document.addEventListener(
 </body>
 
 </html>
+```
