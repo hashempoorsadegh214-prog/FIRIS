@@ -1,4 +1,4 @@
-```html
+
 <!DOCTYPE html>
 
 <html lang="fa" dir="rtl">
@@ -601,6 +601,18 @@ body.night #nightOverlay {
 /* ============================================================
    POPUPS
    ============================================================ */
+
+/*
+ * Leaflet popup must always be above every custom map pane.
+ */
+
+.leaflet-popup-pane {
+  z-index: 1000 !important;
+}
+
+.leaflet-tooltip-pane {
+  z-index: 900 !important;
+}
 
 .leaflet-popup-content {
   margin: 0 !important;
@@ -1736,17 +1748,15 @@ function initMap() {
     );
 
   /*
-   * ترتیب قطعی لایه‌ها:
+   * ترتیب نهایی و قطعی Pane ها:
    *
    * FLI       = 400
    * مرز فارس  = 550
-   * فیلترها   = 700
+   * فیلترها   = 600
    * Popup     = 1000
    *
-   * بنابراین:
-   * - FLI همیشه زیر مرزهاست
-   * - مرزهای فیلتر همیشه روی FLI هستند
-   * - Popup همیشه روی تمام لایه‌های نقشه است
+   * فیلترها روی FLI هستند،
+   * ولی Popup همیشه بالاتر از فیلترهاست.
    */
 
   const fliPane =
@@ -1773,7 +1783,7 @@ function initMap() {
     );
 
   filterPane.style.zIndex =
-    "700";
+    "600";
 
 
   const popupPane =
@@ -4290,7 +4300,8 @@ function bindRegion(
   layer.bindPopup(
     popup,
     {
-      maxWidth: 280
+      maxWidth: 280,
+      pane: "popupPane"
     }
   );
 
@@ -4475,7 +4486,8 @@ function setupMapClick() {
         popup,
         event.latlng,
         {
-          maxWidth: 280
+          maxWidth: 280,
+          pane: "popupPane"
         }
       );
 
@@ -5268,4 +5280,3 @@ document.addEventListener(
 </body>
 
 </html>
-```
