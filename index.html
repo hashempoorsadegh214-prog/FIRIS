@@ -1726,28 +1726,9 @@ function initMap() {
     );
 
   /*
-   * FLI در یک Pane مستقل قرار می‌گیرد.
+   * هیچ Pane سفارشی برای FLI یا فیلترها ایجاد نمی‌شود.
+   * رفتار رندر Leaflet همان حالت اصلی باقی می‌ماند.
    */
-
-  const fliPane =
-    APP_STATE.map.createPane(
-      "fliRiskPane"
-    );
-
-  fliPane.style.zIndex =
-    "450";
-
-  /*
-   * لایه‌های فیلتر همیشه بالای FLI قرار می‌گیرند.
-   */
-
-  const filterPane =
-    APP_STATE.map.createPane(
-      "filterPane"
-    );
-
-  filterPane.style.zIndex =
-    "500";
 
   L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -1814,8 +1795,6 @@ async function loadFLI() {
     L.geoJSON(
       geojson,
       {
-
-        pane: "fliRiskPane",
 
         style: feature => {
 
@@ -2161,15 +2140,6 @@ function buildArchiveExcelWorkbook() {
     for (
       const item of row
     ) {
-
-      /*
-       * null = NoData
-       *
-       * بسیار مهم:
-       * Number(null) برابر 0 است،
-       * بنابراین قبل از Number باید null
-       * صریحاً حذف شود.
-       */
 
       if (
         item === null ||
@@ -3005,8 +2975,6 @@ async function loadArchiveForecast(
       polygons,
       {
 
-        pane: "fliRiskPane",
-
         style: feature => {
 
           const color =
@@ -3239,8 +3207,6 @@ async function loadProtected() {
       geojson,
       {
 
-        pane: "filterPane",
-
         style: {
 
           color: "#1565c0",
@@ -3294,8 +3260,6 @@ async function loadHunting() {
     L.geoJSON(
       geojson,
       {
-
-        pane: "filterPane",
 
         style: {
 
@@ -3620,13 +3584,6 @@ function getPointValue(
       )
     );
 
-  /*
-   * بسیار مهم:
-   * null در Grid یعنی NoData.
-   * نباید Number(null) اجرا شود،
-   * چون Number(null) = 0 است.
-   */
-
   const rawValue =
     grid.values?.[row]?.[col];
 
@@ -3936,15 +3893,6 @@ function regionStatistics(
       col <= endCol;
       col++
     ) {
-
-      /*
-       * بسیار مهم:
-       *
-       * ابتدا مقدار خام را می‌خوانیم.
-       * null = NoData
-       *
-       * نباید مستقیماً Number(null) انجام شود.
-       */
 
       const rawValue =
         grid.values?.[row]?.[col];
@@ -4446,6 +4394,21 @@ function setLayerVisible(
       layer.addTo(
         APP_STATE.map
       );
+
+    }
+
+    /*
+     * فقط لایه فیلتر فعال را به جلوی
+     * لایه‌های هم‌نوع خودش می‌آوریم.
+     * هیچ Pane سفارشی استفاده نمی‌شود.
+     */
+
+    if (
+      typeof layer.bringToFront ===
+      "function"
+    ) {
+
+      layer.bringToFront();
 
     }
 
