@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 
 <html lang="fa" dir="rtl">
@@ -1364,16 +1365,6 @@ const APP_STATE = {
    DATE - IRAN TIME
    ============================================================ */
 
-/*
- * این تابع تاریخ فردا را فقط بر اساس تاریخ ایران
- * (Asia/Tehran) محاسبه می‌کند.
- *
- * تاریخ میلادی ابتدا از ساعت ایران استخراج می‌شود،
- * سپس یک روز به آن اضافه می‌شود و در نهایت با تقویم
- * فارسی نمایش داده می‌شود.
- *
- * بنابراین timezone سیستم کاربر هیچ تأثیری ندارد.
- */
 function setupTomorrowDate() {
 
   const badge =
@@ -1387,9 +1378,6 @@ function setupTomorrowDate() {
 
   try {
 
-    /*
-     * دریافت تاریخ فعلی ایران
-     */
     const iranParts =
       new Intl.DateTimeFormat(
         "en-US",
@@ -1427,9 +1415,6 @@ function setupTomorrowDate() {
         ).value
       );
 
-    /*
-     * ساخت فردا به‌صورت مستقل از timezone مرورگر
-     */
     const tomorrow =
       new Date(
         Date.UTC(
@@ -1442,9 +1427,6 @@ function setupTomorrowDate() {
         )
       );
 
-    /*
-     * دریافت اجزای تاریخ شمسی فردا
-     */
     const persianParts =
       new Intl.DateTimeFormat(
         "fa-IR-u-ca-persian",
@@ -1483,11 +1465,6 @@ function setupTomorrowDate() {
           part.type === "year"
       )?.value || "";
 
-    /*
-     * ترتیب نمایش کاملاً دستی:
-     *
-     * پیش‌بینی برای یکشنبه ۱۵ شهریور ۱۴۰۵
-     */
     badge.textContent =
       `پیش‌بینی برای ${weekday} ${persianDay} ${persianMonth} ${persianYear}`;
 
@@ -1504,6 +1481,7 @@ function setupTomorrowDate() {
   }
 
 }
+
 /* ============================================================
    FETCH
    ============================================================ */
@@ -1970,20 +1948,6 @@ function formatArchiveDate(
    FORECAST BADGE
    ============================================================ */
 
-/*
- * اصلاح مهم:
- *
- * اگر currentArchiveDate = latest باشد،
- * تاریخ تابلو فقط از setupTomorrowDate()
- * گرفته می‌شود.
- *
- * بنابراین metadata قدیمی دیگر نمی‌تواند
- * تاریخ تابلو را از فردا به امروز برگرداند.
- *
- * اگر یک تاریخ آرشیوی انتخاب شده باشد،
- * همان تاریخ آرشیو نمایش داده می‌شود.
- */
-
 function updateForecastBadgeFromMetadata() {
 
   const badge =
@@ -1995,9 +1959,6 @@ function updateForecastBadgeFromMetadata() {
     return;
   }
 
-  /*
-   * حالت آخرین پیش‌بینی
-   */
   if (
     APP_STATE.data.currentArchiveDate ===
     "latest"
@@ -2009,9 +1970,6 @@ function updateForecastBadgeFromMetadata() {
 
   }
 
-  /*
-   * حالت آرشیو
-   */
   const archiveDate =
     APP_STATE.data.currentArchiveDate;
 
@@ -2027,9 +1985,6 @@ function updateForecastBadgeFromMetadata() {
 
   }
 
-  /*
-   * fallback
-   */
   setupTomorrowDate();
 
 }
@@ -2875,12 +2830,6 @@ async function loadArchiveForecast(
   date
 ) {
 
-  /*
-   * ==========================================================
-   * LATEST
-   * ==========================================================
-   */
-
   if (
     !date ||
     date === "latest"
@@ -2905,12 +2854,6 @@ async function loadArchiveForecast(
 
     await loadFLI();
 
-    /*
-     * بسیار مهم:
-     * ابتدا currentArchiveDate روی latest قرار می‌گیرد،
-     * سپس badge فقط بر اساس تاریخ فردا تنظیم می‌شود.
-     */
-
     APP_STATE.data.currentArchiveDate =
       "latest";
 
@@ -2921,12 +2864,6 @@ async function loadArchiveForecast(
     return;
 
   }
-
-  /*
-   * ==========================================================
-   * ARCHIVE
-   * ==========================================================
-   */
 
   const base =
     `data/web/archive/${date}/`;
@@ -3055,10 +2992,6 @@ async function loadArchiveForecast(
   APP_STATE.layers.fli.addTo(
     APP_STATE.map
   );
-
-  /*
-   * در آرشیو، تاریخ انتخاب‌شده نمایش داده می‌شود.
-   */
 
   updateForecastBadgeFromMetadata();
 
@@ -3358,82 +3291,145 @@ function parseBounds(
   bounds
 ) {
 
+  /*
+   * ساختار فعلی داده‌ها:
+   *
+   * {
+   *   "west": ...,
+   *   "south": ...,
+   *   "east": ...,
+   *   "north": ...
+   * }
+   */
+
   if (
-    !Array.isArray(bounds) ||
-    bounds.length < 2
+    bounds &&
+    typeof bounds === "object" &&
+    !Array.isArray(bounds)
   ) {
 
-    return null;
+    const west =
+      Number(bounds.west);
+
+    const south =
+      Number(bounds.south);
+
+    const east =
+      Number(bounds.east);
+
+    const north =
+      Number(bounds.north);
+
+    if (
+      Number.isFinite(west) &&
+      Number.isFinite(south) &&
+      Number.isFinite(east) &&
+      Number.isFinite(north) &&
+      west < east &&
+      south < north
+    ) {
+
+      return {
+
+        south:
+          south,
+
+        north:
+          north,
+
+        west:
+          west,
+
+        east:
+          east
+
+      };
+
+    }
 
   }
 
-  const a =
-    bounds[0];
-
-  const b =
-    bounds[1];
+  /*
+   * سازگاری با ساختار آرایه‌ای قدیمی:
+   *
+   * [
+   *   [south, west],
+   *   [north, east]
+   * ]
+   */
 
   if (
-    !Array.isArray(a) ||
-    !Array.isArray(b) ||
-    a.length < 2 ||
-    b.length < 2
+    Array.isArray(bounds) &&
+    bounds.length >= 2
   ) {
 
-    return null;
+    const a =
+      bounds[0];
+
+    const b =
+      bounds[1];
+
+    if (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length >= 2 &&
+      b.length >= 2
+    ) {
+
+      const y1 =
+        Number(a[0]);
+
+      const x1 =
+        Number(a[1]);
+
+      const y2 =
+        Number(b[0]);
+
+      const x2 =
+        Number(b[1]);
+
+      if (
+        Number.isFinite(y1) &&
+        Number.isFinite(x1) &&
+        Number.isFinite(y2) &&
+        Number.isFinite(x2)
+      ) {
+
+        return {
+
+          south:
+            Math.min(
+              y1,
+              y2
+            ),
+
+          north:
+            Math.max(
+              y1,
+              y2
+            ),
+
+          west:
+            Math.min(
+              x1,
+              x2
+            ),
+
+          east:
+            Math.max(
+              x1,
+              x2
+            )
+
+        };
+
+      }
+
+    }
 
   }
 
-  const y1 =
-    Number(a[0]);
-
-  const x1 =
-    Number(a[1]);
-
-  const y2 =
-    Number(b[0]);
-
-  const x2 =
-    Number(b[1]);
-
-  if (
-    !Number.isFinite(y1) ||
-    !Number.isFinite(x1) ||
-    !Number.isFinite(y2) ||
-    !Number.isFinite(x2)
-  ) {
-
-    return null;
-
-  }
-
-  return {
-
-    south:
-      Math.min(
-        y1,
-        y2
-      ),
-
-    north:
-      Math.max(
-        y1,
-        y2
-      ),
-
-    west:
-      Math.min(
-        x1,
-        x2
-      ),
-
-    east:
-      Math.max(
-        x1,
-        x2
-      )
-
-  };
+  return null;
 
 }
 
@@ -4986,9 +4982,6 @@ async function startApp() {
 
   try {
 
-    /*
-     * ابتدا تاریخ فردا را نمایش بده
-     */
     setupTomorrowDate();
 
     initMap();
@@ -5043,16 +5036,6 @@ async function startApp() {
     setupExcelButton();
 
     await loadArchiveDates();
-
-    /*
-     * مهم:
-     *
-     * اینجا دیگر metadata اجازه ندارد
-     * تاریخ latest را overwrite کند.
-     *
-     * چون حالت اولیه latest است،
-     * تاریخ تابلو = فردای ایران.
-     */
 
     APP_STATE.data.currentArchiveDate =
       "latest";
