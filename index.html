@@ -189,6 +189,7 @@ a {
   height: 7px;
 
   background: #4ade80;
+
   border-radius: 50%;
 
   box-shadow:
@@ -604,6 +605,10 @@ body.night #nightOverlay {
   z-index: 1000 !important;
 }
 
+.leaflet-tooltip-pane {
+  z-index: 900 !important;
+}
+
 .leaflet-popup {
   z-index: 10000 !important;
 }
@@ -634,6 +639,7 @@ body.night #nightOverlay {
 .popup-title {
   font-size: 14px;
   font-weight: 900;
+
   margin-bottom: 7px;
 }
 
@@ -919,6 +925,7 @@ body.night #nightOverlay {
   .header-logo {
     width: 42px;
     height: 42px;
+
     left: 5px;
   }
 
@@ -936,19 +943,23 @@ body.night #nightOverlay {
 
   .header-subtitle-badge {
     font-size: 8px;
+
     padding:
       2px 7px;
   }
 
   .header-buttons-group {
     right: 5px;
+
     gap: 2px;
+
     padding: 3px;
   }
 
   .header-btn {
     width: 31px;
     height: 31px;
+
     font-size: 12px;
   }
 
@@ -1013,11 +1024,11 @@ body.night #nightOverlay {
 </option>
 
 <option value="protected">
-مناطق چهارگانه
+مناطق شکارممنوع
 </option>
 
 <option value="hunting">
-مناطق شکار ممنوع
+مناطق چهارگانه
 </option>
 
 </select>
@@ -1368,26 +1379,6 @@ const APP_STATE = {
 
 
 /* ============================================================
-   CACHE BUSTER
-   ============================================================ */
-
-function cacheBust(
-  url
-) {
-
-  const separator =
-    url.includes("?")
-      ? "&"
-      : "?";
-
-  return (
-    `${url}${separator}v=${Date.now()}`
-  );
-
-}
-
-
-/* ============================================================
    FETCH
    ============================================================ */
 
@@ -1409,7 +1400,7 @@ async function fetchWithTimeout(
 
     const response =
       await fetch(
-        cacheBust(url),
+        url,
         {
           signal: controller.signal,
           cache: "no-store"
@@ -1457,9 +1448,7 @@ async function fetchWithTimeout(
    NUMBER
    ============================================================ */
 
-function formatNumber(
-  value
-) {
+function formatNumber(value) {
 
   const number =
     Number(value);
@@ -1486,9 +1475,7 @@ function formatNumber(
    RISK
    ============================================================ */
 
-function getRisk(
-  value
-) {
+function getRisk(value) {
 
   const num =
     Number(value);
@@ -1606,14 +1593,10 @@ function updateGauge(
   }
 
   const risk =
-    getRisk(
-      value
-    );
+    getRisk(value);
 
   valueElement.textContent =
-    formatNumber(
-      value
-    );
+    formatNumber(value);
 
   labelElement.textContent =
     risk.label;
@@ -1678,7 +1661,7 @@ function initMap() {
   if (popupPane) {
 
     popupPane.style.zIndex =
-      "10000";
+      "1000";
 
   }
 
@@ -1720,23 +1703,13 @@ async function loadFars() {
           "farsPane",
 
         style: {
-
-          color:
-            "#20252a",
-
-          weight:
-            2.2,
-
-          opacity:
-            .95,
-
-          fill:
-            false
-
+          color: "#20252a",
+          weight: 2.2,
+          opacity: .95,
+          fill: false
         },
 
-        interactive:
-          false
+        interactive: false
 
       }
     ).addTo(
@@ -1770,33 +1743,32 @@ async function loadFLI() {
         pane:
           "fliRiskPane",
 
-        style:
-          feature => {
+        style: feature => {
 
-            const color =
-              feature.properties?.color ||
-              "#777";
+          const color =
+            feature.properties?.color ||
+            "#777";
 
-            return {
+          return {
 
-              color:
-                color,
+            color:
+              color,
 
-              weight:
-                .15,
+            weight:
+              .15,
 
-              opacity:
-                .85,
+            opacity:
+              .85,
 
-              fillColor:
-                color,
+            fillColor:
+              color,
 
-              fillOpacity:
-                .72
+            fillOpacity:
+              .72
 
-            };
+          };
 
-          },
+        },
 
         interactive:
           false
@@ -1890,17 +1862,13 @@ function formatArchiveDate(
 ) {
 
   const parts =
-    String(
-      isoDate
-    ).split("-");
+    String(isoDate).split("-");
 
   if (
     parts.length !== 3
   ) {
 
-    return String(
-      isoDate
-    );
+    return String(isoDate);
 
   }
 
@@ -1927,15 +1895,11 @@ function formatArchiveDate(
         day: "numeric",
         weekday: "long"
       }
-    ).format(
-      date
-    );
+    ).format(date);
 
   } catch (error) {
 
-    return String(
-      isoDate
-    );
+    return String(isoDate);
 
   }
 
@@ -1958,8 +1922,7 @@ function updateForecastBadgeFromMetadata() {
   }
 
   const metadata =
-    APP_STATE.data.fliMetadata ||
-    {};
+    APP_STATE.data.fliMetadata || {};
 
   const forecastDate =
     metadata.forecast_date ||
@@ -2043,11 +2006,16 @@ function prepareArchiveExcelButton() {
 
   }
 
-  const archiveExcelUrl =
-    `data/web/archive/${date}/firis_report.xlsx`;
+  /*
+   * گزارش آرشیو قبلاً توسط GitHub Actions
+   * ساخته شده است.
+   *
+   * بنابراین هیچ Excel جدیدی در مرورگر
+   * تولید نمی‌کنیم.
+   */
 
   button.href =
-    archiveExcelUrl;
+    `data/web/archive/${date}/firis_report.xlsx`;
 
   button.target =
     "_blank";
@@ -2366,33 +2334,32 @@ async function loadArchiveForecast(
         pane:
           "fliRiskPane",
 
-        style:
-          feature => {
+        style: feature => {
 
-            const color =
-              feature.properties?.color ||
-              "#777";
+          const color =
+            feature.properties?.color ||
+            "#777";
 
-            return {
+          return {
 
-              color:
-                color,
+            color:
+              color,
 
-              weight:
-                .15,
+            weight:
+              .15,
 
-              opacity:
-                .85,
+            opacity:
+              .85,
 
-              fillColor:
-                color,
+            fillColor:
+              color,
 
-              fillOpacity:
-                .72
+            fillOpacity:
+              .72
 
-            };
+          };
 
-          },
+        },
 
         interactive:
           false
@@ -2501,6 +2468,11 @@ function setupArchiveFilter() {
           APP_STATE.data.currentArchiveDate ||
           "latest";
 
+        /*
+         * اگر بارگذاری latest شکست خورد،
+         * تاریخ فعلی Metadata را حفظ کن.
+         */
+
         updateForecastBadgeFromMetadata();
 
         if (
@@ -2559,7 +2531,7 @@ function setupExcelButton() {
 
   button.addEventListener(
     "click",
-    () => {
+    event => {
 
       const currentDate =
         APP_STATE.data.currentArchiveDate;
@@ -2569,8 +2541,11 @@ function setupExcelButton() {
         currentDate !== "latest"
       ) {
 
-        button.href =
+        const archiveExcelUrl =
           `data/web/archive/${currentDate}/firis_report.xlsx`;
+
+        button.href =
+          archiveExcelUrl;
 
         button.target =
           "_blank";
@@ -2580,6 +2555,12 @@ function setupExcelButton() {
 
         button.download =
           `firis_report_${currentDate}.xlsx`;
+
+        /*
+         * فایل واقعی آرشیو:
+         *
+         * archive/YYYY-MM-DD/firis_report.xlsx
+         */
 
         return;
 
@@ -2605,7 +2586,7 @@ function setupExcelButton() {
 
 
 /* ============================================================
-   PROTECTED = مناطق چهارگانه
+   PROTECTED
    ============================================================ */
 
 async function loadProtected() {
@@ -2628,20 +2609,15 @@ async function loadProtected() {
 
         style: {
 
-          color:
-            "#1565c0",
+          color: "#1565c0",
 
-          weight:
-            1.7,
+          weight: 1.7,
 
-          opacity:
-            .95,
+          opacity: .95,
 
-          fillColor:
-            "#42a5f5",
+          fillColor: "#42a5f5",
 
-          fillOpacity:
-            .10
+          fillOpacity: .10
 
         },
 
@@ -2668,7 +2644,7 @@ async function loadProtected() {
 
 
 /* ============================================================
-   HUNTING = مناطق شکار ممنوع
+   HUNTING
    ============================================================ */
 
 async function loadHunting() {
@@ -2691,20 +2667,15 @@ async function loadHunting() {
 
         style: {
 
-          color:
-            "#7b1fa2",
+          color: "#7b1fa2",
 
-          weight:
-            1.7,
+          weight: 1.7,
 
-          opacity:
-            .95,
+          opacity: .95,
 
-          fillColor:
-            "#ab47bc",
+          fillColor: "#ab47bc",
 
-          fillOpacity:
-            .10
+          fillOpacity: .10
 
         },
 
@@ -2873,10 +2844,15 @@ function validateCoords(
   return (
 
     Number.isFinite(lat) &&
+
     Number.isFinite(lon) &&
+
     lat >= -90 &&
+
     lat <= 90 &&
+
     lon >= -180 &&
+
     lon <= 180
 
   );
@@ -3300,8 +3276,11 @@ function regionStatistics(
   }
 
   let sum = 0;
+
   let count = 0;
+
   let min = Infinity;
+
   let max = -Infinity;
 
   for (
@@ -3372,6 +3351,7 @@ function regionStatistics(
         ) {
 
           sum += value;
+
           count++;
 
           if (
@@ -3490,29 +3470,19 @@ function getRegionTypeTitle(
   regionType
 ) {
 
-  /*
-   * protected_areas.geojson
-   * = مناطق چهارگانه
-   */
-
   if (
     regionType === "protected"
   ) {
 
-    return "مناطق چهارگانه";
+    return "مناطق شکارممنوع";
 
   }
-
-  /*
-   * hunting_banned.geojson
-   * = مناطق شکار ممنوع
-   */
 
   if (
     regionType === "hunting"
   ) {
 
-    return "مناطق شکار ممنوع";
+    return "مناطق چهارگانه";
 
   }
 
@@ -3580,36 +3550,36 @@ function bindRegion(
 
       ${
         Number.isFinite(mean)
-          ?
-            `
+        ?
+        `
 
-            <div class="popup-value">
-              میانگین شاخص خطر:
-              ${formatNumber(mean)}
-            </div>
+        <div class="popup-value">
+          میانگین شاخص خطر:
+          ${formatNumber(mean)}
+        </div>
 
-            <div class="popup-value">
-              تعداد سلول‌های محاسبه‌شده:
-              ${formatNumber(statistics.count)}
-            </div>
+        <div class="popup-value">
+          تعداد سلول‌های محاسبه‌شده:
+          ${formatNumber(statistics.count)}
+        </div>
 
-            <div class="popup-coord">
-              حداقل:
-              ${formatNumber(statistics.min)}
-              <br>
-              حداکثر:
-              ${formatNumber(statistics.max)}
-            </div>
+        <div class="popup-coord">
+          حداقل:
+          ${formatNumber(statistics.min)}
+          <br>
+          حداکثر:
+          ${formatNumber(statistics.max)}
+        </div>
 
-            `
-          :
-            `
+        `
+        :
+        `
 
-            <div class="popup-value">
-              برای این محدوده داده خطر موجود نیست.
-            </div>
+        <div class="popup-value">
+          برای این محدوده داده خطر موجود نیست.
+        </div>
 
-            `
+        `
       }
 
     </div>
@@ -3619,12 +3589,8 @@ function bindRegion(
   layer.bindPopup(
     popup,
     {
-      maxWidth:
-        280,
-
-      pane:
-        "popupPane"
-
+      maxWidth: 280,
+      pane: "popupPane"
     }
   );
 
@@ -3809,12 +3775,8 @@ function setupMapClick() {
         popup,
         event.latlng,
         {
-          maxWidth:
-            280,
-
-          pane:
-            "popupPane"
-
+          maxWidth: 280,
+          pane: "popupPane"
         }
       );
 
@@ -3899,15 +3861,9 @@ function fitFars() {
   APP_STATE.map.fitBounds(
     bounds,
     {
-      padding:
-        [60, 60],
-
-      maxZoom:
-        8,
-
-      animate:
-        true
-
+      padding: [60, 60],
+      maxZoom: 8,
+      animate: true
     }
   );
 
@@ -3955,15 +3911,9 @@ function fitLayer(
   APP_STATE.map.fitBounds(
     bounds,
     {
-      padding:
-        [70, 70],
-
-      maxZoom:
-        10,
-
-      animate:
-        true
-
+      padding: [70, 70],
+      maxZoom: 10,
+      animate: true
     }
   );
 
@@ -4079,7 +4029,9 @@ function applyLocationFilter(
   const validValues = [
 
     "all",
+
     "protected",
+
     "hunting"
 
   ];
@@ -4471,8 +4423,9 @@ async function startApp() {
     initMap();
 
     /*
-     * latest فقط از فایل واقعی latest خوانده می‌شود.
-     * ساعت مرورگر در تعیین تاریخ latest دخالت ندارد.
+     * مهم:
+     * latest همزمان با Metadata و Grid واقعی بارگذاری می‌شود.
+     * بنابراین تاریخ تابلو از ساعت مرورگر محاسبه نمی‌شود.
      */
 
     await Promise.all([
@@ -4529,7 +4482,16 @@ async function startApp() {
     APP_STATE.data.currentArchiveDate =
       "latest";
 
+    /*
+     * تاریخ تابلو از fli_latest.json
+     * می‌آید.
+     */
+
     updateForecastBadgeFromMetadata();
+
+    /*
+     * Excel آخرین پیش‌بینی.
+     */
 
     resetExcelButtonToLatest();
 
