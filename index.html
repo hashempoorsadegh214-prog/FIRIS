@@ -1372,7 +1372,8 @@ const APP_STATE = {
   },
 
   ui: {
-    nightMode: false
+    nightMode: false,
+    locationFilter: "all"
   }
 
 };
@@ -4462,6 +4463,14 @@ async function startApp() {
       APP_STATE.layers.hunting,
       false
     );
+
+    /*
+     * اطمینان از اینکه فیلتر مکانی قبل از
+     * اتصال رویدادها مقدار پیش‌فرض "all"
+     * دارد تا کلیک روی گزینه "کل استان فارس"
+     * بلافاصله بعد از بارگذاری کار کند.
+     */
+    APP_STATE.ui.locationFilter = "all";
 
     setupMapClick();
 
