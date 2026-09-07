@@ -2,7 +2,13 @@ name: Build FIRIS Fire Likelihood Index
 
 on:
   # ------------------------------------------------------------
-  # AUTOMATIC RUN AFTER UPDATE FIRIS FWI
+  # AUTOMATIC RUN AT 00:00 IRAN TIME (20:30 UTC)
+  # ------------------------------------------------------------
+  schedule:
+    - cron: "30 20 * * *"
+
+  # ------------------------------------------------------------
+  # RUN AFTER UPDATE FIRIS FWI (IF TRIGGERED EXTERNALLY)
   # ------------------------------------------------------------
   workflow_run:
     workflows:
@@ -25,6 +31,7 @@ concurrency:
 jobs:
   build-firis:
     if: >
+      github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
 
@@ -110,7 +117,20 @@ jobs:
           PY
 
       # ============================================================
-      # 5. LOCATE TOMORROW FWI ONLY
+      # 5. DOWNLOAD TOMORROW FWI (IF NOT EXISTS)
+      # ============================================================
+      - name: Download Tomorrow FWI
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo ""
+          echo "============================================================"
+          echo "DOWNLOADING FWI FOR TOMORROW (${TOMORROW_DATE})"
+          echo "============================================================"
+          python scripts/update_fwi.py --overwrite
+
+      # ============================================================
+      # 6. LOCATE TOMORROW FWI ONLY
       # ============================================================
       - name: Locate tomorrow FWI
         shell: bash
@@ -146,7 +166,7 @@ jobs:
           echo "✓ Tomorrow FWI files found."
 
       # ============================================================
-      # 6. VALIDATE FWI DATE
+      # 7. VALIDATE FWI DATE
       # ============================================================
       - name: Validate tomorrow FWI
         shell: bash
@@ -165,7 +185,7 @@ jobs:
           with open(path, "r", encoding="utf-8") as file:
               metadata = json.load(file)
 
-          target = metadata.get("target_date") or metadata.get("forecast_date")
+          target = metadata.get("forecast_date") or metadata.get("target_date")
 
           print("")
           print("============================================================")
@@ -184,7 +204,7 @@ jobs:
           PY
 
       # ============================================================
-      # 7. BUILD FLI
+      # 8. BUILD FLI
       # ============================================================
       - name: Build FIRIS FLI
         shell: bash
@@ -215,7 +235,7 @@ jobs:
             --run-date "${FWI_DATE}"
 
       # ============================================================
-      # 8. VERIFY FLI
+      # 9. VERIFY FLI
       # ============================================================
       - name: Verify FLI output
         shell: bash
@@ -240,7 +260,7 @@ jobs:
           ls -lh "${FLI_RASTER}"
 
       # ============================================================
-      # 9. BUILD EXCEL REPORT
+      # 10. BUILD EXCEL REPORT
       # ============================================================
       - name: Build FIRIS Excel report
         shell: bash
@@ -280,7 +300,7 @@ jobs:
           echo "✓ Latest Excel report generated."
 
       # ============================================================
-      # 10. VERIFY LATEST EXCEL
+      # 11. VERIFY LATEST EXCEL
       # ============================================================
       - name: Verify latest Excel report
         shell: bash
@@ -324,7 +344,7 @@ jobs:
           PY
 
       # ============================================================
-      # 11. SAVE EXCEL INSIDE TOMORROW ARCHIVE
+      # 12. SAVE EXCEL INSIDE TOMORROW ARCHIVE
       # ============================================================
       - name: Archive Excel report
         shell: bash
@@ -344,7 +364,7 @@ jobs:
           echo "✓ Excel archived successfully."
 
       # ============================================================
-      # 12. VERIFY ARCHIVED EXCEL
+      # 13. VERIFY ARCHIVED EXCEL
       # ============================================================
       - name: Verify archived Excel report
         shell: bash
@@ -384,7 +404,7 @@ jobs:
           PY
 
       # ============================================================
-      # 13. BUILD WEB GIS
+      # 14. BUILD WEB GIS
       # ============================================================
       - name: Build Web GIS map
         shell: bash
@@ -397,7 +417,7 @@ jobs:
             --output-dir "data/web"
 
       # ============================================================
-      # 14. VERIFY WEB GIS OUTPUTS
+      # 15. VERIFY WEB GIS OUTPUTS
       # ============================================================
       - name: Verify Web GIS outputs
         shell: bash
@@ -415,7 +435,7 @@ jobs:
           echo "✓ Web GIS validation passed."
 
       # ============================================================
-      # 15. UPDATE ARCHIVE INDEX
+      # 16. UPDATE ARCHIVE INDEX
       # ============================================================
       - name: Update Archive Index
         shell: bash
@@ -442,17 +462,6 @@ jobs:
 
           print(f"Archive dates updated: {dates}")
           PY
-
-      # ============================================================
-      # 16. FINAL DATE CONSISTENCY CHECK
-      # ============================================================
-      - name: Final date consistency check
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "============================================================"
-          echo "ALL OUTPUTS TARGET: ${TOMORROW_DATE}"
-          echo "============================================================"
 
       # ============================================================
       # 17. FINAL LATEST JSON DATE VALIDATION
@@ -494,6 +503,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add \
+            data/raw/fwi \
             data/outputs \
             data/web \
             data/report
