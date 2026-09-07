@@ -231,7 +231,7 @@ function getRisk(value) {
       min: 20,
       max: 40,
       label: "متوسط",
-      color: "#c7a900"
+      color: "#FDD835"
     },
 
     {
