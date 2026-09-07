@@ -511,7 +511,7 @@ body.night #nightOverlay {
   background:
     conic-gradient(
       #2e7d32 0deg 72deg,
-      #fdd835 72deg 144deg,
+      #FFB300 72deg 144deg,
       #fb8c00 144deg 216deg,
       #e53935 216deg 288deg,
       #880e4f 288deg 360deg
@@ -1210,7 +1210,7 @@ body.night #nightOverlay {
 
 <span
   class="gauge-legend-chip"
-  style="background:#fdd835;color:#222"
+  style="background:#FFB300;color:#222"
 >
 متوسط
 </span>
@@ -1505,7 +1505,7 @@ function getRisk(value) {
 
     return {
       label: "متوسط",
-      color: "#c7a900"
+      color: "#FFB300"
     };
 
   }
@@ -3058,7 +3058,7 @@ function pointInsideFars(
       if (
         turf.booleanPointInPolygon(
           point,
-          layer.toGeoJSON()
+          layer.feature?.geometry || layer.toGeoJSON()
         )
       ) {
 
@@ -3662,7 +3662,7 @@ function setupMapClick() {
             if (
               turf.booleanPointInPolygon(
                 point,
-                layer.toGeoJSON()
+                layer.feature?.geometry || layer.toGeoJSON()
               )
             ) {
 
