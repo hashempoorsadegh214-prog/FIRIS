@@ -1,104 +1,55 @@
-name: Build FIRIS Fire Likelihood Index
+name: FIRIS Build Pipeline
 
 on:
   schedule:
-    - cron: "15 21 * * *"
+    # ساعت ۲۱:۱۵ UTC (ساعت ۰۰:۴۵ بامداد به وقت ایران)
+    - cron: '15 21 * * *'
+  workflow_dispatch:
   workflow_run:
-    workflows:
-      - "Update FIRIS FWI"
+    workflows: ["Update FWI Data"]
     types:
       - completed
-  workflow_dispatch:
-
-permissions:
-  contents: write
-
-concurrency:
-  group: build-firis
-  cancel-in-progress: false
 
 jobs:
-  build-firis:
-    if: |
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+  build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: '3.10'
+          cache: 'pip'
 
       - name: Install dependencies
-        shell: bash
         run: |
-          set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install numpy pandas rasterio openpyxl shapely pyproj fiona requests Pillow affine
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Determine Iran dates
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import os
-          from datetime import datetime, timedelta
-          from zoneinfo import ZoneInfo
+      - name: Build FLI
+        run: python scripts/build_fli.py
 
-          iran = ZoneInfo("Asia/Tehran")
-          now_iran = datetime.now(iran)
-          today = now_iran.date()
-          tomorrow = today + timedelta(days=1)
-          today_str = today.isoformat()
-          tomorrow_str = tomorrow.isoformat()
-
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
-              env.write(f"TODAY_IRAN={today_str}\n")
-              env.write(f"TOMORROW_DATE={tomorrow_str}\n")
-          PY
-
-      - name: Download Tomorrow FWI (if needed)
-        shell: bash
-        run: |
-          python scripts/update_fwi.py --overwrite || true
-
-      - name: Build FIRIS FLI
-        shell: bash
-        run: |
-          mkdir -p data/outputs
-          mkdir -p data/report
-          mkdir -p data/web
-          python scripts/build_firis.py --fwi-raster "data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif" --fuel-raster "data/raw/fuel/fars_fuel.tif" --dem-raster "data/raw/topography/dem_fars.tif" --fuel-excel "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx" --boundary "fars.geojson" --output-dir "data/outputs" --run-date "${TOMORROW_DATE}"
-
-      - name: Build FIRIS Excel report
-        shell: bash
-        run: |
-          python scripts/build_report.py --input "data/outputs/fli_fars_${TOMORROW_DATE}.tif" --output "data/report/firis_report.xlsx" --run-date "${TOMORROW_DATE}" --protected "protected_areas.geojson" --hunting "hunting_banned.geojson"
+      - name: Build Report
+        run: python scripts/build_report.py
 
       - name: Build Web Map
-        shell: bash
         run: |
-          python scripts/build_web_map.py
+          python scripts/build_web_map.py --input output/firis_latest.geojson --output-dir docs/ --archive-dir docs/archive/
 
-      - name: Commit and Push
-        shell: bash
+      - name: Commit and Push Changes
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/
-          git add index.html || true
-          if git diff --cached --quiet; then
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "chore(firis): update FLI ${TOMORROW_DATE} [skip ci]"
-            git pull --rebase origin main || true
-            git push origin HEAD:main
+            git commit -m "Auto-update FIRIS data, reports and web map [skip ci]"
+            git push
           fi
