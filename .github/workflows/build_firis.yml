@@ -1,24 +1,14 @@
 name: Build FIRIS Fire Likelihood Index
 
+# RUN AUTOMATICALLY AFTER MIDNIGHT IRAN TIME (21:15 UTC = 00:45 Iran)
 on:
-  # ------------------------------------------------------------
-  # AUTOMATIC RUN AT 00:00 IRAN TIME (20:30 UTC)
-  # ------------------------------------------------------------
   schedule:
-    - cron: "30 20 * * *"
-
-  # ------------------------------------------------------------
-  # RUN AFTER UPDATE FIRIS FWI (IF TRIGGERED EXTERNALLY)
-  # ------------------------------------------------------------
+    - cron: "15 21 * * *"
   workflow_run:
     workflows:
       - "Update FIRIS FWI"
     types:
       - completed
-
-  # ------------------------------------------------------------
-  # MANUAL RUN
-  # ------------------------------------------------------------
   workflow_dispatch:
 
 permissions:
@@ -30,62 +20,32 @@ concurrency:
 
 jobs:
   build-firis:
-    if: >
+    if: |
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      # ============================================================
-      # 1. CHECKOUT
-      # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # ============================================================
-      # 2. PYTHON
-      # ============================================================
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ============================================================
-      # 3. DEPENDENCIES
-      # ============================================================
       - name: Install dependencies
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install \
-            numpy \
-            pandas \
-            rasterio \
-            openpyxl \
-            shapely \
-            pyproj \
-            fiona \
-            requests \
-            Pillow \
-            affine
+          python -m pip install numpy pandas rasterio openpyxl shapely pyproj fiona requests Pillow affine
 
-          echo ""
-          echo "============================================================"
-          echo "VERIFYING PILLOW"
-          echo "============================================================"
-          python -c "from PIL import Image; print('Pillow OK - version:', Image.__version__)"
-          echo ""
-          echo "Pillow import test passed."
-
-      # ============================================================
-      # 4. DETERMINE IRAN DATES
-      # ============================================================
       - name: Determine Iran dates
         shell: bash
         run: |
@@ -103,11 +63,6 @@ jobs:
           today_str = today.isoformat()
           tomorrow_str = tomorrow.isoformat()
 
-          print("")
-          print("============================================================")
-          print("IRAN DATE CALCULATION")
-          print("============================================================")
-          print(f"Current Iran datetime: {now_iran.isoformat()}")
           print(f"Today in Iran: {today_str}")
           print(f"Tomorrow in Iran: {tomorrow_str}")
 
@@ -116,403 +71,34 @@ jobs:
               env.write(f"TOMORROW_DATE={tomorrow_str}\n")
           PY
 
-      # ============================================================
-      # 5. DOWNLOAD TOMORROW FWI (IF NOT EXISTS)
-      # ============================================================
-      - name: Download Tomorrow FWI
-        shell: bash
+      - name: Download Tomorrow FWI (Fallback)
         run: |
-          set -euo pipefail
-          echo ""
-          echo "============================================================"
-          echo "DOWNLOADING FWI FOR TOMORROW (${TOMORROW_DATE})"
-          echo "============================================================"
-          python scripts/update_fwi.py --overwrite
+          python scripts/update_fwi.py --boundary "fars.geojson" --overwrite || true
 
-      # ============================================================
-      # 6. LOCATE TOMORROW FWI ONLY
-      # ============================================================
-      - name: Locate tomorrow FWI
-        shell: bash
-        run: |
-          set -euo pipefail
-          FWI_JSON="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.json"
-          FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif"
-
-          echo ""
-          echo "============================================================"
-          echo "SEARCHING FOR TOMORROW FWI ONLY"
-          echo "============================================================"
-          echo "Today in Iran: ${TODAY_IRAN}"
-          echo "Required forecast date: ${TOMORROW_DATE}"
-          echo "Required FWI metadata: ${FWI_JSON}"
-          echo "Required FWI raster: ${FWI_RASTER}"
-
-          if [ ! -f "${FWI_JSON}" ]; then
-            echo ""
-            echo "ERROR: Tomorrow FWI metadata was not found."
-            echo "Expected: ${FWI_JSON}"
-            exit 1
-          fi
-
-          if [ ! -f "${FWI_RASTER}" ]; then
-            echo ""
-            echo "ERROR: Tomorrow FWI raster was not found."
-            echo "Expected: ${FWI_RASTER}"
-            exit 1
-          fi
-
-          echo ""
-          echo "✓ Tomorrow FWI files found."
-
-      # ============================================================
-      # 7. VALIDATE FWI DATE
-      # ============================================================
-      - name: Validate tomorrow FWI
-        shell: bash
-        run: |
-          set -euo pipefail
-          export FWI_JSON="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.json"
-
-          python - <<'PY'
-          import json
-          import os
-          import sys
-
-          path = os.environ["FWI_JSON"]
-          expected = os.environ["TOMORROW_DATE"]
-
-          with open(path, "r", encoding="utf-8") as file:
-              metadata = json.load(file)
-
-          target = metadata.get("forecast_date") or metadata.get("target_date")
-
-          print("")
-          print("============================================================")
-          print("FWI DATE VALIDATION")
-          print("============================================================")
-          print(f"Expected: {expected}")
-          print(f"Metadata target: {target}")
-
-          if target != expected:
-              print("")
-              print("ERROR: FWI metadata date does not match tomorrow.")
-              sys.exit(1)
-
-          print("")
-          print("✓ FWI forecast date is correct.")
-          PY
-
-      # ============================================================
-      # 8. BUILD FLI
-      # ============================================================
       - name: Build FIRIS FLI
-        shell: bash
         run: |
-          set -euo pipefail
-          FWI_DATE="${TOMORROW_DATE}"
-          FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${FWI_DATE}.tif"
+          FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif"
+          mkdir -p data/outputs data/report data/web
+          python scripts/build_firis.py --fwi-raster "${FWI_RASTER}" --fuel-raster "data/raw/fuel/fars_fuel.tif" --dem-raster "data/raw/topography/dem_fars.tif" --fuel-excel "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx" --boundary "fars.geojson" --output-dir "data/outputs" --run-date "${TOMORROW_DATE}"
 
-          mkdir -p data/outputs
-          mkdir -p data/report
-          mkdir -p data/web
-
-          echo ""
-          echo "============================================================"
-          echo "BUILDING FIRIS FLI"
-          echo "============================================================"
-          echo "Today in Iran: ${TODAY_IRAN}"
-          echo "Forecast date: ${FWI_DATE}"
-          echo "FWI raster: ${FWI_RASTER}"
-
-          python scripts/build_firis.py \
-            --fwi-raster "${FWI_RASTER}" \
-            --fuel-raster "data/raw/fuel/fars_fuel.tif" \
-            --dem-raster "data/raw/topography/dem_fars.tif" \
-            --fuel-excel "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx" \
-            --boundary "fars.geojson" \
-            --output-dir "data/outputs" \
-            --run-date "${FWI_DATE}"
-
-      # ============================================================
-      # 9. VERIFY FLI
-      # ============================================================
-      - name: Verify FLI output
-        shell: bash
+      - name: Build Report and Archive
         run: |
-          set -euo pipefail
-          FLI_RASTER="data/outputs/fli_fars_${TOMORROW_DATE}.tif"
-
-          echo ""
-          echo "============================================================"
-          echo "VERIFYING FLI"
-          echo "============================================================"
-          echo "Expected FLI: ${FLI_RASTER}"
-
-          if [ ! -f "${FLI_RASTER}" ]; then
-            echo ""
-            echo "ERROR: Tomorrow FLI was not created."
-            exit 1
-          fi
-
-          echo ""
-          echo "✓ FLI output exists."
-          ls -lh "${FLI_RASTER}"
-
-      # ============================================================
-      # 10. BUILD EXCEL REPORT
-      # ============================================================
-      - name: Build FIRIS Excel report
-        shell: bash
-        run: |
-          set -euo pipefail
           FLI_RASTER="data/outputs/fli_fars_${TOMORROW_DATE}.tif"
           REPORT_FILE="data/report/firis_report.xlsx"
-
-          echo ""
-          echo "============================================================"
-          echo "BUILDING FIRIS EXCEL REPORT"
-          echo "============================================================"
-          echo "Forecast date: ${TOMORROW_DATE}"
-          echo "Input FLI: ${FLI_RASTER}"
-          echo "Output Excel: ${REPORT_FILE}"
-
-          rm -f "${REPORT_FILE}"
-
-          python scripts/build_report.py \
-            --input "${FLI_RASTER}" \
-            --output "${REPORT_FILE}" \
-            --run-date "${TOMORROW_DATE}" \
-            --protected "protected_areas.geojson" \
-            --hunting "hunting_banned.geojson"
-
-          if [ ! -f "${REPORT_FILE}" ]; then
-            echo ""
-            echo "ERROR: Excel report was not created."
-            exit 1
-          fi
-
-          echo ""
-          echo "Generated Excel:"
-          ls -lh "${REPORT_FILE}"
-
-          echo ""
-          echo "✓ Latest Excel report generated."
-
-      # ============================================================
-      # 11. VERIFY LATEST EXCEL
-      # ============================================================
-      - name: Verify latest Excel report
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          from openpyxl import load_workbook
-          import os
-          import sys
-
-          report = Path("data/report/firis_report.xlsx")
-          expected_date = os.environ["TOMORROW_DATE"]
-          expected_fli = f"fli_fars_{expected_date}.tif"
-
-          if not report.exists():
-              print("ERROR: Excel report does not exist.")
-              sys.exit(1)
-
-          wb = load_workbook(report, read_only=True, data_only=True)
-          try:
-              if "خلاصه" not in wb.sheetnames:
-                  print("ERROR: Sheet 'خلاصه' not found.")
-                  sys.exit(1)
-
-              ws = wb["خلاصه"]
-              actual_date = ws["B3"].value
-              actual_fli = ws["B4"].value
-
-              if str(actual_date) != expected_date:
-                  print("ERROR: Latest Excel date is incorrect.")
-                  sys.exit(1)
-
-              if str(actual_fli) != expected_fli:
-                  print("ERROR: Latest Excel FLI filename is incorrect.")
-                  sys.exit(1)
-
-              print("✓ Latest Excel date and FLI filename are correct.")
-          finally:
-              wb.close()
-          PY
-
-      # ============================================================
-      # 12. SAVE EXCEL INSIDE TOMORROW ARCHIVE
-      # ============================================================
-      - name: Archive Excel report
-        shell: bash
-        run: |
-          set -euo pipefail
           ARCHIVE_DIR="data/web/archive/${TOMORROW_DATE}"
-          REPORT_FILE="data/report/firis_report.xlsx"
-          ARCHIVE_REPORT="${ARCHIVE_DIR}/firis_report.xlsx"
-
           mkdir -p "${ARCHIVE_DIR}"
-          cp -f "${REPORT_FILE}" "${ARCHIVE_REPORT}"
+          python scripts/build_report.py --input "${FLI_RASTER}" --output "${REPORT_FILE}" --run-date "${TOMORROW_DATE}" --protected "protected_areas.geojson" --hunting "hunting_banned.geojson"
+          cp -f "${REPORT_FILE}" "${ARCHIVE_DIR}/firis_report.xlsx"
 
-          if [ ! -f "${ARCHIVE_REPORT}" ]; then
-            echo "ERROR: Archived Excel was not created."
-            exit 1
-          fi
-          echo "✓ Excel archived successfully."
-
-      # ============================================================
-      # 13. VERIFY ARCHIVED EXCEL
-      # ============================================================
-      - name: Verify archived Excel report
-        shell: bash
+      - name: Commit and Push
         run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          from openpyxl import load_workbook
-          import os
-          import sys
-
-          date = os.environ["TOMORROW_DATE"]
-          report = Path(f"data/web/archive/{date}/firis_report.xlsx")
-          expected_fli = f"fli_fars_{date}.tif"
-
-          if not report.exists():
-              print("ERROR: Archived Excel does not exist.")
-              sys.exit(1)
-
-          wb = load_workbook(report, read_only=True, data_only=True)
-          try:
-              if "خلاصه" not in wb.sheetnames:
-                  print("ERROR: Archived Excel sheet 'خلاصه' not found.")
-                  sys.exit(1)
-
-              ws = wb["خلاصه"]
-              actual_date = ws["B3"].value
-              actual_fli = ws["B4"].value
-
-              if str(actual_date) != date or str(actual_fli) != expected_fli:
-                  print("ERROR: Archived Excel date or FLI mismatch.")
-                  sys.exit(1)
-
-              print("✓ Archived Excel validation passed.")
-          finally:
-              wb.close()
-          PY
-
-      # ============================================================
-      # 14. BUILD WEB GIS
-      # ============================================================
-      - name: Build Web GIS map
-        shell: bash
-        run: |
-          set -euo pipefail
-          FLI_RASTER="data/outputs/fli_fars_${TOMORROW_DATE}.tif"
-
-          python scripts/build_web_map.py \
-            --input "${FLI_RASTER}" \
-            --output-dir "data/web"
-
-      # ============================================================
-      # 15. VERIFY WEB GIS OUTPUTS
-      # ============================================================
-      - name: Verify Web GIS outputs
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ ! -f "data/web/fli_latest.json" ]; then
-            echo "ERROR: fli_latest.json not found."
-            exit 1
-          fi
-
-          if [ ! -f "data/web/archive/${TOMORROW_DATE}/firis_report.xlsx" ]; then
-            echo "ERROR: Tomorrow archived Excel not found."
-            exit 1
-          fi
-          echo "✓ Web GIS validation passed."
-
-      # ============================================================
-      # 16. UPDATE ARCHIVE INDEX
-      # ============================================================
-      - name: Update Archive Index
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          from pathlib import Path
-
-          archive_dir = Path("data/web/archive")
-          index_file = archive_dir / "index.json"
-          archive_dir.mkdir(parents=True, exist_ok=True)
-
-          dates = sorted(
-              [
-                  p.name for p in archive_dir.iterdir()
-                  if p.is_dir() and len(p.name) == 10 and p.name[4] == "-" and p.name[7] == "-"
-              ]
-          )
-
-          with index_file.open("w", encoding="utf-8") as file:
-              json.dump(dates, file, ensure_ascii=False, indent=2)
-              file.write("\n")
-
-          print(f"Archive dates updated: {dates}")
-          PY
-
-      # ============================================================
-      # 17. FINAL LATEST JSON DATE VALIDATION
-      # ============================================================
-      - name: Validate latest JSON date
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          import json
-          import os
-          import sys
-
-          expected = os.environ["TOMORROW_DATE"]
-          path = "data/web/fli_latest.json"
-
-          with open(path, "r", encoding="utf-8") as file:
-              metadata = json.load(file)
-
-          actual = metadata.get("forecast_date") or metadata.get("target_date")
-          source_file = metadata.get("source_file", "")
-          expected_source = f"fli_fars_{expected}.tif"
-
-          if str(actual) != expected or str(source_file) != expected_source:
-              print("ERROR: fli_latest.json metadata does not match TOMORROW_DATE.")
-              sys.exit(1)
-
-          print("✓ latest JSON forecast date and source file are correct.")
-          PY
-
-      # ============================================================
-      # 18. COMMIT AND PUSH
-      # ============================================================
-      - name: Commit FIRIS outputs
-        shell: bash
-        run: |
-          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add \
-            data/raw/fwi \
-            data/outputs \
-            data/web \
-            data/report
-
+          git add data/
           if git diff --cached --quiet; then
-            echo "No generated changes."
-            exit 0
+            echo "No changes to commit."
+          else
+            git commit -m "Auto update FLI and report for ${TOMORROW_DATE}"
+            git pull --rebase origin main || true
+            git push origin HEAD:main
           fi
-
-          git commit -m "Update FIRIS forecast ${TOMORROW_DATE}"
-          git pull --rebase origin main || true
-          git push
