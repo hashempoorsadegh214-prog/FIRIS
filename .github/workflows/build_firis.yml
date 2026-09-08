@@ -1,56 +1,68 @@
 name: FIRIS
 
 on:
+  schedule:
+    # ساعت ۲۱:۱۵ به وقت UTC (معادل ۰۰:۴۵ بامداد ایران)
+    - cron: '15 21 * * *'
+  workflow_dispatch:
   workflow_run:
-    workflows: ["Update FWI"]
+    workflows: ["Update FIRIS FWI"]
     types:
       - completed
-  workflow_dispatch:
 
-permissions:
-  contents: write
+concurrency:
+  group: firis-build
+  cancel-in-progress: false
 
 jobs:
   build:
+    name: Build FIRIS Data & Maps
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: '3.10'
+          cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev gdal-bin
+
+      - name: Install Python Dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Build FLI
+      - name: Build FIRI (FLI)
         run: |
-          if [ -f scripts/build_fli.py ]; then
-            python scripts/build_fli.py
-          elif [ -f build_fli.py ]; then
-            python build_fli.py
-          else
-            echo "build_fli.py not found!" && exit 1
-          fi
+          python scripts/build_firis.py
+
+      - name: Build Excel Report
+        run: |
+          python scripts/build_report.py
 
       - name: Build Web Map
         run: |
-          if [ -f scripts/build_web_map.py ]; then
-            python scripts/build_web_map.py
-          elif [ -f build_web_map.py ]; then
-            python build_web_map.py
-          else
-            echo "build_web_map.py not found!" && exit 1
-          fi
+          python scripts/build_web_map.py
 
-      - name: Commit and push changes
+      - name: Commit and Push Changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update FIRIS maps and data" && git push)
+          if git diff --staged --quiet; then
+            echo "تغییری برای ثبت وجود ندارد."
+          else
+            git commit -m "Auto-update FIRIS outputs [skip ci]"
+            git push
+          fi
