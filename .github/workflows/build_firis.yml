@@ -1,16 +1,19 @@
-name: FIRIS Daily Pipeline
+name: FIRIS Pipeline
 
 on:
   schedule:
-    - cron: '0 4 * * *' # اجرای خودکار روزانه ساعت ۰۴:۰۰ UTC
-  workflow_dispatch: # امکان اجرای دستی
+    - cron: '35 20 * * *' # اجرای خودکار هر شب ساعت ۰۰:۰۵ بامداد به وقت ایران
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
-  build:
+  run-pipeline:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -18,51 +21,74 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install numpy pandas rasterio openpyxl geopandas shapely folium
+          pip install numpy pandas rasterio openpyxl geopandas shapely folium requests
 
-      - name: Calculate Target Date (Tomorrow - Iran Time)
-        id: date_step
+      - name: Auto detect target date and files
+        id: prepare_env
         run: |
           python -c '
+          import os, glob
           from datetime import datetime, timedelta
           import zoneinfo
 
           tehran = zoneinfo.ZoneInfo("Asia/Tehran")
           now = datetime.now(tehran)
-          target_date = now + timedelta(days=1)
-          
-          date_str = target_date.strftime("%Y-%m-%d")
-          print(f"TARGET_DATE={date_str}")
-          with open("${{ github.env }}", "a") as f:
-              f.write(f"TARGET_DATE={date_str}\n")
+          target_date = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+
+          # پیدا کردن خودکار فایل FWI مربوط به تاریخ فردا یا آخرین فایل موجود
+          fwi_file = f"data/fwi_{target_date}.tif"
+          if not os.path.exists(fwi_file):
+              fwi_candidates = sorted(glob.glob("data/*fwi*.tif") + glob.glob("*.tif"))
+              fwi_file = fwi_candidates[-1] if fwi_candidates else "data/fwi.tif"
+
+          # پیدا کردن خودکار فایل اکسل سوخت
+          excel_candidates = sorted(glob.glob("data/*.xlsx") + glob.glob("data/*.xls") + glob.glob("*.xlsx") + glob.glob("*.xls"))
+          excel_file = excel_candidates[0] if excel_candidates else "data/fuel_table.xlsx"
+
+          # پیدا کردن خودکار لایه سوخت
+          fuel_candidates = sorted(glob.glob("data/*fuel*.tif") + glob.glob("*fuel*.tif"))
+          fuel_file = fuel_candidates[0] if fuel_candidates else "data/fuel.tif"
+
+          # پیدا کردن خودکار DEM
+          dem_candidates = sorted(glob.glob("data/*dem*.tif") + glob.glob("*dem*.tif"))
+          dem_file = dem_candidates[0] if dem_candidates else "data/dem.tif"
+
+          # مرز استان
+          boundary_candidates = sorted(glob.glob("data/*fars*.geojson") + glob.glob("*fars*.geojson") + glob.glob("*.geojson"))
+          boundary_file = boundary_candidates[0] if boundary_candidates else "fars.geojson"
+
+          with open(os.environ["GITHUB_ENV"], "a") as f:
+              f.write(f"TARGET_DATE={target_date}\n")
+              f.write(f"FWI_FILE={fwi_file}\n")
+              f.write(f"EXCEL_FILE={excel_file}\n")
+              f.write(f"FUEL_FILE={fuel_file}\n")
+              f.write(f"DEM_FILE={dem_file}\n")
+              f.write(f"BOUNDARY_FILE={boundary_file}\n")
           '
 
-      - name: Create Output Directory
+      - name: Run FIRIS Model
         run: |
           mkdir -p outputs
-
-      - name: Build FLI (Run FIRIS Script)
-        run: |
           python scripts/build_firis.py \
-            --fwi-raster "data/fwi_${TARGET_DATE}.tif" \
-            --fuel-raster "data/fuel.tif" \
-            --dem-raster "data/dem.tif" \
-            --fuel-excel "data/fuel_table.xlsx" \
-            --boundary "fars.geojson" \
+            --fwi-raster "${FWI_FILE}" \
+            --fuel-raster "${FUEL_FILE}" \
+            --dem-raster "${DEM_FILE}" \
+            --fuel-excel "${EXCEL_FILE}" \
+            --boundary "${BOUNDARY_FILE}" \
             --output-dir "outputs" \
             --run-date "${TARGET_DATE}"
 
-      - name: Commit and Push Outputs
+      - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add outputs/
           if git diff --staged --quiet; then
-            echo "No changes to commit."
+            echo "خروجی جدیدی برای ذخیره وجود ندارد."
           else
-            git commit -m "Update FIRIS FLI outputs for ${TARGET_DATE}"
+            git commit -m "Auto-update FIRIS outputs for ${TARGET_DATE}"
             git push
           fi
