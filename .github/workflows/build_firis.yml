@@ -1,8 +1,8 @@
-name: FIRIS Pipeline
+name: FIRIS Automated Pipeline
 
 on:
   schedule:
-    - cron: '35 20 * * *' # اجرای خودکار شبانه (۰۰:۰۵ بامداد ایران)
+    - cron: '30 20 * * *' # اجرای خودکار هر شب (۰۰:۰۰ به وقت ایران)
   workflow_dispatch:
 
 permissions:
@@ -13,134 +13,61 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: 1. Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 2. Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
 
-      - name: Install dependencies
+      - name: 3. Install Required Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install numpy pandas rasterio openpyxl geopandas shapely folium requests
+          pip install numpy pandas rasterio openpyxl geopandas shapely requests folium
 
-      - name: Auto-resolve data files and date
-        id: prepare_env
+      - name: 4. Prepare Environment & Fetch Weather
         run: |
-          python -c '
-          import os, glob, sys
-          from datetime import datetime, timedelta
-          import zoneinfo
+          python scripts/prepare_and_fetch.py
 
-          tehran = zoneinfo.ZoneInfo("Asia/Tehran")
-          now = datetime.now(tehran)
-          target_date = (now + timedelta(days=1)).strftime("%Y-%m-%d")
-
-          def find_first(patterns):
-              for pat in patterns:
-                  matches = sorted(glob.glob(pat, recursive=True))
-                  if matches:
-                      return matches[0]
-              return None
-
-          def find_latest(patterns):
-              for pat in patterns:
-                  matches = sorted(glob.glob(pat, recursive=True))
-                  if matches:
-                      return matches[-1]
-              return None
-
-          # 1. جستجوی خودکار لایه FWI
-          fwi_file = find_latest([
-              f"data/*{target_date}*.tif",
-              "data/*fwi*.tif",
-              "**/*fwi*.tif",
-              "data/*.tif"
-          ])
-
-          # 2. جستجوی خودکار لایه سوخت (Fuel)
-          fuel_file = find_first([
-              "data/*fuel*.tif",
-              "**/*fuel*.tif",
-              "data/fuel.tif"
-          ])
-
-          # 3. جستجوی خودکار لایه ارتفاعی (DEM)
-          dem_file = find_first([
-              "data/*dem*.tif",
-              "**/*dem*.tif",
-              "data/dem.tif"
-          ])
-
-          # 4. جستجوی خودکار جدول اکسل سوخت
-          excel_file = find_first([
-              "data/*.xlsx",
-              "data/*.xls",
-              "**/*.xlsx",
-              "**/*.xls"
-          ])
-
-          # 5. جستجوی مرز منطقه (GeoJSON / Shapefile)
-          boundary_file = find_first([
-              "data/*fars*.geojson",
-              "**/*fars*.geojson",
-              "data/*.geojson",
-              "**/*.geojson"
-          ])
-
-          print(f"Target Date: {target_date}")
-          print(f"FWI File: {fwi_file}")
-          print(f"Fuel File: {fuel_file}")
-          print(f"DEM File: {dem_file}")
-          print(f"Excel File: {excel_file}")
-          print(f"Boundary File: {boundary_file}")
-
-          if not fwi_file:
-              # در صورتی که فایلی پیدا نشود لیست فایل‌های موجود جهت بررسی چاپ می‌شود
-              print("Existing tif files:", glob.glob("**/*.tif", recursive=True))
-              raise FileNotFoundError("هیچ فایل تیف مربوط به FWI در مخزن یافت نشد.")
-
-          with open(os.environ["GITHUB_ENV"], "a") as f:
-              f.write(f"TARGET_DATE={target_date}\n")
-              f.write(f"FWI_FILE={fwi_file}\n")
-              f.write(f"FUEL_FILE={fuel_file or ''}\n")
-              f.write(f"DEM_FILE={dem_file or ''}\n")
-              f.write(f"EXCEL_FILE={excel_file or ''}\n")
-              f.write(f"BOUNDARY_FILE={boundary_file or ''}\n")
-          '
-
-      - name: Run FIRIS Model
+      - name: 5. Build FLI Model
         run: |
-          mkdir -p outputs
-          
-          CMD="python scripts/build_firis.py --fwi-raster \"$FWI_FILE\" --output-dir \"outputs\" --run-date \"$TARGET_DATE\""
-          
-          if [ -n "$FUEL_FILE" ]; then
-            CMD="$CMD --fuel-raster \"$FUEL_FILE\""
+          if [ -z "$FWI_PATH" ] || [ ! -f "$FWI_PATH" ]; then
+            echo "Error: FWI raster file not found."
+            exit 1
           fi
-          if [ -n "$DEM_FILE" ]; then
-            CMD="$CMD --dem-raster \"$DEM_FILE\""
-          fi
-          if [ -n "$EXCEL_FILE" ]; then
-            CMD="$CMD --fuel-excel \"$EXCEL_FILE\""
-          fi
-          if [ -n "$BOUNDARY_FILE" ]; then
-            CMD="$CMD --boundary \"$BOUNDARY_FILE\""
+
+          CMD="python scripts/build_firis.py \
+            --fwi-raster \"$FWI_PATH\" \
+            --fuel-raster \"$FUEL_PATH\" \
+            --dem-raster \"$DEM_PATH\" \
+            --fuel-excel \"$EXCEL_PATH\" \
+            --output-dir \"outputs\" \
+            --run-date \"$RUN_DATE\""
+
+          if [ -n "$BOUNDARY_PATH" ] && [ -f "$BOUNDARY_PATH" ]; then
+            CMD="$CMD --boundary \"$BOUNDARY_PATH\""
           fi
 
           echo "Running: $CMD"
           eval $CMD
 
-      - name: Commit and push changes
+      - name: 6. Build Web Map
+        if: always()
+        run: |
+          if [ -f "scripts/build_map.py" ]; then
+            python scripts/build_map.py --output-dir "outputs" --run-date "$RUN_DATE" || echo "Web map build skipped or warning."
+          fi
+
+      - name: 7. Commit and Push Results
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add outputs/
           if git diff --staged --quiet; then
-            echo "تغییر جدیدی برای ارسال وجود ندارد."
+            echo "No output changes to commit."
           else
-            git commit -m "Auto-update FIRIS outputs for ${TARGET_DATE}"
+            git commit -m "Auto-generate FIRIS FLI layers for ${RUN_DATE}"
             git push
           fi
