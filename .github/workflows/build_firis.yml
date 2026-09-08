@@ -2,7 +2,6 @@ name: Build FIRIS Fire Likelihood Index
 
 on:
   schedule:
-    # ساعت ۲۱:۱۵ UTC (معادل ۰۰:۴۵ به وقت ایران - ۴۰ دقیقه پس از دریافت داده‌های FWI)
     - cron: "15 21 * * *"
   workflow_run:
     workflows:
@@ -24,7 +23,6 @@ jobs:
       github.event_name == 'schedule' ||
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -59,64 +57,48 @@ jobs:
           now_iran = datetime.now(iran)
           today = now_iran.date()
           tomorrow = today + timedelta(days=1)
-
           today_str = today.isoformat()
           tomorrow_str = tomorrow.isoformat()
-
-          print(f"Current Iran datetime: {now_iran.isoformat()}")
-          print(f"Today in Iran: {today_str}")
-          print(f"Tomorrow in Iran: {tomorrow_str}")
 
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
               env.write(f"TODAY_IRAN={today_str}\n")
               env.write(f"TOMORROW_DATE={tomorrow_str}\n")
           PY
 
-      - name: Download Tomorrow FWI (Fallback)
-        run: |
-          python scripts/update_fwi.py --boundary "fars.geojson" --overwrite || true
-
-      - name: Locate and Validate Tomorrow FWI
+      - name: Download Tomorrow FWI (if needed)
         shell: bash
         run: |
-          FWI_JSON="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.json"
-          FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif"
-          
-          if [ ! -f "${FWI_RASTER}" ]; then
-            echo "ERROR: Tomorrow FWI raster not found: ${FWI_RASTER}"
-            exit 1
-          fi
-          echo "FWI Raster validated."
+          python scripts/update_fwi.py --overwrite || true
 
       - name: Build FIRIS FLI
+        shell: bash
         run: |
-          FWI_RASTER="data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif"
-          mkdir -p data/outputs data/report data/web
-          python scripts/build_firis.py --fwi-raster "${FWI_RASTER}" --fuel-raster "data/raw/fuel/fars_fuel.tif" --dem-raster "data/raw/topography/dem_fars.tif" --fuel-excel "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx" --boundary "fars.geojson" --output-dir "data/outputs" --run-date "${TOMORROW_DATE}"
+          mkdir -p data/outputs
+          mkdir -p data/report
+          mkdir -p data/web
+          python scripts/build_firis.py --fwi-raster "data/raw/fwi/fwi_ecmwf_fars_${TOMORROW_DATE}.tif" --fuel-raster "data/raw/fuel/fars_fuel.tif" --dem-raster "data/raw/topography/dem_fars.tif" --fuel-excel "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx" --boundary "fars.geojson" --output-dir "data/outputs" --run-date "${TOMORROW_DATE}"
 
-      - name: Build Excel Report and Web Map
+      - name: Build FIRIS Excel report
+        shell: bash
         run: |
-          FLI_RASTER="data/outputs/fli_fars_${TOMORROW_DATE}.tif"
-          REPORT_FILE="data/report/firis_report.xlsx"
-          ARCHIVE_DIR="data/web/archive/${TOMORROW_DATE}"
-          mkdir -p "${ARCHIVE_DIR}"
-          
-          python scripts/build_report.py --input "${FLI_RASTER}" --output "${REPORT_FILE}" --run-date "${TOMORROW_DATE}" --protected "protected_areas.geojson" --hunting "hunting_banned.geojson"
-          cp -f "${REPORT_FILE}" "${ARCHIVE_DIR}/firis_report.xlsx"
-          
-          if [ -f "scripts/build_web_map.py" ]; then
-            python scripts/build_web_map.py || true
-          fi
+          python scripts/build_report.py --input "data/outputs/fli_fars_${TOMORROW_DATE}.tif" --output "data/report/firis_report.xlsx" --run-date "${TOMORROW_DATE}" --protected "protected_areas.geojson" --hunting "hunting_banned.geojson"
+
+      - name: Build Web Map
+        shell: bash
+        run: |
+          python scripts/build_web_map.py
 
       - name: Commit and Push
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/
+          git add index.html || true
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Auto update FLI and report for ${TOMORROW_DATE} [skip ci]"
+            git commit -m "chore(firis): update FLI ${TOMORROW_DATE} [skip ci]"
             git pull --rebase origin main || true
             git push origin HEAD:main
           fi
