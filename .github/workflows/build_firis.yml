@@ -1,10 +1,9 @@
-name: Build FIRIS
+name: FIRIS Daily Pipeline
 
 on:
   schedule:
-    # اجرا هر روز ساعت 00:45 بامداد به وقت ایران (21:15 UTC)
-    - cron: '15 21 * * *'
-  workflow_dispatch:
+    - cron: '0 4 * * *' # اجرای خودکار روزانه ساعت ۰۴:۰۰ UTC
+  workflow_dispatch: # امکان اجرای دستی
 
 jobs:
   build:
@@ -17,34 +16,53 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
-      - name: Install System Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgdal-dev gdal-bin
-
-      - name: Install Python Dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install numpy pandas rasterio geopandas openpyxl matplotlib folium requests
+          pip install numpy pandas rasterio openpyxl geopandas shapely folium
 
-      - name: Run Build FIRIS
+      - name: Calculate Target Date (Tomorrow - Iran Time)
+        id: date_step
         run: |
-          python scripts/build_firis.py
+          python -c '
+          from datetime import datetime, timedelta
+          import zoneinfo
 
-      - name: Run Build Report
+          tehran = zoneinfo.ZoneInfo("Asia/Tehran")
+          now = datetime.now(tehran)
+          target_date = now + timedelta(days=1)
+          
+          date_str = target_date.strftime("%Y-%m-%d")
+          print(f"TARGET_DATE={date_str}")
+          with open("${{ github.env }}", "a") as f:
+              f.write(f"TARGET_DATE={date_str}\n")
+          '
+
+      - name: Create Output Directory
         run: |
-          python scripts/build_report.py
+          mkdir -p outputs
 
-      - name: Run Build Web Map
+      - name: Build FLI (Run FIRIS Script)
         run: |
-          python scripts/build_web_map.py
+          python scripts/build_firis.py \
+            --fwi-raster "data/fwi_${TARGET_DATE}.tif" \
+            --fuel-raster "data/fuel.tif" \
+            --dem-raster "data/dem.tif" \
+            --fuel-excel "data/fuel_table.xlsx" \
+            --boundary "fars.geojson" \
+            --output-dir "outputs" \
+            --run-date "${TARGET_DATE}"
 
-      - name: Commit and Push Output
+      - name: Commit and Push Outputs
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git diff-index --quiet HEAD || git commit -m "Auto update FIRIS products [skip ci]"
-          git push
+          git add outputs/
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "Update FIRIS FLI outputs for ${TARGET_DATE}"
+            git push
+          fi
