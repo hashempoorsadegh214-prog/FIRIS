@@ -1,22 +1,19 @@
-name: FIRIS Build Pipeline
+name: FIRIS
 
 on:
-  schedule:
-    # ساعت ۲۱:۱۵ UTC (ساعت ۰۰:۴۵ بامداد به وقت ایران)
-    - cron: '15 21 * * *'
-  workflow_dispatch:
   workflow_run:
-    workflows: ["Update FWI Data"]
+    workflows: ["Update FWI"]
     types:
       - completed
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'schedule' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,8 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-          cache: 'pip'
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
@@ -33,23 +29,28 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Build FLI
-        run: python scripts/build_fli.py
-
-      - name: Build Report
-        run: python scripts/build_report.py
+        run: |
+          if [ -f scripts/build_fli.py ]; then
+            python scripts/build_fli.py
+          elif [ -f build_fli.py ]; then
+            python build_fli.py
+          else
+            echo "build_fli.py not found!" && exit 1
+          fi
 
       - name: Build Web Map
         run: |
-          python scripts/build_web_map.py --input output/firis_latest.geojson --output-dir docs/ --archive-dir docs/archive/
+          if [ -f scripts/build_web_map.py ]; then
+            python scripts/build_web_map.py
+          elif [ -f build_web_map.py ]; then
+            python build_web_map.py
+          else
+            echo "build_web_map.py not found!" && exit 1
+          fi
 
-      - name: Commit and Push Changes
+      - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          if git diff --staged --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "Auto-update FIRIS data, reports and web map [skip ci]"
-            git push
-          fi
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update FIRIS maps and data" && git push)
