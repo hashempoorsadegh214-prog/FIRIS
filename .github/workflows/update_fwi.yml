@@ -3,17 +3,12 @@ name: Update FIRIS FWI
 on:
   workflow_dispatch:
 
+  # اجرای خودکار روزانه کمی بعد از نیمه‌شب ایران
+  # 20:35 UTC = 00:05 به وقت ایران
   schedule:
-    # ----------------------------------------------------------
-    # RUN 1: 20:35 UTC = 00:05 Iran (Immediately after midnight)
-    # ----------------------------------------------------------
     - cron: "35 20 * * *"
 
-    # ----------------------------------------------------------
-    # RUN 2: 21:35 UTC = 01:05 Iran (Backup run)
-    # ----------------------------------------------------------
-    - cron: "35 21 * * *"
-
+  # اجرای خودکار در صورت تغییر فایل‌های اصلی FWI
   push:
     paths:
       - "scripts/update_fwi.py"
@@ -32,8 +27,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       # ========================================================
-      # CHECKOUT
+      # 1. CHECKOUT
       # ========================================================
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,22 +38,25 @@ jobs:
           persist-credentials: true
 
       # ========================================================
-      # SETUP PYTHON
+      # 2. SETUP PYTHON
       # ========================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: "pip"
 
       # ========================================================
-      # INSTALL DEPENDENCIES
+      # 3. INSTALL DEPENDENCIES
       # ========================================================
       - name: Install dependencies
         shell: bash
         run: |
           set -euo pipefail
+
           python -m pip install --upgrade pip
-          pip install \
+
+          python -m pip install \
             numpy \
             rasterio \
             requests \
@@ -65,215 +64,430 @@ jobs:
             pyproj
 
       # ========================================================
-      # CALCULATE IRAN DATE
+      # 4. CALCULATE IRAN TODAY + TOMORROW
       # ========================================================
       - name: Calculate Iran dates
         shell: bash
         run: |
           set -euo pipefail
+
           python - <<'PY'
           import os
           from datetime import datetime, timedelta
           from zoneinfo import ZoneInfo
 
           IRAN = ZoneInfo("Asia/Tehran")
+
           now_iran = datetime.now(IRAN)
+
           today = now_iran.date()
           tomorrow = today + timedelta(days=1)
 
           today_str = today.isoformat()
           tomorrow_str = tomorrow.isoformat()
 
-          print("")
           print("=" * 70)
           print("FIRIS IRAN DATE CALCULATION")
           print("=" * 70)
-          print(f"Current Iran datetime: {now_iran.isoformat()}")
-          print(f"Today in Iran: {today_str}")
-          print(f"Forecast target: {tomorrow_str}")
 
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
-              env.write(f"TODAY_IRAN={today_str}\n")
-              env.write(f"EXPECTED_DATE={tomorrow_str}\n")
+          print(f"Current Iran datetime : {now_iran.isoformat()}")
+          print(f"Today in Iran        : {today_str}")
+          print(f"Tomorrow / target    : {tomorrow_str}")
+
+          print("=" * 70)
+
+          with open(
+              os.environ["GITHUB_ENV"],
+              "a",
+              encoding="utf-8"
+          ) as env:
+
+              env.write(
+                  f"TODAY_IRAN={today_str}\n"
+              )
+
+              env.write(
+                  f"EXPECTED_DATE={tomorrow_str}\n"
+              )
+
           PY
 
       # ========================================================
-      # DOWNLOAD TOMORROW FWI
+      # 5. DOWNLOAD FWI FOR TOMORROW
       # ========================================================
       - name: Download FWI for tomorrow
         shell: bash
         run: |
           set -euo pipefail
+
+          echo "======================================================================"
+          echo "STEP 1 - DOWNLOAD TOMORROW FWI"
+          echo "======================================================================"
+
+          echo "Today in Iran : ${TODAY_IRAN}"
+          echo "Target date   : ${EXPECTED_DATE}"
+
           echo ""
-          echo "======================================================================"
-          echo "DOWNLOADING FIRIS FWI"
-          echo "======================================================================"
-          echo "Today in Iran: ${TODAY_IRAN}"
-          echo "Target forecast: ${EXPECTED_DATE}"
-          echo "Running update_fwi.py..."
 
           python scripts/update_fwi.py \
             --boundary "fars.geojson" \
             --overwrite
 
+          echo ""
+
+          echo "FWI downloader finished successfully."
+
       # ========================================================
-      # VERIFY TOMORROW FWI
+      # 6. HARD CHECK
+      # EXACT TOMORROW FILES MUST EXIST
       # ========================================================
-      - name: Verify tomorrow FWI
+      - name: Verify exact tomorrow FWI files
         shell: bash
         run: |
           set -euo pipefail
+
           FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${EXPECTED_DATE}.tif"
+
           FWI_METADATA="data/raw/fwi/fwi_ecmwf_fars_${EXPECTED_DATE}.json"
 
+          echo "======================================================================"
+          echo "STEP 2 - VERIFY EXACT TOMORROW FWI"
+          echo "======================================================================"
+
+          echo "Expected raster   : ${FWI_FILE}"
+          echo "Expected metadata : ${FWI_METADATA}"
+
           echo ""
-          echo "======================================================================"
-          echo "VERIFYING TOMORROW FWI"
-          echo "======================================================================"
-          echo "Today in Iran: ${TODAY_IRAN}"
-          echo "Expected forecast date: ${EXPECTED_DATE}"
 
           if [ ! -f "${FWI_FILE}" ]; then
-            echo "ERROR: Tomorrow FWI raster was not created: ${FWI_FILE}"
+
+            echo "ERROR: Exact tomorrow FWI raster does not exist."
+
+            echo "The pipeline will stop here."
+
+            echo "No old FWI may be used."
+
             exit 1
+
           fi
 
           if [ ! -f "${FWI_METADATA}" ]; then
-            echo "ERROR: Tomorrow FWI metadata was not created: ${FWI_METADATA}"
+
+            echo "ERROR: Exact tomorrow FWI metadata does not exist."
+
+            echo "The pipeline will stop here."
+
             exit 1
+
           fi
 
-          echo "✓ Tomorrow FWI raster and metadata exist."
+          if [ ! -s "${FWI_FILE}" ]; then
+
+            echo "ERROR: FWI raster exists but is empty."
+
+            exit 1
+
+          fi
+
+          if [ ! -s "${FWI_METADATA}" ]; then
+
+            echo "ERROR: FWI metadata exists but is empty."
+
+            exit 1
+
+          fi
+
+          echo "OK: Exact tomorrow FWI raster exists."
+
+          echo "OK: Exact tomorrow FWI metadata exists."
 
       # ========================================================
-      # VERIFY METADATA DATE
+      # 7. HARD CHECK
+      # METADATA DATE MUST EQUAL TOMORROW
       # ========================================================
-      - name: Verify FWI metadata date
+      - name: Verify FWI target date
         shell: bash
         run: |
           set -euo pipefail
+
           python - <<'PY'
           import json
           import os
           import sys
 
           expected = os.environ["EXPECTED_DATE"]
-          path = f"data/raw/fwi/fwi_ecmwf_fars_{expected}.json"
 
-          with open(path, "r", encoding="utf-8") as file:
+          path = (
+              f"data/raw/fwi/"
+              f"fwi_ecmwf_fars_{expected}.json"
+          )
+
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as file:
+
               metadata = json.load(file)
 
-          actual = metadata.get("target_date") or metadata.get("forecast_date")
+          actual = (
+              metadata.get("target_date")
+              or
+              metadata.get("forecast_date")
+          )
 
           print("=" * 70)
-          print("FWI DATE VALIDATION")
+          print("STEP 3 - FWI DATE VALIDATION")
           print("=" * 70)
-          print(f"Expected: {expected}")
-          print(f"Metadata: {actual}")
+
+          print(
+              f"Expected target date : {expected}"
+          )
+
+          print(
+              f"Metadata target date : {actual}"
+          )
+
+          print("")
 
           if actual != expected:
-              print("ERROR: FWI target date does not match EXPECTED_DATE.")
+
+              print(
+                  "ERROR: FWI metadata date is NOT tomorrow."
+              )
+
+              print(
+                  "ERROR: Old or wrong-date FWI is forbidden."
+              )
+
               sys.exit(1)
 
-          print("✓ FWI target date is correct.")
+          print(
+              "OK: FWI target date exactly matches tomorrow."
+          )
+
           PY
 
       # ========================================================
-      # VALIDATE GEOTIFF
+      # 8. VALIDATE GEOTIFF CONTENT
       # ========================================================
       - name: Validate FWI GeoTIFF
         shell: bash
         run: |
           set -euo pipefail
+
           python - <<'PY'
           import os
           import rasterio
 
           expected = os.environ["EXPECTED_DATE"]
-          path = f"data/raw/fwi/fwi_ecmwf_fars_{expected}.tif"
+
+          path = (
+              f"data/raw/fwi/"
+              f"fwi_ecmwf_fars_{expected}.tif"
+          )
 
           print("=" * 70)
-          print("FWI GEOTIFF VALIDATION")
+          print("STEP 4 - FWI GEOTIFF VALIDATION")
           print("=" * 70)
 
           with rasterio.open(path) as src:
-              print(f"CRS: {src.crs}")
-              print(f"Width: {src.width}, Height: {src.height}")
-              print(f"Resolution: {src.res}")
-              print(f"Bounds: {src.bounds}")
 
-              if src.crs is None or src.crs.to_epsg() != 4326:
-                  raise SystemExit("ERROR: FWI CRS is invalid or not EPSG:4326.")
+              print(f"CRS        : {src.crs}")
 
-              data = src.read(1, masked=True)
+              print(
+                  f"Width      : {src.width}"
+              )
+
+              print(
+                  f"Height     : {src.height}"
+              )
+
+              print(
+                  f"Resolution : {src.res}"
+              )
+
+              print(
+                  f"Bounds     : {src.bounds}"
+              )
+
+              if (
+                  src.crs is None
+                  or
+                  src.crs.to_epsg() != 4326
+              ):
+
+                  raise SystemExit(
+                      "ERROR: FWI CRS is invalid "
+                      "or is not EPSG:4326."
+                  )
+
+              data = src.read(
+                  1,
+                  masked=True
+              )
+
               if data.count() == 0:
-                  raise SystemExit("ERROR: FWI contains no valid pixels.")
 
-              print(f"Valid pixels: {int(data.count())}")
-              print(f"Min: {float(data.min())}, Max: {float(data.max())}, Mean: {float(data.mean())}")
+                  raise SystemExit(
+                      "ERROR: FWI contains no valid pixels."
+                  )
 
-          print("✓ FWI GeoTIFF is valid.")
+              minimum = float(
+                  data.min()
+              )
+
+              maximum = float(
+                  data.max()
+              )
+
+              mean = float(
+                  data.mean()
+              )
+
+              print(
+                  f"Valid pixels: {int(data.count())}"
+              )
+
+              print(
+                  f"Min         : {minimum}"
+              )
+
+              print(
+                  f"Max         : {maximum}"
+              )
+
+              print(
+                  f"Mean        : {mean}"
+              )
+
+              if maximum < 0:
+
+                  raise SystemExit(
+                      "ERROR: FWI maximum is invalid."
+                  )
+
+          print("")
+          print(
+              "OK: FWI GeoTIFF is valid and contains data."
+          )
+
           PY
 
       # ========================================================
-      # FINAL FORECAST VALIDATION
+      # 9. FINAL FWI SUCCESS GATE
       # ========================================================
-      - name: Final forecast validation
+      - name: Final FWI success gate
         shell: bash
         run: |
           set -euo pipefail
+
           python - <<'PY'
           import json
           import os
           import sys
 
           expected = os.environ["EXPECTED_DATE"]
-          path = f"data/raw/fwi/fwi_ecmwf_fars_{expected}.json"
 
-          with open(path, "r", encoding="utf-8") as file:
+          path = (
+              f"data/raw/fwi/"
+              f"fwi_ecmwf_fars_{expected}.json"
+          )
+
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as file:
+
               metadata = json.load(file)
 
-          target = metadata.get("target_date") or metadata.get("forecast_date")
+          target = (
+              metadata.get("target_date")
+              or
+              metadata.get("forecast_date")
+          )
 
           print("=" * 70)
-          print("FINAL FIRIS FWI FORECAST")
+          print("FINAL FWI SUCCESS GATE")
           print("=" * 70)
-          print(f"Iran datetime: {metadata.get('current_iran_datetime')}")
-          print(f"Today in Iran: {os.environ['TODAY_IRAN']}")
-          print(f"Target forecast: {target}")
+
+          print(
+              f"Today in Iran : "
+              f"{os.environ['TODAY_IRAN']}"
+          )
+
+          print(
+              f"FWI target    : {target}"
+          )
+
+          print(
+              f"Expected      : {expected}"
+          )
+
+          print("")
 
           if target != expected:
-              print("ERROR: Final target date is not tomorrow.")
+
+              print(
+                  "ERROR: FWI final gate failed."
+              )
+
               sys.exit(1)
 
-          print("✓ Forecast target is correct.")
-          print("✓ Tomorrow FWI validated.")
+          print(
+              "SUCCESS: FWI for tomorrow was "
+              "downloaded and fully validated."
+          )
+
+          print(
+              "SUCCESS: The FWI stage is complete."
+          )
+
+          print(
+              "SUCCESS: No stale FWI fallback "
+              "is permitted by this workflow."
+          )
+
           PY
 
       # ========================================================
-      # COMMIT & PUSH
+      # 10. COMMIT + PUSH ONLY VERIFIED FWI
       # ========================================================
-      - name: Commit and Push FWI
+      - name: Commit and Push verified FWI
         shell: bash
         run: |
           set -euo pipefail
+
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add data/raw/fwi
 
           if git diff --cached --quiet; then
+
             echo "No FWI changes to commit."
+
             exit 0
+
           fi
 
-          git commit -m "Update FWI forecast ${EXPECTED_DATE}"
-          git pull --rebase origin main || true
+          git commit \
+            -m "Update FWI forecast ${EXPECTED_DATE}"
+
+          git pull --rebase origin main
+
           git push origin HEAD:main
 
           echo ""
           echo "======================================================================"
           echo "FIRIS FWI UPDATE COMPLETED"
           echo "======================================================================"
-          echo "Today in Iran: ${TODAY_IRAN}"
-          echo "Forecast target: ${EXPECTED_DATE}"
+
+          echo "Today in Iran : ${TODAY_IRAN}"
+
+          echo "Forecast date : ${EXPECTED_DATE}"
+
+          echo "======================================================================"
