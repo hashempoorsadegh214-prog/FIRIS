@@ -28,11 +28,8 @@ jobs:
   build-firis:
 
     # ============================================================
-    # برای اجرای خودکار:
-    # فقط وقتی Update FIRIS FWI موفق بوده اجرا شود.
-    #
-    # برای اجرای دستی:
-    # همیشه اجازه اجرا دارد.
+    # اجرای خودکار فقط اگر FWI با موفقیت تمام شده باشد
+    # اجرای دستی همیشه مجاز است
     # ============================================================
     if: >
       github.event_name == 'workflow_dispatch'
@@ -155,49 +152,70 @@ jobs:
         run: |
           set -euo pipefail
 
+          # ------------------------------------------------------
+          # FWI:
+          # همیشه FWI دقیقاً مربوط به فردای امروز ایران
+          # ------------------------------------------------------
           FWI_PATH="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
 
           FWI_METADATA="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.json"
 
-          DEM_PATH="data/raw/topography/dem_fars.tif"
+          # ------------------------------------------------------
+          # FUEL:
+          # رستر کدگذاری‌شده اصلی فارس
+          # مقادیر آن باید با JOIN_VALUE اکسل منطبق باشد
+          # ------------------------------------------------------
+          FUEL_PATH="data/raw/fuel/fars_fuel.tif"
 
-          FUEL_PATH="data/outputs/f_fuel_fars_2026-08-26.tif"
+          # ------------------------------------------------------
+          # سایر ورودی‌های ثابت
+          # ------------------------------------------------------
+          DEM_PATH="data/raw/topography/dem_fars.tif"
 
           EXCEL_PATH="data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
 
           BOUNDARY_PATH="fars.geojson"
 
+          OUTPUT_DIR="outputs"
+
           echo "FWI_PATH=${FWI_PATH}" >> "$GITHUB_ENV"
 
           echo "FWI_METADATA=${FWI_METADATA}" >> "$GITHUB_ENV"
 
-          echo "DEM_PATH=${DEM_PATH}" >> "$GITHUB_ENV"
-
           echo "FUEL_PATH=${FUEL_PATH}" >> "$GITHUB_ENV"
+
+          echo "DEM_PATH=${DEM_PATH}" >> "$GITHUB_ENV"
 
           echo "EXCEL_PATH=${EXCEL_PATH}" >> "$GITHUB_ENV"
 
           echo "BOUNDARY_PATH=${BOUNDARY_PATH}" >> "$GITHUB_ENV"
 
-          echo "OUTPUT_DIR=outputs" >> "$GITHUB_ENV"
+          echo "OUTPUT_DIR=${OUTPUT_DIR}" >> "$GITHUB_ENV"
 
           echo "======================================================================"
           echo "FIRIS INPUT PATHS"
           echo "======================================================================"
 
           echo "Today Iran : ${TODAY_IRAN}"
+
           echo "Run date   : ${RUN_DATE}"
+
           echo ""
 
           echo "FWI        : ${FWI_PATH}"
+
           echo "Metadata   : ${FWI_METADATA}"
+
           echo "Fuel       : ${FUEL_PATH}"
+
           echo "DEM        : ${DEM_PATH}"
+
           echo "Fuel Excel : ${EXCEL_PATH}"
+
           echo "Boundary   : ${BOUNDARY_PATH}"
 
       # ========================================================
-      # 6. HARD CHECK - EXACT FWI FOR TOMORROW
+      # 6. HARD CHECK - EXACT TOMORROW FWI
       # ========================================================
       - name: 6. Verify exact tomorrow FWI
         shell: bash
@@ -208,7 +226,7 @@ jobs:
           echo "VERIFYING EXACT TOMORROW FWI"
           echo "======================================================================"
 
-          echo "Today Iran : ${TODAY_IRAN}"
+          echo "Today Iran    : ${TODAY_IRAN}"
 
           echo "Required date : ${RUN_DATE}"
 
@@ -404,6 +422,7 @@ jobs:
               )
 
           print("")
+
           print(
               "OK: Tomorrow FWI raster is valid."
           )
@@ -411,7 +430,7 @@ jobs:
           PY
 
       # ========================================================
-      # 9. CHECK OTHER REQUIRED INPUTS
+      # 9. VERIFY STATIC FIRIS INPUTS
       # ========================================================
       - name: 9. Verify FIRIS static inputs
         shell: bash
@@ -432,6 +451,7 @@ jobs:
             if [ ! -f "${FILE}" ]; then
 
               echo "ERROR: Required input not found:"
+
               echo "${FILE}"
 
               exit 1
@@ -443,9 +463,188 @@ jobs:
           done
 
       # ========================================================
-      # 10. BUILD FIRIS
+      # 10. VALIDATE CODED FUEL RASTER
       # ========================================================
-      - name: 10. Build FIRIS Fire Likelihood Index
+      - name: 10. Validate coded Fuel raster
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          import os
+          import math
+
+          import numpy as np
+          import pandas as pd
+          import rasterio
+
+          fuel_path = os.environ["FUEL_PATH"]
+
+          excel_path = os.environ["EXCEL_PATH"]
+
+          print("=" * 70)
+          print("FUEL RASTER VALIDATION")
+          print("=" * 70)
+
+          print(
+              f"Fuel raster : {fuel_path}"
+          )
+
+          print(
+              f"Fuel Excel  : {excel_path}"
+          )
+
+          print("")
+
+          # ----------------------------------------------------
+          # Read raster values
+          # ----------------------------------------------------
+          with rasterio.open(fuel_path) as src:
+
+              print(
+                  f"Fuel CRS        : {src.crs}"
+              )
+
+              print(
+                  f"Fuel size       : "
+                  f"{src.width} x {src.height}"
+              )
+
+              print(
+                  f"Fuel resolution : {src.res}"
+              )
+
+              print(
+                  f"Fuel bounds     : {src.bounds}"
+              )
+
+              values = src.read(
+                  1,
+                  masked=True
+              )
+
+              compressed = values.compressed()
+
+              if compressed.size == 0:
+
+                  raise SystemExit(
+                      "ERROR: Fuel raster contains no valid pixels."
+                  )
+
+              unique_values = np.unique(
+                  compressed
+              )
+
+          # ----------------------------------------------------
+          # Read JOIN_VALUE from Excel
+          # ----------------------------------------------------
+          df = pd.read_excel(
+              excel_path,
+              engine="openpyxl"
+          )
+
+          if "JOIN_VALUE" not in df.columns:
+
+              raise SystemExit(
+                  "ERROR: JOIN_VALUE column is missing "
+                  "from Fuel Excel."
+              )
+
+          excel_codes = set()
+
+          for value in df["JOIN_VALUE"].dropna().tolist():
+
+              try:
+
+                  numeric = float(value)
+
+                  if math.isfinite(
+                      numeric
+                  ):
+
+                      excel_codes.add(
+                          numeric
+                      )
+
+              except (
+                  TypeError,
+                  ValueError
+              ):
+
+                  pass
+
+          raster_codes = set(
+              float(value)
+              for value in unique_values
+          )
+
+          mapped = sorted(
+              raster_codes.intersection(
+                  excel_codes
+              )
+          )
+
+          unmapped = sorted(
+              raster_codes.difference(
+                  excel_codes
+              )
+          )
+
+          print("")
+          print("FUEL CODE MATCHING")
+          print("------------------")
+
+          print(
+              f"Unique raster codes : "
+              f"{len(raster_codes)}"
+          )
+
+          print(
+              f"Mapped codes        : "
+              f"{len(mapped)}"
+          )
+
+          print(
+              f"Unmapped codes      : "
+              f"{len(unmapped)}"
+          )
+
+          if mapped:
+
+              print("")
+              print("Mapped raster codes:")
+
+              for code in mapped[:30]:
+
+                  print(
+                      f"  - {code}"
+                  )
+
+          if unmapped:
+
+              print("")
+              print("First unmapped codes:")
+
+              for code in unmapped[:30]:
+
+                  print(
+                      f"  - {code}"
+                  )
+
+              raise SystemExit(
+                  "ERROR: Fuel raster contains codes "
+                  "that are not present in JOIN_VALUE."
+              )
+
+          print("")
+          print(
+              "OK: Fuel raster codes match JOIN_VALUE."
+          )
+
+      # ========================================================
+      # 11. BUILD FIRIS
+      # ========================================================
+      - name: 11. Build FIRIS Fire Likelihood Index
         shell: bash
         run: |
           set -euo pipefail
@@ -461,7 +660,14 @@ jobs:
           echo ""
 
           echo "USING FWI:"
+
           echo "${FWI_PATH}"
+
+          echo ""
+
+          echo "USING FUEL:"
+
+          echo "${FUEL_PATH}"
 
           echo ""
 
@@ -475,9 +681,9 @@ jobs:
             --boundary "${BOUNDARY_PATH}"
 
       # ========================================================
-      # 11. BUILD WEB MAP
+      # 12. BUILD WEB MAP
       # ========================================================
-      - name: 11. Build Web Map
+      - name: 12. Build Web Map
         if: success()
         shell: bash
         run: |
@@ -502,9 +708,9 @@ jobs:
           fi
 
       # ========================================================
-      # 12. VERIFY FIRIS OUTPUT
+      # 13. VERIFY FIRIS OUTPUT
       # ========================================================
-      - name: 12. Verify FIRIS output
+      - name: 13. Verify FIRIS output
         if: success()
         shell: bash
         run: |
@@ -524,22 +730,28 @@ jobs:
 
           echo ""
 
-          find "${OUTPUT_DIR}" -maxdepth 2 -type f -print | sort
+          find \
+            "${OUTPUT_DIR}" \
+            -maxdepth 2 \
+            -type f \
+            -print \
+            | sort
 
           echo ""
 
           echo "FIRIS build completed."
 
       # ========================================================
-      # 13. COMMIT + PUSH
+      # 14. COMMIT + PUSH
       # ========================================================
-      - name: 13. Commit and Push FIRIS outputs
+      - name: 14. Commit and Push FIRIS outputs
         if: success()
         shell: bash
         run: |
           set -euo pipefail
 
-          git config user.name "github-actions[bot]"
+          git config user.name \
+            "github-actions[bot]"
 
           git config user.email \
             "41898282+github-actions[bot]@users.noreply.github.com"
@@ -562,6 +774,7 @@ jobs:
           git push origin HEAD:main
 
           echo ""
+
           echo "======================================================================"
           echo "FIRIS BUILD COMPLETED"
           echo "======================================================================"
