@@ -1,73 +1,573 @@
-name: FIRIS Automated Pipeline
+name: Build FIRIS Fire Likelihood Index
 
 on:
-  schedule:
-    - cron: '30 20 * * *' # اجرای خودکار هر شب (۰۰:۰۰ به وقت ایران)
+
+  # ============================================================
+  # اجرای خودکار فقط بعد از موفقیت Update FIRIS FWI
+  # ============================================================
+  workflow_run:
+    workflows:
+      - "Update FIRIS FWI"
+    types:
+      - completed
+
+  # ============================================================
+  # اجرای دستی
+  # ============================================================
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: build-firis
+  cancel-in-progress: false
+
 jobs:
-  run-pipeline:
+
+  build-firis:
+
+    # ============================================================
+    # برای اجرای خودکار:
+    # فقط وقتی Update FIRIS FWI موفق بوده اجرا شود.
+    #
+    # برای اجرای دستی:
+    # همیشه اجازه اجرا دارد.
+    # ============================================================
+    if: >
+      github.event_name == 'workflow_dispatch'
+      ||
+      (
+        github.event_name == 'workflow_run'
+        &&
+        github.event.workflow_run.conclusion == 'success'
+      )
+
     runs-on: ubuntu-latest
 
     steps:
+
+      # ========================================================
+      # 1. CHECKOUT
+      # ========================================================
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
 
+      # ========================================================
+      # 2. SETUP PYTHON
+      # ========================================================
       - name: 2. Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
+          python-version: "3.11"
+          cache: "pip"
 
+      # ========================================================
+      # 3. INSTALL DEPENDENCIES
+      # ========================================================
       - name: 3. Install Required Dependencies
+        shell: bash
         run: |
+          set -euo pipefail
+
           python -m pip install --upgrade pip
-          pip install numpy pandas rasterio openpyxl geopandas shapely requests folium
 
-      - name: 4. Prepare Environment & Fetch Weather
-        run: |
-          python scripts/prepare_and_fetch.py
+          python -m pip install \
+            numpy \
+            pandas \
+            rasterio \
+            openpyxl \
+            geopandas \
+            shapely \
+            requests \
+            folium
 
-      - name: 5. Build FLI Model
+      # ========================================================
+      # 4. CALCULATE TODAY + TOMORROW IN IRAN
+      # ========================================================
+      - name: 4. Calculate FIRIS forecast date
+        shell: bash
         run: |
-          if [ -z "$FWI_PATH" ] || [ ! -f "$FWI_PATH" ]; then
-            echo "Error: FWI raster file not found."
+          set -euo pipefail
+
+          python - <<'PY'
+          import os
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+
+          IRAN = ZoneInfo("Asia/Tehran")
+
+          now_iran = datetime.now(IRAN)
+
+          today = now_iran.date()
+
+          tomorrow = today + timedelta(days=1)
+
+          today_str = today.isoformat()
+
+          tomorrow_str = tomorrow.isoformat()
+
+          print("=" * 70)
+          print("FIRIS FORECAST DATE")
+          print("=" * 70)
+
+          print(
+              f"Current Iran datetime : "
+              f"{now_iran.isoformat()}"
+          )
+
+          print(
+              f"Today in Iran         : "
+              f"{today_str}"
+          )
+
+          print(
+              f"Forecast target       : "
+              f"{tomorrow_str}"
+          )
+
+          print("=" * 70)
+
+          with open(
+              os.environ["GITHUB_ENV"],
+              "a",
+              encoding="utf-8"
+          ) as env:
+
+              env.write(
+                  f"TODAY_IRAN={today_str}\n"
+              )
+
+              env.write(
+                  f"RUN_DATE={tomorrow_str}\n"
+              )
+
+          PY
+
+      # ========================================================
+      # 5. DEFINE EXACT INPUT PATHS
+      # ========================================================
+      - name: 5. Define FIRIS input paths
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FWI_PATH="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
+
+          FWI_METADATA="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.json"
+
+          DEM_PATH="data/raw/topography/dem_fars.tif"
+
+          FUEL_PATH="data/outputs/f_fuel_fars_2026-08-26.tif"
+
+          EXCEL_PATH="data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
+
+          BOUNDARY_PATH="fars.geojson"
+
+          echo "FWI_PATH=${FWI_PATH}" >> "$GITHUB_ENV"
+
+          echo "FWI_METADATA=${FWI_METADATA}" >> "$GITHUB_ENV"
+
+          echo "DEM_PATH=${DEM_PATH}" >> "$GITHUB_ENV"
+
+          echo "FUEL_PATH=${FUEL_PATH}" >> "$GITHUB_ENV"
+
+          echo "EXCEL_PATH=${EXCEL_PATH}" >> "$GITHUB_ENV"
+
+          echo "BOUNDARY_PATH=${BOUNDARY_PATH}" >> "$GITHUB_ENV"
+
+          echo "OUTPUT_DIR=outputs" >> "$GITHUB_ENV"
+
+          echo "======================================================================"
+          echo "FIRIS INPUT PATHS"
+          echo "======================================================================"
+
+          echo "Today Iran : ${TODAY_IRAN}"
+          echo "Run date   : ${RUN_DATE}"
+          echo ""
+
+          echo "FWI        : ${FWI_PATH}"
+          echo "Metadata   : ${FWI_METADATA}"
+          echo "Fuel       : ${FUEL_PATH}"
+          echo "DEM        : ${DEM_PATH}"
+          echo "Fuel Excel : ${EXCEL_PATH}"
+          echo "Boundary   : ${BOUNDARY_PATH}"
+
+      # ========================================================
+      # 6. HARD CHECK - EXACT FWI FOR TOMORROW
+      # ========================================================
+      - name: 6. Verify exact tomorrow FWI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================================================"
+          echo "VERIFYING EXACT TOMORROW FWI"
+          echo "======================================================================"
+
+          echo "Today Iran : ${TODAY_IRAN}"
+
+          echo "Required date : ${RUN_DATE}"
+
+          echo ""
+
+          if [ ! -f "${FWI_PATH}" ]; then
+
+            echo "ERROR: Required tomorrow FWI does not exist."
+
+            echo "Expected file:"
+            echo "${FWI_PATH}"
+
+            echo ""
+
+            echo "FIRIS build is STOPPED."
+
+            echo "No old FWI is allowed."
+
             exit 1
+
           fi
 
-          CMD="python scripts/build_firis.py \
-            --fwi-raster \"$FWI_PATH\" \
-            --fuel-raster \"$FUEL_PATH\" \
-            --dem-raster \"$DEM_PATH\" \
-            --fuel-excel \"$EXCEL_PATH\" \
-            --output-dir \"outputs\" \
-            --run-date \"$RUN_DATE\""
+          if [ ! -f "${FWI_METADATA}" ]; then
 
-          if [ -n "$BOUNDARY_PATH" ] && [ -f "$BOUNDARY_PATH" ]; then
-            CMD="$CMD --boundary \"$BOUNDARY_PATH\""
+            echo "ERROR: Required FWI metadata does not exist."
+
+            echo "${FWI_METADATA}"
+
+            exit 1
+
           fi
 
-          echo "Running: $CMD"
-          eval $CMD
+          if [ ! -s "${FWI_PATH}" ]; then
 
-      - name: 6. Build Web Map
-        if: always()
+            echo "ERROR: FWI raster is empty."
+
+            exit 1
+
+          fi
+
+          if [ ! -s "${FWI_METADATA}" ]; then
+
+            echo "ERROR: FWI metadata is empty."
+
+            exit 1
+
+          fi
+
+          echo "OK: Exact tomorrow FWI exists."
+
+      # ========================================================
+      # 7. VALIDATE FWI METADATA DATE
+      # ========================================================
+      - name: 7. Validate FWI metadata date
+        shell: bash
         run: |
-          if [ -f "scripts/build_map.py" ]; then
-            python scripts/build_map.py --output-dir "outputs" --run-date "$RUN_DATE" || echo "Web map build skipped or warning."
-          fi
+          set -euo pipefail
 
-      - name: 7. Commit and Push Results
+          python - <<'PY'
+          import json
+          import os
+          import sys
+
+          expected = os.environ["RUN_DATE"]
+
+          path = os.environ["FWI_METADATA"]
+
+          with open(
+              path,
+              "r",
+              encoding="utf-8"
+          ) as file:
+
+              metadata = json.load(file)
+
+          actual = (
+              metadata.get("target_date")
+              or
+              metadata.get("forecast_date")
+          )
+
+          print("=" * 70)
+          print("FWI DATE VALIDATION")
+          print("=" * 70)
+
+          print(
+              f"Expected : {expected}"
+          )
+
+          print(
+              f"Actual   : {actual}"
+          )
+
+          print("")
+
+          if actual != expected:
+
+              print(
+                  "ERROR: FWI date does not match tomorrow."
+              )
+
+              print(
+                  "ERROR: Old/wrong-date FWI is forbidden."
+              )
+
+              sys.exit(1)
+
+          print(
+              "OK: FWI date exactly matches forecast date."
+          )
+
+          PY
+
+      # ========================================================
+      # 8. VALIDATE FWI RASTER
+      # ========================================================
+      - name: 8. Validate FWI raster
+        shell: bash
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add outputs/
-          if git diff --staged --quiet; then
-            echo "No output changes to commit."
+          set -euo pipefail
+
+          python - <<'PY'
+          import os
+          import rasterio
+
+          path = os.environ["FWI_PATH"]
+
+          print("=" * 70)
+          print("FWI RASTER VALIDATION")
+          print("=" * 70)
+
+          with rasterio.open(path) as src:
+
+              print(
+                  f"CRS        : {src.crs}"
+              )
+
+              print(
+                  f"Width      : {src.width}"
+              )
+
+              print(
+                  f"Height     : {src.height}"
+              )
+
+              print(
+                  f"Resolution : {src.res}"
+              )
+
+              print(
+                  f"Bounds     : {src.bounds}"
+              )
+
+              if (
+                  src.crs is None
+                  or
+                  src.crs.to_epsg() != 4326
+              ):
+
+                  raise SystemExit(
+                      "ERROR: FWI must be EPSG:4326."
+                  )
+
+              data = src.read(
+                  1,
+                  masked=True
+              )
+
+              valid = int(
+                  data.count()
+              )
+
+              print(
+                  f"Valid pixels : {valid}"
+              )
+
+              if valid == 0:
+
+                  raise SystemExit(
+                      "ERROR: FWI contains no valid pixels."
+                  )
+
+              print(
+                  f"Min          : {float(data.min())}"
+              )
+
+              print(
+                  f"Max          : {float(data.max())}"
+              )
+
+              print(
+                  f"Mean         : {float(data.mean())}"
+              )
+
+          print("")
+          print(
+              "OK: Tomorrow FWI raster is valid."
+          )
+
+          PY
+
+      # ========================================================
+      # 9. CHECK OTHER REQUIRED INPUTS
+      # ========================================================
+      - name: 9. Verify FIRIS static inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================================================"
+          echo "VERIFYING FIRIS STATIC INPUTS"
+          echo "======================================================================"
+
+          for FILE in \
+            "${FUEL_PATH}" \
+            "${DEM_PATH}" \
+            "${EXCEL_PATH}" \
+            "${BOUNDARY_PATH}"
+          do
+
+            if [ ! -f "${FILE}" ]; then
+
+              echo "ERROR: Required input not found:"
+              echo "${FILE}"
+
+              exit 1
+
+            fi
+
+            echo "OK: ${FILE}"
+
+          done
+
+      # ========================================================
+      # 10. BUILD FIRIS
+      # ========================================================
+      - name: 10. Build FIRIS Fire Likelihood Index
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================================================"
+          echo "STEP 2 - BUILD FIRIS"
+          echo "======================================================================"
+
+          echo "Today Iran : ${TODAY_IRAN}"
+
+          echo "Forecast   : ${RUN_DATE}"
+
+          echo ""
+
+          echo "USING FWI:"
+          echo "${FWI_PATH}"
+
+          echo ""
+
+          python scripts/build_firis.py \
+            --fwi-raster "${FWI_PATH}" \
+            --fuel-raster "${FUEL_PATH}" \
+            --dem-raster "${DEM_PATH}" \
+            --fuel-excel "${EXCEL_PATH}" \
+            --output-dir "${OUTPUT_DIR}" \
+            --run-date "${RUN_DATE}" \
+            --boundary "${BOUNDARY_PATH}"
+
+      # ========================================================
+      # 11. BUILD WEB MAP
+      # ========================================================
+      - name: 11. Build Web Map
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -f "scripts/build_web_map.py" ]; then
+
+            python scripts/build_web_map.py \
+              --output-dir "${OUTPUT_DIR}" \
+              --run-date "${RUN_DATE}"
+
+          elif [ -f "scripts/build_map.py" ]; then
+
+            python scripts/build_map.py \
+              --output-dir "${OUTPUT_DIR}" \
+              --run-date "${RUN_DATE}"
+
           else
-            git commit -m "Auto-generate FIRIS FLI layers for ${RUN_DATE}"
-            git push
+
+            echo "WARNING: No web map builder found."
+
           fi
+
+      # ========================================================
+      # 12. VERIFY FIRIS OUTPUT
+      # ========================================================
+      - name: 12. Verify FIRIS output
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "======================================================================"
+          echo "VERIFYING FIRIS OUTPUT"
+          echo "======================================================================"
+
+          if [ ! -d "${OUTPUT_DIR}" ]; then
+
+            echo "ERROR: Output directory does not exist."
+
+            exit 1
+
+          fi
+
+          echo ""
+
+          find "${OUTPUT_DIR}" -maxdepth 2 -type f -print | sort
+
+          echo ""
+
+          echo "FIRIS build completed."
+
+      # ========================================================
+      # 13. COMMIT + PUSH
+      # ========================================================
+      - name: 13. Commit and Push FIRIS outputs
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add outputs/
+
+          if git diff --cached --quiet; then
+
+            echo "No FIRIS output changes to commit."
+
+            exit 0
+
+          fi
+
+          git commit \
+            -m "Update FIRIS forecast ${RUN_DATE}"
+
+          git pull --rebase origin main
+
+          git push origin HEAD:main
+
+          echo ""
+          echo "======================================================================"
+          echo "FIRIS BUILD COMPLETED"
+          echo "======================================================================"
+
+          echo "Today Iran : ${TODAY_IRAN}"
+
+          echo "Forecast   : ${RUN_DATE}"
+
+          echo "======================================================================"
