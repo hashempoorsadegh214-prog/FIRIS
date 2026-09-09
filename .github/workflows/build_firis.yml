@@ -28,7 +28,7 @@ jobs:
   build-firis:
 
     # ============================================================
-    # اجرای خودکار فقط اگر FWI با موفقیت تمام شده باشد
+    # اجرای خودکار فقط اگر FWI موفق بوده باشد
     # اجرای دستی همیشه مجاز است
     # ============================================================
     if: >
@@ -111,20 +111,9 @@ jobs:
           print("FIRIS FORECAST DATE")
           print("=" * 70)
 
-          print(
-              f"Current Iran datetime : "
-              f"{now_iran.isoformat()}"
-          )
-
-          print(
-              f"Today in Iran         : "
-              f"{today_str}"
-          )
-
-          print(
-              f"Forecast target       : "
-              f"{tomorrow_str}"
-          )
+          print(f"Current Iran datetime : {now_iran.isoformat()}")
+          print(f"Today in Iran         : {today_str}")
+          print(f"Forecast target       : {tomorrow_str}")
 
           print("=" * 70)
 
@@ -134,14 +123,8 @@ jobs:
               encoding="utf-8"
           ) as env:
 
-              env.write(
-                  f"TODAY_IRAN={today_str}\n"
-              )
-
-              env.write(
-                  f"RUN_DATE={tomorrow_str}\n"
-              )
-
+              env.write(f"TODAY_IRAN={today_str}\n")
+              env.write(f"RUN_DATE={tomorrow_str}\n")
           PY
 
       # ========================================================
@@ -153,43 +136,36 @@ jobs:
           set -euo pipefail
 
           # ------------------------------------------------------
-          # FWI:
-          # همیشه FWI دقیقاً مربوط به فردای امروز ایران
+          # FWI = exact forecast for tomorrow
           # ------------------------------------------------------
           FWI_PATH="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
 
           FWI_METADATA="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.json"
 
           # ------------------------------------------------------
-          # FUEL:
-          # رستر کدگذاری‌شده اصلی فارس
-          # مقادیر آن باید با JOIN_VALUE اکسل منطبق باشد
+          # FUEL = coded raster
+          # Pixel values must correspond to JOIN_VALUE
           # ------------------------------------------------------
           FUEL_PATH="data/raw/fuel/fars_fuel.tif"
 
           # ------------------------------------------------------
-          # سایر ورودی‌های ثابت
+          # FUEL TABLE
+          # The correct sheet is Fuelbeds_metric
           # ------------------------------------------------------
-          DEM_PATH="data/raw/topography/dem_fars.tif"
-
           EXCEL_PATH="data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
+
+          DEM_PATH="data/raw/topography/dem_fars.tif"
 
           BOUNDARY_PATH="fars.geojson"
 
           OUTPUT_DIR="outputs"
 
           echo "FWI_PATH=${FWI_PATH}" >> "$GITHUB_ENV"
-
           echo "FWI_METADATA=${FWI_METADATA}" >> "$GITHUB_ENV"
-
           echo "FUEL_PATH=${FUEL_PATH}" >> "$GITHUB_ENV"
-
-          echo "DEM_PATH=${DEM_PATH}" >> "$GITHUB_ENV"
-
           echo "EXCEL_PATH=${EXCEL_PATH}" >> "$GITHUB_ENV"
-
+          echo "DEM_PATH=${DEM_PATH}" >> "$GITHUB_ENV"
           echo "BOUNDARY_PATH=${BOUNDARY_PATH}" >> "$GITHUB_ENV"
-
           echo "OUTPUT_DIR=${OUTPUT_DIR}" >> "$GITHUB_ENV"
 
           echo "======================================================================"
@@ -197,25 +173,18 @@ jobs:
           echo "======================================================================"
 
           echo "Today Iran : ${TODAY_IRAN}"
-
           echo "Run date   : ${RUN_DATE}"
-
           echo ""
 
           echo "FWI        : ${FWI_PATH}"
-
           echo "Metadata   : ${FWI_METADATA}"
-
           echo "Fuel       : ${FUEL_PATH}"
-
-          echo "DEM        : ${DEM_PATH}"
-
           echo "Fuel Excel : ${EXCEL_PATH}"
-
+          echo "DEM        : ${DEM_PATH}"
           echo "Boundary   : ${BOUNDARY_PATH}"
 
       # ========================================================
-      # 6. HARD CHECK - EXACT TOMORROW FWI
+      # 6. VERIFY EXACT TOMORROW FWI
       # ========================================================
       - name: 6. Verify exact tomorrow FWI
         shell: bash
@@ -227,52 +196,33 @@ jobs:
           echo "======================================================================"
 
           echo "Today Iran    : ${TODAY_IRAN}"
-
           echo "Required date : ${RUN_DATE}"
-
           echo ""
 
           if [ ! -f "${FWI_PATH}" ]; then
-
             echo "ERROR: Required tomorrow FWI does not exist."
-
             echo "Expected file:"
             echo "${FWI_PATH}"
-
             echo ""
-
             echo "FIRIS build is STOPPED."
-
             echo "No old FWI is allowed."
-
             exit 1
-
           fi
 
           if [ ! -f "${FWI_METADATA}" ]; then
-
             echo "ERROR: Required FWI metadata does not exist."
-
             echo "${FWI_METADATA}"
-
             exit 1
-
           fi
 
           if [ ! -s "${FWI_PATH}" ]; then
-
             echo "ERROR: FWI raster is empty."
-
             exit 1
-
           fi
 
           if [ ! -s "${FWI_METADATA}" ]; then
-
             echo "ERROR: FWI metadata is empty."
-
             exit 1
-
           fi
 
           echo "OK: Exact tomorrow FWI exists."
@@ -304,22 +254,15 @@ jobs:
 
           actual = (
               metadata.get("target_date")
-              or
-              metadata.get("forecast_date")
+              or metadata.get("forecast_date")
           )
 
           print("=" * 70)
           print("FWI DATE VALIDATION")
           print("=" * 70)
 
-          print(
-              f"Expected : {expected}"
-          )
-
-          print(
-              f"Actual   : {actual}"
-          )
-
+          print(f"Expected : {expected}")
+          print(f"Actual   : {actual}")
           print("")
 
           if actual != expected:
@@ -337,7 +280,6 @@ jobs:
           print(
               "OK: FWI date exactly matches forecast date."
           )
-
           PY
 
       # ========================================================
@@ -360,25 +302,11 @@ jobs:
 
           with rasterio.open(path) as src:
 
-              print(
-                  f"CRS        : {src.crs}"
-              )
-
-              print(
-                  f"Width      : {src.width}"
-              )
-
-              print(
-                  f"Height     : {src.height}"
-              )
-
-              print(
-                  f"Resolution : {src.res}"
-              )
-
-              print(
-                  f"Bounds     : {src.bounds}"
-              )
+              print(f"CRS        : {src.crs}")
+              print(f"Width      : {src.width}")
+              print(f"Height     : {src.height}")
+              print(f"Resolution : {src.res}")
+              print(f"Bounds     : {src.bounds}")
 
               if (
                   src.crs is None
@@ -422,15 +350,13 @@ jobs:
               )
 
           print("")
-
           print(
               "OK: Tomorrow FWI raster is valid."
           )
-
           PY
 
       # ========================================================
-      # 9. VERIFY STATIC FIRIS INPUTS
+      # 9. VERIFY STATIC INPUTS
       # ========================================================
       - name: 9. Verify FIRIS static inputs
         shell: bash
@@ -451,7 +377,6 @@ jobs:
             if [ ! -f "${FILE}" ]; then
 
               echo "ERROR: Required input not found:"
-
               echo "${FILE}"
 
               exit 1
@@ -471,49 +396,37 @@ jobs:
           set -euo pipefail
 
           python - <<'PY'
-          import os
           import math
+          import os
 
           import numpy as np
           import pandas as pd
           import rasterio
 
           fuel_path = os.environ["FUEL_PATH"]
-
           excel_path = os.environ["EXCEL_PATH"]
 
           print("=" * 70)
           print("FUEL RASTER VALIDATION")
           print("=" * 70)
 
-          print(
-              f"Fuel raster : {fuel_path}"
-          )
-
-          print(
-              f"Fuel Excel  : {excel_path}"
-          )
-
+          print(f"Fuel raster : {fuel_path}")
+          print(f"Fuel Excel  : {excel_path}")
           print("")
 
           # ----------------------------------------------------
-          # Read raster values
+          # Read coded Fuel raster
           # ----------------------------------------------------
           with rasterio.open(fuel_path) as src:
 
-              print(
-                  f"Fuel CRS        : {src.crs}"
-              )
-
+              print(f"Fuel CRS        : {src.crs}")
               print(
                   f"Fuel size       : "
                   f"{src.width} x {src.height}"
               )
-
               print(
                   f"Fuel resolution : {src.res}"
               )
-
               print(
                   f"Fuel bounds     : {src.bounds}"
               )
@@ -536,23 +449,50 @@ jobs:
               )
 
           # ----------------------------------------------------
-          # Read JOIN_VALUE from Excel
+          # IMPORTANT:
+          # Read the correct Excel sheet.
+          # The first sheet is Comments and does not contain
+          # JOIN_VALUE.
           # ----------------------------------------------------
           df = pd.read_excel(
               excel_path,
+              sheet_name="Fuelbeds_metric",
               engine="openpyxl"
           )
 
+          print("")
+          print(
+              f"Excel sheet : Fuelbeds_metric"
+          )
+
+          print(
+              f"Excel rows  : {len(df)}"
+          )
+
+          print(
+              f"Excel columns: {len(df.columns)}"
+          )
+
+          # ----------------------------------------------------
+          # Verify JOIN_VALUE exists
+          # ----------------------------------------------------
           if "JOIN_VALUE" not in df.columns:
 
               raise SystemExit(
                   "ERROR: JOIN_VALUE column is missing "
-                  "from Fuel Excel."
+                  "from Fuelbeds_metric."
               )
 
+          # ----------------------------------------------------
+          # Build Excel JOIN_VALUE set
+          # ----------------------------------------------------
           excel_codes = set()
 
-          for value in df["JOIN_VALUE"].dropna().tolist():
+          for value in (
+              df["JOIN_VALUE"]
+              .dropna()
+              .tolist()
+          ):
 
               try:
 
@@ -571,8 +511,11 @@ jobs:
                   ValueError
               ):
 
-                  pass
+                  continue
 
+          # ----------------------------------------------------
+          # Build raster code set
+          # ----------------------------------------------------
           raster_codes = set(
               float(value)
               for value in unique_values
@@ -612,7 +555,7 @@ jobs:
           if mapped:
 
               print("")
-              print("Mapped raster codes:")
+              print("Mapped codes:")
 
               for code in mapped[:30]:
 
@@ -623,7 +566,9 @@ jobs:
           if unmapped:
 
               print("")
-              print("First unmapped codes:")
+              print(
+                  "First unmapped codes:"
+              )
 
               for code in unmapped[:30]:
 
@@ -640,6 +585,7 @@ jobs:
           print(
               "OK: Fuel raster codes match JOIN_VALUE."
           )
+          PY
 
       # ========================================================
       # 11. BUILD FIRIS
@@ -654,20 +600,21 @@ jobs:
           echo "======================================================================"
 
           echo "Today Iran : ${TODAY_IRAN}"
-
           echo "Forecast   : ${RUN_DATE}"
-
           echo ""
 
           echo "USING FWI:"
-
           echo "${FWI_PATH}"
 
           echo ""
 
           echo "USING FUEL:"
-
           echo "${FUEL_PATH}"
+
+          echo ""
+
+          echo "USING FUEL EXCEL:"
+          echo "${EXCEL_PATH}"
 
           echo ""
 
@@ -708,7 +655,7 @@ jobs:
           fi
 
       # ========================================================
-      # 13. VERIFY FIRIS OUTPUT
+      # 13. VERIFY OUTPUT
       # ========================================================
       - name: 13. Verify FIRIS output
         if: success()
@@ -780,7 +727,6 @@ jobs:
           echo "======================================================================"
 
           echo "Today Iran : ${TODAY_IRAN}"
-
           echo "Forecast   : ${RUN_DATE}"
 
           echo "======================================================================"
