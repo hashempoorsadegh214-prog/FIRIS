@@ -60,9 +60,18 @@ RISK_CODE_TO_INFO = {
 # WEB POLYGON CLEANUP
 # ============================================================
 
-# فقط روی خروجی fli_polygons.geojson اثر دارد.
-# Raster اصلی و Grid اصلاً تغییر نمی‌کنند.
+# این فیلتر فقط روی خروجی fli_polygons.geojson اثر دارد.
+# Raster اصلی FLI و Grid اصلاً تغییر نمی‌کنند.
+#
+# برای طبقات عادی:
+#   لکه‌های کوچک‌تر از 9 سلول حذف می‌شوند.
+#
+# برای طبقه «کم» (سبز):
+#   لکه‌های کوچک‌تر از 49 سلول حذف می‌شوند
+#   تا پیکسل‌ها/لکه‌های سبز پراکنده روی نقشه کمتر شوند.
+
 MIN_POLYGON_CELLS = 9
+MIN_LOW_RISK_POLYGON_CELLS = 49
 
 
 # ============================================================
@@ -503,6 +512,25 @@ def build_metadata_json(
                 f"archive/{forecast_date}"
             ),
         },
+
+        "polygon_cleanup": {
+            "general_minimum_polygon_cells":
+                MIN_POLYGON_CELLS,
+
+            "low_risk_minimum_polygon_cells":
+                MIN_LOW_RISK_POLYGON_CELLS,
+
+            "low_risk_code":
+                1,
+
+            "description":
+                (
+                    "Small display polygons are removed "
+                    "from the web vector layer only. "
+                    "The original FLI raster and grid "
+                    "remain unchanged."
+                ),
+        },
     }
 
 
@@ -618,12 +646,19 @@ def make_feature_collection(
             "pixel area is not positive."
         )
 
-    min_polygon_area = (
+    # آستانه عمومی
+    min_polygon_area_general = (
         pixel_area * MIN_POLYGON_CELLS
+    )
+
+    # آستانه سخت‌گیرانه‌تر فقط برای طبقه «کم»
+    min_polygon_area_low_risk = (
+        pixel_area * MIN_LOW_RISK_POLYGON_CELLS
     )
 
     original_polygon_count = 0
     removed_small_polygons = 0
+    removed_low_risk_polygons = 0
     remaining_polygon_count = 0
 
     for code, geometries in grouped.items():
@@ -637,6 +672,30 @@ def make_feature_collection(
 
         filtered_geometries = []
 
+        # ----------------------------------------------------
+        # تعیین آستانه حذف بر اساس طبقه خطر
+        # ----------------------------------------------------
+
+        if code == 1:
+
+            minimum_area = (
+                min_polygon_area_low_risk
+            )
+
+            minimum_cells = (
+                MIN_LOW_RISK_POLYGON_CELLS
+            )
+
+        else:
+
+            minimum_area = (
+                min_polygon_area_general
+            )
+
+            minimum_cells = (
+                MIN_POLYGON_CELLS
+            )
+
         for geom in geometries:
 
             if geom.is_empty:
@@ -649,14 +708,16 @@ def make_feature_collection(
                 continue
 
             # ------------------------------------------------
-            # تنها فیلتر جدید:
-            # لکه‌های کوچک‌تر از ۹ سلول حذف می‌شوند.
-            #
-            # خود FLI تغییر نمی‌کند.
+            # حذف لکه‌های کوچک فقط از لایه نمایش
             # ------------------------------------------------
-            if geom.area < min_polygon_area:
+
+            if geom.area < minimum_area:
 
                 removed_small_polygons += 1
+
+                if code == 1:
+                    removed_low_risk_polygons += 1
+
                 continue
 
             filtered_geometries.append(
@@ -707,6 +768,9 @@ def make_feature_collection(
                     "forecast_date": (
                         metadata["forecast_date"]
                     ),
+                    "minimum_polygon_cells": (
+                        minimum_cells
+                    ),
                 },
 
                 "geometry": mapping(
@@ -724,24 +788,39 @@ def make_feature_collection(
     print()
     print("WEB POLYGON CLEANUP")
     print("-------------------")
+
     print(
-        "Minimum polygon cells : "
+        "General minimum polygon cells : "
         f"{MIN_POLYGON_CELLS}"
     )
+
     print(
-        "Original polygons     : "
+        "Low-risk minimum polygon cells: "
+        f"{MIN_LOW_RISK_POLYGON_CELLS}"
+    )
+
+    print(
+        "Original polygons              : "
         f"{original_polygon_count}"
     )
+
     print(
-        "Removed small polygons: "
+        "Removed small polygons         : "
         f"{removed_small_polygons}"
     )
+
     print(
-        "Remaining polygons    : "
+        "Removed low-risk polygons      : "
+        f"{removed_low_risk_polygons}"
+    )
+
+    print(
+        "Remaining polygons             : "
         f"{remaining_polygon_count}"
     )
+
     print(
-        "Final class features  : "
+        "Final class features           : "
         f"{len(features)}"
     )
 
@@ -772,6 +851,9 @@ def make_feature_collection(
             ),
             "minimum_polygon_cells": (
                 MIN_POLYGON_CELLS
+            ),
+            "minimum_low_risk_polygon_cells": (
+                MIN_LOW_RISK_POLYGON_CELLS
             ),
         },
 
@@ -1326,15 +1408,19 @@ def main() -> None:
         print(
             "✓ Staged Web GIS products validated."
         )
+
         print(
             "✓ Latest date validated."
         )
+
         print(
             "✓ Grid dimensions validated."
         )
+
         print(
             "✓ Polygon metadata validated."
         )
+
         print(
             "✓ Archive validated."
         )
@@ -1417,10 +1503,13 @@ def main() -> None:
 
     print()
     print("=" * 70)
+
     print(
         "FIRIS WEB MAP BUILD COMPLETED SUCCESSFULLY"
     )
+
     print("=" * 70)
+
     print()
 
     print(
@@ -1449,14 +1538,17 @@ def main() -> None:
     )
 
     print()
+
     print(
         "✓ latest products belong to "
         "the same dated FLI input."
     )
+
     print(
         "✓ archive products belong to "
         "the same forecast date."
     )
+
     print(
         "✓ no older forecast can silently "
         "become latest."
