@@ -30,7 +30,7 @@ from typing import Any
 
 import numpy as np
 import rasterio
-from rasterio.features import shapes, sieve
+from rasterio.features import shapes
 from shapely.geometry import shape, mapping
 from shapely.ops import unary_union
 
@@ -39,9 +39,19 @@ from shapely.ops import unary_union
 # RISK CLASSIFICATION
 # ============================================================
 
+# Web display classification:
+#
+# 0-40   -> متوسط
+# 40-60  -> زیاد
+# 60-80  -> خیلی زیاد
+# 80-100 -> بحرانی
+#
+# IMPORTANT:
+# The original FLI raster values remain unchanged.
+# Only the Web GIS display classification is changed.
+
 RISK_CLASSES = (
-    ("کم", 0.0, 20.0, "#FFF59D"),
-    ("متوسط", 20.0, 40.0, "#FDD835"),
+    ("متوسط", 0.0, 40.0, "#FDD835"),
     ("زیاد", 40.0, 60.0, "#FB8C00"),
     ("خیلی زیاد", 60.0, 80.0, "#E53935"),
     ("بحرانی", 80.0, 100.000001, "#880E4F"),
@@ -59,16 +69,12 @@ RISK_CODE_TO_INFO = {
 # WEB POLYGON CLEANUP
 # ============================================================
 
-# طبقات عادی:
-# لکه‌های کمتر از 9 سلول حذف می‌شوند.
-MIN_POLYGON_CELLS = 9
-
-# طبقه «کم»:
-# فقط اجزای متصل کوچک‌تر از 100 سلول حذف می‌شوند.
+# فقط لکه‌های بسیار کوچک برای نمایش Web GIS حذف می‌شوند.
 #
-# این فیلتر فقط برای نمایش Web GIS است.
-# مقدار واقعی FLI هرگز تغییر نمی‌کند.
-MIN_LOW_RISK_COMPONENT_CELLS = 100
+# این فیلتر فقط روی Polygonهای خروجی وب اعمال می‌شود.
+# مقدار واقعی FLI و فایل fli_latest_grid.json هرگز تغییر نمی‌کند.
+
+MIN_POLYGON_CELLS = 9
 
 
 # ============================================================
@@ -657,6 +663,15 @@ def build_metadata_json(
             ) in RISK_CLASSES
         ],
 
+        "classification_note":
+            (
+                "Web display uses four risk classes. "
+                "The previous low-risk class (0-20) "
+                "is merged into the medium-risk class "
+                "(0-40). Original FLI values remain "
+                "unchanged."
+            ),
+
         "grid": {
 
             "row_order":
@@ -690,24 +705,16 @@ def build_metadata_json(
                 MIN_POLYGON_CELLS,
 
             "low_risk_component_filter":
-                "Raster connected-component sieve",
-
-            "low_risk_minimum_component_cells":
-                MIN_LOW_RISK_COMPONENT_CELLS,
-
-            "low_risk_code":
-                1,
-
-            "low_risk_range":
-                "0-20",
+                "Disabled",
 
             "description":
                 (
-                    "Small isolated low-risk "
-                    "components are removed from "
-                    "the web vector layer only. "
-                    "The original FLI raster and "
-                    "grid remain unchanged."
+                    "Only very small polygons are removed "
+                    "from the Web GIS vector layer. "
+                    "There is no separate low-risk class "
+                    "or low-risk connected-component sieve. "
+                    "The original FLI raster and grid "
+                    "remain unchanged."
                 ),
         },
     }
@@ -754,83 +761,6 @@ def build_classified_raster(
 
 
 # ============================================================
-# LOW-RISK CONNECTED COMPONENT CLEANUP
-# ============================================================
-
-def clean_low_risk_components(
-    classified: np.ndarray,
-) -> tuple[
-    np.ndarray,
-    int,
-    int,
-]:
-
-    """
-    Remove only isolated low-risk components.
-
-    Low-risk class = code 1 = FLI 0-20.
-
-    The filtering is performed directly on the
-    classified raster before polygonization.
-
-    Other risk classes are not modified.
-    The original FLI values are never modified.
-    """
-
-    low_risk = (
-        classified == 1
-    ).astype(
-        np.uint8
-    )
-
-    original_cells = int(
-        np.sum(low_risk)
-    )
-
-    if original_cells == 0:
-
-        return (
-            classified,
-            0,
-            0,
-        )
-
-    filtered_low_risk = sieve(
-
-        low_risk,
-
-        size=(
-            MIN_LOW_RISK_COMPONENT_CELLS
-        ),
-
-        connectivity=4,
-    )
-
-    cleaned = classified.copy()
-
-    removed_mask = (
-
-        (low_risk == 1)
-
-        &
-        (filtered_low_risk == 0)
-
-    )
-
-    removed_cells = int(
-        np.sum(removed_mask)
-    )
-
-    cleaned[removed_mask] = 0
-
-    return (
-        cleaned,
-        original_cells,
-        removed_cells,
-    )
-
-
-# ============================================================
 # POLYGONIZE
 # ============================================================
 
@@ -840,7 +770,7 @@ def polygonize_classes(
 ) -> dict[int, list[Any]]:
 
     """
-    Polygonize risk classes.
+    Polygonize four Web GIS risk classes.
 
     Class 0 / NoData is omitted.
     """
@@ -904,17 +834,15 @@ def make_feature_collection(
     metadata: dict[str, Any],
 ) -> dict[str, Any]:
 
-    (
-        classified_cleaned,
-        original_low_risk_cells,
-        removed_low_risk_cells,
-    ) = clean_low_risk_components(
-        classified
-    )
+    # IMPORTANT:
+    # No low-risk sieve is applied here.
+    #
+    # The old 0-20 class has been merged into
+    # the 0-40 "متوسط" class.
 
     grouped = polygonize_classes(
 
-        classified_cleaned,
+        classified,
 
         transform,
     )
@@ -1077,42 +1005,39 @@ def make_feature_collection(
     )
 
     print(
-        "General polygon minimum cells : "
-        f"{MIN_POLYGON_CELLS}"
+        "Web risk classes            : 4"
     )
 
     print(
-        "Low-risk sieve minimum cells  : "
-        f"{MIN_LOW_RISK_COMPONENT_CELLS}"
+        "Medium risk range           : 0-40"
     )
 
     print(
-        "Low-risk original cells       : "
-        f"{original_low_risk_cells:,}"
+        "General polygon minimum     : "
+        f"{MIN_POLYGON_CELLS} cells"
     )
 
     print(
-        "Low-risk removed cells        : "
-        f"{removed_low_risk_cells:,}"
+        "Low-risk component sieve    : Disabled"
     )
 
     print(
-        "Original polygons             : "
+        "Original polygons           : "
         f"{original_polygon_count:,}"
     )
 
     print(
-        "Removed small polygons        : "
+        "Removed small polygons      : "
         f"{removed_small_polygons:,}"
     )
 
     print(
-        "Remaining polygons            : "
+        "Remaining polygons          : "
         f"{remaining_polygon_count:,}"
     )
 
     print(
-        "Final class features          : "
+        "Final class features        : "
         f"{len(features):,}"
     )
 
@@ -1154,16 +1079,14 @@ def make_feature_collection(
                 ],
 
             "classification":
-                "FLI risk classes",
+                "FLI risk classes - 4 classes",
 
             "minimum_polygon_cells":
                 MIN_POLYGON_CELLS,
 
-            "minimum_low_risk_component_cells":
-                MIN_LOW_RISK_COMPONENT_CELLS,
-
             "low_risk_component_filter":
-                "Raster sieve, 4-connectivity",
+                "Disabled",
+
         },
 
         "features":
