@@ -5,16 +5,16 @@
   "source_url": "https://maps.effis.emergency.copernicus.eu/gwis",
   "layer": "ecmwf.fwi",
   "timezone": "Asia/Tehran",
-  "current_iran_datetime": "2026-09-15T00:21:49.845824+03:30",
+  "current_iran_datetime": "2026-09-15T01:51:18.013187+03:30",
   "forecast_date": "2026-09-16",
   "forecast_definition": "Tomorrow according to Iran local date",
   "boundary_file": "fars.geojson",
   "boundary_margin_degree": 0.1,
   "request_bbox": {
-    "west": 50.50318309972035,
-    "south": 26.94561700022441,
-    "east": 55.68006519994905,
-    "north": 31.76959889996929
+    "west": 50.50271988849024,
+    "south": 26.950244654701315,
+    "east": 55.68187571284401,
+    "north": 31.771938827883936
   },
   "request_parameters": {
     "SERVICE": "WMS",
@@ -23,42 +23,42 @@
     "LAYERS": "ecmwf.fwi",
     "STYLES": "",
     "SRS": "EPSG:4326",
-    "BBOX": "50.50318310,26.94561700,55.68006520,31.76959890",
+    "BBOX": "50.50271989,26.95024465,55.68187571,31.77193883",
     "WIDTH": "2000",
     "HEIGHT": "2000",
     "FORMAT": "image/tiff",
     "TRANSPARENT": "FALSE",
     "TIME": "2026-09-16"
   },
-  "request_url": "https://maps.effis.emergency.copernicus.eu/gwis?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=ecmwf.fwi&STYLES=&SRS=EPSG%3A4326&BBOX=50.50318310%2C26.94561700%2C55.68006520%2C31.76959890&WIDTH=2000&HEIGHT=2000&FORMAT=image%2Ftiff&TRANSPARENT=FALSE&TIME=2026-09-16",
-  "downloaded_at_utc": "2026-09-14T20:51:53.077405+00:00",
+  "request_url": "https://maps.effis.emergency.copernicus.eu/gwis?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=ecmwf.fwi&STYLES=&SRS=EPSG%3A4326&BBOX=50.50271989%2C26.95024465%2C55.68187571%2C31.77193883&WIDTH=2000&HEIGHT=2000&FORMAT=image%2Ftiff&TRANSPARENT=FALSE&TIME=2026-09-16",
+  "downloaded_at_utc": "2026-09-14T22:21:21.530870+00:00",
   "raster": {
     "crs": "EPSG:4326",
     "width": 2000,
     "height": 2000,
     "resolution": {
-      "x": 0.002588441050000003,
-      "y": 0.002411990949999999
+      "x": 0.0025895779099999986,
+      "y": 0.002410847090000002
     },
     "bounds": {
-      "west": 50.5031831,
-      "south": 26.945617,
-      "east": 55.68006520000001,
-      "north": 31.7695989
+      "west": 50.50271989,
+      "south": 26.950244649999995,
+      "east": 55.68187571,
+      "north": 31.77193883
     },
     "transform": [
-      0.002588441050000003,
+      0.0025895779099999986,
       0.0,
-      50.5031831,
+      50.50271989,
       0.0,
-      -0.002411990949999999,
-      31.7695989
+      -0.002410847090000002,
+      31.77193883
     ],
     "nodata": null,
     "valid_pixels": 4000000,
     "min": 0.0,
     "max": 94.2992935180664,
-    "mean": 39.799537658691406
+    "mean": 39.815528869628906
   },
   "output_file": "fwi_ecmwf_fars_2026-09-16.tif"
 }
