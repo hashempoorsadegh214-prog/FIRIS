@@ -1338,7 +1338,6 @@ const APP_STATE = {
 
   data: {
     fliGrid: null,
-    fliGridDate: null,
     fliMetadata: null,
     archiveDates: [],
     currentArchiveDate: "latest"
@@ -1589,7 +1588,7 @@ function formatNumber(value) {
 }
 
 /* ============================================================
-   RISK PALETTE
+   RISK
    ============================================================ */
 
 const FLI_PALETTE = {
@@ -1601,10 +1600,6 @@ const FLI_PALETTE = {
   nodata: "#777"
 
 };
-
-/* ============================================================
-   RISK
-   ============================================================ */
 
 function getRisk(value) {
 
@@ -1642,6 +1637,7 @@ function getRisk(value) {
     label: "بحرانی",
     color: FLI_PALETTE.critical
   };
+
 }
 
 /* ============================================================
@@ -1885,66 +1881,35 @@ function getGridUrl() {
 
 async function loadGrid() {
 
-  const date =
-    APP_STATE.data.currentArchiveDate ||
-    "latest";
-
-  if (
-    APP_STATE.data.fliGrid &&
-    APP_STATE.data.fliGridDate === date
-  ) {
-
+  if (APP_STATE.data.fliGrid) {
     return APP_STATE.data.fliGrid;
-
   }
 
-  const url =
-    getGridUrl();
+  const response =
+    await fetchWithTimeout(
+      getGridUrl(),
+      45000
+    );
 
-  try {
+  const grid =
+    await response.json();
 
-    const response =
-      await fetchWithTimeout(
-        url,
-        45000
-      );
-
-    const grid =
-      await response.json();
-
-    if (
-      grid &&
-      grid.bounds &&
-      Array.isArray(grid.values)
-    ) {
-
-      APP_STATE.data.fliGrid =
-        grid;
-
-      APP_STATE.data.fliGridDate =
-        date;
-
-      return grid;
-
-    }
+  if (
+    !grid ||
+    !grid.bounds ||
+    !Array.isArray(grid.values)
+  ) {
 
     throw new Error(
       "Invalid FLI grid structure."
     );
 
-  } catch (error) {
-
-    APP_STATE.data.fliGrid = null;
-    APP_STATE.data.fliGridDate = null;
-
-    console.error(
-      "FLI grid:",
-      error
-    );
-
-    throw error;
-
   }
+
+  APP_STATE.data.fliGrid =
+    grid;
+
+  return grid;
 
 }
 
@@ -2905,12 +2870,6 @@ async function loadArchiveForecast(
   date
 ) {
 
-  /*
-   * ==========================================================
-   * LATEST
-   * ==========================================================
-   */
-
   if (
     !date ||
     date === "latest"
@@ -2919,8 +2878,8 @@ async function loadArchiveForecast(
     APP_STATE.data.currentArchiveDate =
       "latest";
 
-    APP_STATE.data.fliGrid = null;
-    APP_STATE.data.fliGridDate = null;
+    APP_STATE.data.fliGrid =
+      null;
 
     await loadFLIData();
 
@@ -2946,30 +2905,20 @@ async function loadArchiveForecast(
 
   }
 
-  /*
-   * ==========================================================
-   * ARCHIVE
-   * ==========================================================
-   */
-
   const base =
     `data/web/archive/${date}/`;
 
-  /*
-   * Grid عمداً در شروع آرشیو بارگذاری نمی‌شود؛
-   * چون بسیار حجیم است. فقط Metadata و polygons لازم
-   * برای نمایش نقشه ابتدا دریافت می‌شوند.
-   */
   const responses =
     await Promise.all([
 
       fetchWithTimeout(
-        `${base}fli.json`
+        `${base}fli.json`,
+        30000
       ),
 
       fetchWithTimeout(
         `${base}fli_polygons.geojson`,
-        30000
+        45000
       )
 
     ]);
@@ -2998,8 +2947,7 @@ async function loadArchiveForecast(
 
   if (
     !polygons ||
-    polygons.type !==
-      "FeatureCollection"
+    polygons.type !== "FeatureCollection"
   ) {
 
     throw new Error(
@@ -3011,10 +2959,8 @@ async function loadArchiveForecast(
   APP_STATE.data.fliMetadata =
     metadata;
 
+  // Grid فقط هنگام نیاز واقعی خوانده می‌شود.
   APP_STATE.data.fliGrid =
-    null;
-
-  APP_STATE.data.fliGridDate =
     null;
 
   APP_STATE.data.currentArchiveDate =
@@ -3067,21 +3013,20 @@ async function loadArchiveForecast(
 
   updateForecastBadgeFromMetadata();
 
+  // Excel آرشیو هنگام کلیک روی دکمه آماده می‌شود.
+  releaseArchiveExcelObjectUrl();
+
   const button =
     document.getElementById(
       "excelButton"
     );
 
-  releaseArchiveExcelObjectUrl();
-
   if (button) {
-
     button.href = "#";
-    button.target = "_self";
+    button.removeAttribute("target");
     button.removeAttribute("download");
     button.title =
-      `گزارش Excel آرشیو ${formatArchiveDate(date)} — با کلیک تهیه می‌شود`;
-
+      `گزارش Excel آرشیو ${formatArchiveDate(date)}`;
   }
 
 }
@@ -3119,7 +3064,7 @@ function setupArchiveFilter() {
 
   button.addEventListener(
     "click",
-    event => {
+    async event => {
 
       event.stopPropagation();
 
@@ -4151,77 +4096,6 @@ function bindRegion(
       regionTypeTitle
     );
 
-  function renderRegionPopup(
-    statistics
-  ) {
-
-    const mean =
-      statistics
-        ? statistics.mean
-        : null;
-
-    const risk =
-      getRisk(mean);
-
-    return `
-
-      <div class="region-popup">
-
-        <div class="popup-title">
-          ${name}
-        </div>
-
-        <div
-          class="popup-risk"
-          style="background:${risk.color}"
-        >
-          ${risk.label}
-        </div>
-
-        <div class="popup-value">
-          ${regionTypeTitle}
-        </div>
-
-        ${
-          Number.isFinite(mean)
-          ?
-          `
-
-          <div class="popup-value">
-            میانگین شاخص خطر:
-            ${formatNumber(mean)}
-          </div>
-
-          <div class="popup-value">
-            تعداد سلول‌های محاسبه‌شده:
-            ${formatNumber(statistics.count)}
-          </div>
-
-          <div class="popup-coord">
-            حداقل:
-            ${formatNumber(statistics.min)}
-            <br>
-            حداکثر:
-            ${formatNumber(statistics.max)}
-          </div>
-
-          `
-          :
-          `
-
-          <div class="popup-value">
-            برای این محدوده داده خطر موجود نیست.
-          </div>
-
-          `
-        }
-
-      </div>
-
-    `;
-
-  }
-
   layer.bindPopup(
     `
       <div class="region-popup">
@@ -4233,9 +4107,7 @@ function bindRegion(
         </div>
       </div>
     `,
-    {
-      maxWidth: 280
-    }
+    { maxWidth: 280 }
   );
 
   layer.on(
@@ -4244,8 +4116,7 @@ function bindRegion(
 
       try {
 
-        const grid =
-          await loadGrid();
+        await loadGrid();
 
         const statistics =
           regionStatistics(
@@ -4257,11 +4128,46 @@ function bindRegion(
             ? statistics.mean
             : null;
 
-        layer.setPopupContent(
-          renderRegionPopup(
-            statistics
-          )
-        );
+        const risk =
+          getRisk(mean);
+
+        layer.setPopupContent(`
+          <div class="region-popup">
+            <div class="popup-title">
+              ${name}
+            </div>
+            <div
+              class="popup-risk"
+              style="background:${risk.color}"
+            >
+              ${risk.label}
+            </div>
+            <div class="popup-value">
+              ${regionTypeTitle}
+            </div>
+            ${
+              Number.isFinite(mean)
+                ? `
+                  <div class="popup-value">
+                    میانگین شاخص خطر: ${formatNumber(mean)}
+                  </div>
+                  <div class="popup-value">
+                    تعداد سلول‌های محاسبه‌شده: ${formatNumber(statistics.count)}
+                  </div>
+                  <div class="popup-coord">
+                    حداقل: ${formatNumber(statistics.min)}
+                    <br>
+                    حداکثر: ${formatNumber(statistics.max)}
+                  </div>
+                `
+                : `
+                  <div class="popup-value">
+                    برای این محدوده داده خطر موجود نیست.
+                  </div>
+                `
+            }
+          </div>
+        `);
 
         updateGauge(
           mean,
@@ -4276,18 +4182,16 @@ function bindRegion(
           error
         );
 
-        layer.setPopupContent(
-          `
-            <div class="region-popup">
-              <div class="popup-title">
-                ${name}
-              </div>
-              <div class="popup-value">
-                بارگذاری داده خطر ناموفق بود.
-              </div>
+        layer.setPopupContent(`
+          <div class="region-popup">
+            <div class="popup-title">
+              ${name}
             </div>
-          `
-        );
+            <div class="popup-value">
+              بارگذاری داده خطر ناموفق بود.
+            </div>
+          </div>
+        `);
 
         updateGauge(
           null,
@@ -4326,50 +4230,37 @@ function setupMapClick() {
         const activeLayer =
           APP_STATE.ui.locationFilter ===
           "protected"
-            ?
-              APP_STATE.layers.protected
-            :
-              APP_STATE.layers.hunting;
+            ? APP_STATE.layers.protected
+            : APP_STATE.layers.hunting;
 
         if (!activeLayer) {
           return;
         }
 
         const point =
-          turf.point(
-            [lon, lat]
-          );
+          turf.point([lon, lat]);
 
-        let inside =
-          false;
+        let inside = false;
 
         for (
-          const layer of
-          activeLayer.getLayers()
+          const layer of activeLayer.getLayers()
         ) {
 
           try {
-
             if (
               turf.booleanPointInPolygon(
                 point,
                 layer.toGeoJSON()
               )
             ) {
-
               inside = true;
-
               break;
-
             }
-
           } catch (error) {
-
             console.warn(
               "Filter point test:",
               error
             );
-
           }
 
         }
@@ -4386,9 +4277,7 @@ function setupMapClick() {
             lon
           )
         ) {
-
           return;
-
         }
 
       }
@@ -4415,20 +4304,13 @@ function setupMapClick() {
       }
 
       updateGauge(
-
         value,
-
-        APP_STATE.ui.locationFilter ===
-          "all"
-          ?
-            "استان فارس"
-          :
-            getRegionTypeTitle(
+        APP_STATE.ui.locationFilter === "all"
+          ? "استان فارس"
+          : getRegionTypeTitle(
               APP_STATE.ui.locationFilter
             ),
-
         `${lat.toFixed(4)}° ، ${lon.toFixed(4)}°`
-
       );
 
       if (
@@ -4436,54 +4318,38 @@ function setupMapClick() {
           Number(value)
         )
       ) {
-
         return;
-
       }
 
       const risk =
-        getRisk(
-          value
-        );
+        getRisk(value);
 
       const popup = `
-
         <div class="fli-popup">
-
           <div class="popup-title">
             شاخص خطر حریق
           </div>
-
           <div
             class="popup-risk"
             style="background:${risk.color}"
           >
             ${risk.label}
           </div>
-
           <div class="popup-value">
-            مقدار شاخص:
-            ${formatNumber(value)}
+            مقدار شاخص: ${formatNumber(value)}
           </div>
-
           <div class="popup-coord">
-            عرض:
-            ${lat.toFixed(5)}
+            عرض: ${lat.toFixed(5)}
             <br>
-            طول:
-            ${lon.toFixed(5)}
+            طول: ${lon.toFixed(5)}
           </div>
-
         </div>
-
       `;
 
       APP_STATE.map.openPopup(
         popup,
         event.latlng,
-        {
-          maxWidth: 280
-        }
+        { maxWidth: 280 }
       );
 
     }
@@ -4637,70 +4503,49 @@ async function updateFilterGauge(
     );
 
   if (!layer) {
-
     updateGauge(
       null,
       regionTypeTitle,
       "داده موجود نیست"
     );
-
     return;
-
   }
 
   try {
-
     await loadGrid();
-
   } catch (error) {
-
     console.error(
       "Filter grid error:",
       error
     );
-
     updateGauge(
       null,
       regionTypeTitle,
       "بارگذاری داده FLI ناموفق بود"
     );
-
     return;
-
   }
 
-  let totalWeighted =
-    0;
-
-  let totalCells =
-    0;
-
-  let regionCount =
-    0;
+  let totalWeighted = 0;
+  let totalCells = 0;
+  let regionCount = 0;
 
   for (
-    const regionLayer of
-    layer.getLayers()
+    const regionLayer of layer.getLayers()
   ) {
 
     const feature =
       regionLayer.toGeoJSON();
 
     const statistics =
-      regionStatistics(
-        feature
-      );
+      regionStatistics(feature);
 
     if (
       !statistics ||
-      !Number.isFinite(
-        statistics.mean
-      ) ||
+      !Number.isFinite(statistics.mean) ||
       statistics.count <= 0
     ) {
-
       continue;
-
     }
 
     totalWeighted +=
@@ -4714,18 +4559,13 @@ async function updateFilterGauge(
 
   }
 
-  if (
-    totalCells <= 0
-  ) {
-
+  if (totalCells <= 0) {
     updateGauge(
       null,
       regionTypeTitle,
       "برای این محدوده داده FLI موجود نیست"
     );
-
     return;
-
   }
 
   const mean =
@@ -5148,7 +4988,6 @@ async function startApp() {
       "latest";
 
     APP_STATE.data.fliGrid = null;
-    APP_STATE.data.fliGridDate = null;
 
     await loadFLIData();
 
