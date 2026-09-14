@@ -1,15 +1,12 @@
-
 <!DOCTYPE html>
+
 <html lang="fa" dir="rtl">
 
 <head>
 
 <meta charset="UTF-8">
 
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1.0"
->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>
 سامانه پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی
@@ -37,329 +34,166 @@
 }
 
 :root {
-
-  --font-main:
-    "B Nazanin",
-    Tahoma,
-    Arial,
-    sans-serif;
-
-  --header-height:
-    92px;
-
-  /* ========================================================
-     FINAL FLI PALETTE
-     ======================================================== */
-
-  --risk-nodata:
-    #ECEFF1;
-
-  --risk-low:
-    #2E7D32;
-
-  --risk-moderate:
-    #FDD835;
-
-  --risk-high:
-    #FB8C00;
-
-  --risk-very-high:
-    #E53935;
-
-  --risk-critical:
-    #880E4F;
-
-  --red-main:
-    #b40000;
-
-  --green:
-    #176b2c;
-
-  --text:
-    #222;
-
-  --text-light:
-    #555;
-
-  --muted:
-    #66717b;
-
-  --border:
-    #d6dce1;
-
-  --border-light:
-    #e8ebed;
-
-  --panel:
-    rgba(255,255,255,.98);
-
-  --shadow-md:
-    0 4px 16px rgba(0,0,0,.12);
-
-  --shadow-lg:
-    0 8px 24px rgba(0,0,0,.16);
-
-  --transition:
-    all .25s ease;
+  --font-main: "B Nazanin", Tahoma, Arial, sans-serif;
+  --header-height: 92px;
+  --red-main: #b40000;
+  --green: #176b2c;
+  --text: #222;
+  --text-light: #555;
+  --muted: #66717b;
+  --border: #d6dce1;
+  --border-light: #e8ebed;
+  --panel: rgba(255,255,255,.98);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.12);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,.16);
+  --transition: all .25s ease;
 }
 
 html,
 body {
-
   width: 100%;
   height: 100%;
-
   margin: 0;
   padding: 0;
-
-  font-family:
-    var(--font-main);
-
-  background:
-    #f5f7fa;
-
-  color:
-    var(--text);
-
-  overflow:
-    hidden;
+  font-family: var(--font-main);
+  background: #f5f7fa;
+  color: var(--text);
+  overflow: hidden;
 }
 
 button,
 select,
 a {
-  font-family:
-    var(--font-main);
+  font-family: var(--font-main);
 }
 
 #app {
-
   width: 100%;
   height: 100%;
-
   display: flex;
   flex-direction: column;
 }
-
 
 /* ============================================================
    HEADER
    ============================================================ */
 
 .header {
-
   position: relative;
+  height: var(--header-height);
+  flex: 0 0 var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  color: white;
 
-  height:
-    var(--header-height);
+  background: linear-gradient(
+    135deg,
+    #e52e2e 0%,
+    #c31313 50%,
+    #8c0505 100%
+  );
 
-  flex:
-    0 0 var(--header-height);
-
-  display:
-    flex;
-
-  align-items:
-    center;
-
-  justify-content:
-    center;
-
-  padding:
-    10px 20px;
-
-  color:
-    white;
-
-  background:
-    linear-gradient(
-      135deg,
-      #e52e2e 0%,
-      #c31313 50%,
-      #8c0505 100%
-    );
-
-  box-shadow:
-    var(--shadow-lg);
-
-  z-index:
-    3000;
+  box-shadow: var(--shadow-lg);
+  z-index: 3000;
 }
-
 
 /* ============================================================
    LOGO
    ============================================================ */
 
 .header-logo {
-
   position: absolute;
+  left: 22px;
+  top: 50%;
+  transform: translateY(-50%);
 
-  left:
-    22px;
+  width: 68px;
+  height: 68px;
 
-  top:
-    50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-  transform:
-    translateY(-50%);
-
-  width:
-    68px;
-
-  height:
-    68px;
-
-  display:
-    flex;
-
-  align-items:
-    center;
-
-  justify-content:
-    center;
-
-  z-index:
-    20;
+  z-index: 20;
 }
 
 .header-logo img {
-
-  display:
-    block;
-
-  width:
-    100%;
-
-  height:
-    100%;
-
-  object-fit:
-    contain;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 
   filter:
     brightness(0)
     invert(1);
 
-  opacity:
-    .98;
-
-  transition:
-    var(--transition);
+  opacity: .98;
+  transition: var(--transition);
 }
 
 .header-logo img:hover {
-
-  transform:
-    scale(1.05);
+  transform: scale(1.05);
 }
-
 
 /* ============================================================
    HEADER CENTER
    ============================================================ */
 
 .header-center {
-
-  position:
-    relative;
-
-  z-index:
-    2;
-
-  text-align:
-    center;
-
-  padding:
-    0 190px;
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  padding: 0 190px;
 }
 
 .header-title {
-
-  margin:
-    0;
-
-  font-size:
-    24px;
-
-  font-weight:
-    900;
-
-  line-height:
-    1.2;
-
-  text-shadow:
-    0 2px 4px rgba(0,0,0,.3);
+  margin: 0;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-shadow: 0 2px 4px rgba(0,0,0,.3);
 }
 
 .header-subtitle {
-
-  margin:
-    3px 0 0;
-
-  font-size:
-    12px;
-
-  font-weight:
-    600;
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 600;
 }
-
 
 /* ============================================================
    FORECAST BADGE
    ============================================================ */
 
 .header-subtitle-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 
-  display:
-    inline-flex;
+  margin-top: 5px;
+  padding: 3px 11px;
 
-  align-items:
-    center;
+  background: rgba(0,0,0,.28);
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 18px;
 
-  gap:
-    6px;
-
-  margin-top:
-    5px;
-
-  padding:
-    3px 11px;
-
-  background:
-    rgba(0,0,0,.28);
-
-  border:
-    1px solid
-    rgba(255,255,255,.25);
-
-  border-radius:
-    18px;
-
-  font-size:
-    11px;
+  font-size: 11px;
 }
 
 .header-subtitle-badge .bullet {
+  width: 7px;
+  height: 7px;
 
-  width:
-    7px;
+  background: #4ade80;
 
-  height:
-    7px;
-
-  background:
-    #4ade80;
-
-  border-radius:
-    50%;
+  border-radius: 50%;
 
   box-shadow:
     0 0 5px #4ade80,
     0 0 10px rgba(74,222,128,.85);
 
-  flex-shrink:
-    0;
+  flex-shrink: 0;
 
   animation:
     forecastLedBlink
@@ -372,12 +206,8 @@ a {
 
   0%,
   100% {
-
-    opacity:
-      .30;
-
-    transform:
-      scale(.78);
+    opacity: .30;
+    transform: scale(.78);
 
     box-shadow:
       0 0 3px #4ade80,
@@ -385,12 +215,8 @@ a {
   }
 
   50% {
-
-    opacity:
-      1;
-
-    transform:
-      scale(1.18);
+    opacity: 1;
+    transform: scale(1.18);
 
     box-shadow:
       0 0 7px #4ade80,
@@ -400,229 +226,134 @@ a {
 
 }
 
-
 /* ============================================================
    HEADER BUTTONS
    ============================================================ */
 
 .header-buttons-group {
+  position: absolute;
 
-  position:
-    absolute;
+  right: 20px;
+  left: auto;
 
-  right:
-    20px;
+  top: 50%;
+  transform: translateY(-50%);
 
-  left:
-    auto;
+  display: flex;
+  align-items: center;
 
-  top:
-    50%;
+  gap: 7px;
 
-  transform:
-    translateY(-50%);
+  padding: 6px 9px;
 
-  display:
-    flex;
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 10px;
 
-  align-items:
-    center;
-
-  gap:
-    7px;
-
-  padding:
-    6px 9px;
-
-  background:
-    rgba(255,255,255,.08);
-
-  border:
-    1px solid
-    rgba(255,255,255,.15);
-
-  border-radius:
-    10px;
-
-  z-index:
-    10;
+  z-index: 10;
 }
 
 .header-btn {
+  width: 38px;
+  height: 38px;
 
-  width:
-    38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 
-  height:
-    38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 
-  display:
-    inline-flex;
+  background: var(--panel);
+  color: var(--text);
 
-  align-items:
-    center;
+  cursor: pointer;
+  text-decoration: none;
 
-  justify-content:
-    center;
+  font-size: 16px;
+  line-height: 1;
 
-  border:
-    1px solid
-    var(--border);
+  transition: var(--transition);
 
-  border-radius:
-    8px;
-
-  background:
-    var(--panel);
-
-  color:
-    var(--text);
-
-  cursor:
-    pointer;
-
-  text-decoration:
-    none;
-
-  font-size:
-    16px;
-
-  line-height:
-    1;
-
-  transition:
-    var(--transition);
-
-  flex-shrink:
-    0;
+  flex-shrink: 0;
 }
 
 .header-btn:hover {
-
-  background:
-    #f8f9fa;
-
-  transform:
-    translateY(-2px);
-
-  box-shadow:
-    var(--shadow-md);
+  background: #f8f9fa;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .header-btn:active {
-
-  transform:
-    translateY(0);
+  transform: translateY(0);
 }
 
 .header-btn.primary {
-
-  background:
-    var(--green);
-
-  color:
-    white;
-
-  border-color:
-    var(--green);
+  background: var(--green);
+  color: white;
+  border-color: var(--green);
 }
 
 .header-btn.primary:hover {
-
-  background:
-    #125523;
+  background: #125523;
 }
-
 
 /* ============================================================
    DROPDOWN
    ============================================================ */
 
 .dropdown {
-
-  position:
-    relative;
+  position: relative;
 }
 
 .dropdown-menu {
+  position: absolute;
 
-  position:
-    absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  left: auto;
 
-  top:
-    calc(100% + 9px);
+  width: 285px;
 
-  right:
-    0;
+  margin: 0;
+  padding: 12px;
 
-  left:
-    auto;
+  list-style: none;
 
-  width:
-    285px;
-
-  margin:
-    0;
-
-  padding:
-    12px;
-
-  list-style:
-    none;
-
-  background:
-    var(--panel);
+  background: var(--panel);
 
   border:
     1px solid
     var(--border-light);
 
-  border-radius:
-    12px;
+  border-radius: 12px;
 
-  box-shadow:
-    var(--shadow-lg);
+  box-shadow: var(--shadow-lg);
 
-  z-index:
-    6000;
+  z-index: 6000;
 
-  display:
-    none;
+  display: none;
 }
 
 .dropdown-menu.show {
-
-  display:
-    block;
+  display: block;
 }
 
 .archive-menu {
-
-  width:
-    285px;
+  width: 285px;
 }
-
 
 /* ============================================================
    FILTER
    ============================================================ */
 
 .location-filter-title {
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--text);
 
-  font-size:
-    15px;
-
-  font-weight:
-    900;
-
-  color:
-    var(--text);
-
-  margin-bottom:
-    10px;
-
-  padding-bottom:
-    9px;
+  margin-bottom: 10px;
+  padding-bottom: 9px;
 
   border-bottom:
     1px solid
@@ -630,64 +361,40 @@ a {
 }
 
 .location-filter-label {
+  display: block;
 
-  display:
-    block;
+  margin-bottom: 6px;
 
-  margin-bottom:
-    6px;
+  color: var(--text-light);
 
-  color:
-    var(--text-light);
-
-  font-size:
-    12px;
-
-  font-weight:
-    700;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .filter-select {
+  width: 100%;
+  height: 40px;
 
-  width:
-    100%;
-
-  height:
-    40px;
-
-  padding:
-    5px 10px;
+  padding: 5px 10px;
 
   border:
     1px solid
     var(--border);
 
-  border-radius:
-    8px;
+  border-radius: 8px;
 
-  background:
-    white;
+  background: white;
+  color: var(--text);
 
-  color:
-    var(--text);
+  font-size: 13px;
+  font-weight: 700;
 
-  font-size:
-    13px;
-
-  font-weight:
-    700;
-
-  outline:
-    none;
-
-  cursor:
-    pointer;
+  outline: none;
+  cursor: pointer;
 }
 
 .filter-select:focus {
-
-  border-color:
-    var(--green);
+  border-color: var(--green);
 
   box-shadow:
     0 0 0 2px
@@ -695,262 +402,164 @@ a {
 }
 
 .filter-description {
+  margin-top: 9px;
 
-  margin-top:
-    9px;
+  padding: 8px;
 
-  padding:
-    8px;
+  background: #f5f7f8;
 
-  background:
-    #f5f7f8;
+  border-radius: 7px;
 
-  border-radius:
-    7px;
+  color: var(--muted);
 
-  color:
-    var(--muted);
+  font-size: 10px;
 
-  font-size:
-    10px;
-
-  line-height:
-    1.7;
+  line-height: 1.7;
 }
-
 
 /* ============================================================
    MAP
    ============================================================ */
 
 #map-wrap {
-
-  position:
-    relative;
-
-  flex:
-    1 1 auto;
-
-  min-height:
-    0;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 #map {
-
-  width:
-    100%;
-
-  height:
-    100%;
+  width: 100%;
+  height: 100%;
 }
 
 .leaflet-container {
-
-  font-family:
-    var(--font-main);
-
-  background:
-    #dfe6ea;
+  font-family: var(--font-main);
+  background: #dfe6ea;
 }
 
 .leaflet-control-zoom {
-
-  display:
-    none;
+  display: none;
 }
-
 
 /* ============================================================
    NIGHT
    ============================================================ */
 
 #nightOverlay {
+  position: absolute;
+  inset: 0;
 
-  position:
-    absolute;
+  z-index: 1000;
+  pointer-events: none;
 
-  inset:
-    0;
-
-  z-index:
-    1000;
-
-  pointer-events:
-    none;
-
-  display:
-    none;
+  display: none;
 
   background:
     rgba(20,25,35,.20);
 }
 
 body.night #nightOverlay {
-
-  display:
-    block;
+  display: block;
 }
-
 
 /* ============================================================
    GAUGE
    ============================================================ */
 
 .gauge-panel {
+  position: absolute;
 
-  position:
-    absolute;
+  top: 20px;
+  right: 20px;
 
-  top:
-    20px;
+  width: 270px;
 
-  right:
-    20px;
-
-  width:
-    270px;
-
-  background:
-    var(--panel);
+  background: var(--panel);
 
   border:
     1px solid
     var(--border-light);
 
-  border-radius:
-    14px;
+  border-radius: 14px;
 
-  box-shadow:
-    var(--shadow-lg);
+  box-shadow: var(--shadow-lg);
 
-  padding:
-    17px;
+  padding: 17px;
 
-  z-index:
-    1400;
+  z-index: 1400;
 
-  text-align:
-    center;
+  text-align: center;
 }
 
 .gauge-title {
-
-  font-size:
-    14px;
-
-  font-weight:
-    800;
-
-  margin-bottom:
-    12px;
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 12px;
 }
 
 .gauge {
+  width: 145px;
+  height: 145px;
 
-  width:
-    145px;
+  margin: 0 auto 12px;
 
-  height:
-    145px;
-
-  margin:
-    0 auto 12px;
-
-  border-radius:
-    50%;
+  border-radius: 50%;
 
   background:
     conic-gradient(
-      var(--risk-low) 0deg 72deg,
-      var(--risk-moderate) 72deg 144deg,
-      var(--risk-high) 144deg 216deg,
-      var(--risk-very-high) 216deg 288deg,
-      var(--risk-critical) 288deg 360deg
+      #c7a900 0deg 90deg,
+      #fb8c00 90deg 180deg,
+      #e53935 180deg 270deg,
+      #880e4f 270deg 360deg
     );
 
-  display:
-    flex;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
-  align-items:
-    center;
-
-  justify-content:
-    center;
-
-  position:
-    relative;
+  position: relative;
 }
 
 .gauge::before {
+  content: "";
 
-  content:
-    "";
+  position: absolute;
 
-  position:
-    absolute;
+  width: 110px;
+  height: 110px;
 
-  width:
-    110px;
+  border-radius: 50%;
 
-  height:
-    110px;
-
-  border-radius:
-    50%;
-
-  background:
-    var(--panel);
+  background: var(--panel);
 }
 
 .gauge-content {
-
-  position:
-    relative;
-
-  z-index:
-    2;
+  position: relative;
+  z-index: 2;
 }
 
 .gauge-value {
-
-  font-size:
-    31px;
-
-  font-weight:
-    900;
-
-  line-height:
-    1;
+  font-size: 31px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .gauge-label {
+  margin-top: 5px;
 
-  margin-top:
-    5px;
-
-  font-size:
-    12px;
-
-  font-weight:
-    800;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .gauge-location {
+  font-size: 11px;
 
-  font-size:
-    11px;
+  color: var(--muted);
 
-  color:
-    var(--muted);
+  line-height: 1.6;
 
-  line-height:
-    1.6;
-
-  margin-top:
-    8px;
-
-  padding-top:
-    9px;
+  margin-top: 8px;
+  padding-top: 9px;
 
   border-top:
     1px solid
@@ -958,12 +567,8 @@ body.night #nightOverlay {
 }
 
 .gauge-legend-bar {
-
-  margin-top:
-    9px;
-
-  padding-top:
-    8px;
+  margin-top: 9px;
+  padding-top: 8px;
 
   border-top:
     1px solid
@@ -971,246 +576,139 @@ body.night #nightOverlay {
 }
 
 .gauge-legend-items {
-
-  display:
-    flex;
-
-  gap:
-    2px;
+  display: flex;
+  gap: 2px;
 }
 
 .gauge-legend-chip {
+  flex: 1;
 
-  flex:
-    1;
+  font-size: 8px;
+  font-weight: 700;
 
-  font-size:
-    8px;
+  padding: 4px 2px;
 
-  font-weight:
-    700;
+  border-radius: 4px;
 
-  padding:
-    4px 2px;
-
-  border-radius:
-    4px;
-
-  color:
-    white;
+  color: white;
 }
-
 
 /* ============================================================
    POPUPS
    ============================================================ */
 
-.leaflet-popup-pane {
-
-  z-index:
-    1000 !important;
-}
-
-.leaflet-tooltip-pane {
-
-  z-index:
-    900 !important;
-}
-
-.leaflet-popup {
-
-  z-index:
-    10000 !important;
-}
-
-.leaflet-popup-content-wrapper,
-.leaflet-popup-tip {
-
-  z-index:
-    10000 !important;
-}
-
 .leaflet-popup-content {
+  margin: 0 !important;
+  padding: 0 !important;
 
-  margin:
-    0 !important;
-
-  padding:
-    0 !important;
-
-  direction:
-    rtl;
-
-  text-align:
-    center;
+  direction: rtl;
+  text-align: center;
 }
 
 .fli-popup,
 .region-popup {
+  min-width: 230px;
 
-  min-width:
-    230px;
+  padding: 12px;
 
-  padding:
-    12px;
-
-  direction:
-    rtl;
-
-  text-align:
-    center;
+  direction: rtl;
+  text-align: center;
 }
 
 .popup-title {
+  font-size: 14px;
+  font-weight: 900;
 
-  font-size:
-    14px;
-
-  font-weight:
-    900;
-
-  margin-bottom:
-    7px;
+  margin-bottom: 7px;
 }
 
 .popup-risk {
+  display: inline-block;
 
-  display:
-    inline-block;
+  padding: 5px 11px;
 
-  padding:
-    5px 11px;
+  border-radius: 7px;
 
-  border-radius:
-    7px;
+  color: white;
 
-  color:
-    white;
+  font-size: 12px;
+  font-weight: 800;
 
-  font-size:
-    12px;
-
-  font-weight:
-    800;
-
-  margin:
-    3px 0 5px;
+  margin: 3px 0 5px;
 }
 
 .popup-value {
+  font-size: 12px;
+  font-weight: 800;
 
-  font-size:
-    12px;
-
-  font-weight:
-    800;
-
-  margin-top:
-    4px;
+  margin-top: 4px;
 }
 
 .popup-coord {
+  color: var(--muted);
 
-  color:
-    var(--muted);
+  font-size: 10px;
 
-  font-size:
-    10px;
+  margin-top: 7px;
 
-  margin-top:
-    7px;
-
-  line-height:
-    1.5;
+  line-height: 1.5;
 }
-
 
 /* ============================================================
    ABOUT
    ============================================================ */
 
 .about-overlay {
+  position: fixed;
 
-  position:
-    fixed;
+  inset: 0;
 
-  inset:
-    0;
+  display: none;
 
-  display:
-    none;
+  align-items: center;
+  justify-content: center;
 
-  align-items:
-    center;
-
-  justify-content:
-    center;
-
-  padding:
-    20px;
+  padding: 20px;
 
   background:
     rgba(0,0,0,.5);
 
-  backdrop-filter:
-    blur(4px);
+  backdrop-filter: blur(4px);
 
-  z-index:
-    7000;
+  z-index: 7000;
 }
 
 .about-overlay.open {
-
-  display:
-    flex;
+  display: flex;
 }
 
 .about-box {
+  width: min(680px,96vw);
 
-  width:
-    min(680px,96vw);
+  max-height: 88vh;
 
-  max-height:
-    88vh;
+  overflow-y: auto;
 
-  overflow-y:
-    auto;
+  background: var(--panel);
 
-  background:
-    var(--panel);
+  border-radius: 15px;
 
-  border-radius:
-    15px;
+  box-shadow: var(--shadow-lg);
 
-  box-shadow:
-    var(--shadow-lg);
+  padding: 25px;
 
-  padding:
-    25px;
-
-  direction:
-    rtl;
-
-  text-align:
-    right;
+  direction: rtl;
+  text-align: right;
 }
 
 .about-header {
+  display: flex;
 
-  display:
-    flex;
+  align-items: center;
+  justify-content: space-between;
 
-  align-items:
-    center;
-
-  justify-content:
-    space-between;
-
-  margin-bottom:
-    17px;
-
-  padding-bottom:
-    13px;
+  margin-bottom: 17px;
+  padding-bottom: 13px;
 
   border-bottom:
     2px solid
@@ -1218,138 +716,93 @@ body.night #nightOverlay {
 }
 
 .about-title {
+  margin: 0;
 
-  margin:
-    0;
+  color: var(--red-main);
 
-  color:
-    var(--red-main);
-
-  font-size:
-    22px;
-
-  font-weight:
-    900;
+  font-size: 22px;
+  font-weight: 900;
 }
 
 .about-close {
-
-  width:
-    38px;
-
-  height:
-    38px;
+  width: 38px;
+  height: 38px;
 
   border:
     1px solid
     var(--border-light);
 
-  border-radius:
-    9px;
+  border-radius: 9px;
 
-  background:
-    #f8f9fa;
+  background: #f8f9fa;
 
-  cursor:
-    pointer;
+  cursor: pointer;
 
-  font-size:
-    20px;
+  font-size: 20px;
 
-  display:
-    flex;
+  display: flex;
 
-  align-items:
-    center;
-
-  justify-content:
-    center;
+  align-items: center;
+  justify-content: center;
 }
 
 .about-text {
+  font-size: 13px;
 
-  font-size:
-    13px;
+  line-height: 1.8;
 
-  line-height:
-    1.8;
-
-  color:
-    var(--text-light);
+  color: var(--text-light);
 }
 
 .about-text p {
-
-  margin:
-    9px 0;
+  margin: 9px 0;
 }
 
 .about-table {
+  width: 100%;
 
-  width:
-    100%;
+  border-collapse: collapse;
 
-  border-collapse:
-    collapse;
+  margin-top: 13px;
 
-  margin-top:
-    13px;
-
-  font-size:
-    12px;
+  font-size: 12px;
 }
 
 .about-table th,
 .about-table td {
-
   border:
     1px solid
     var(--border-light);
 
-  padding:
-    9px;
+  padding: 9px;
 
-  text-align:
-    right;
+  text-align: right;
 }
 
 .about-table th {
-
-  background:
-    #f1f3f5;
-
-  font-weight:
-    800;
+  background: #f1f3f5;
+  font-weight: 800;
 }
 
 .about-note {
+  margin-top: 13px;
 
-  margin-top:
-    13px;
+  padding: 11px;
 
-  padding:
-    11px;
+  border-radius: 9px;
 
-  border-radius:
-    9px;
-
-  background:
-    #e8f5e9;
+  background: #e8f5e9;
 
   border:
     1px solid
     #c8e6c9;
 
-  font-size:
-    12px;
+  font-size: 12px;
 
-  line-height:
-    1.8;
+  line-height: 1.8;
 
-  color:
-    #2e7d32;
+  color: #2e7d32;
 }
-
 
 /* ============================================================
    MOBILE
@@ -1358,31 +811,21 @@ body.night #nightOverlay {
 @media (max-width: 768px) {
 
   :root {
-
-    --header-height:
-      86px;
+    --header-height: 86px;
   }
 
   .header {
-
-    padding:
-      6px 8px;
+    padding: 6px 8px;
   }
 
   .header-logo {
+    left: 8px;
 
-    left:
-      8px;
-
-    width:
-      48px;
-
-    height:
-      48px;
+    width: 48px;
+    height: 48px;
   }
 
   .header-center {
-
     padding:
       0
       115px
@@ -1391,109 +834,67 @@ body.night #nightOverlay {
   }
 
   .header-title {
-
-    font-size:
-      15px;
+    font-size: 15px;
   }
 
   .header-subtitle {
-
-    display:
-      none;
+    display: none;
   }
 
   .header-subtitle-badge {
-
-    font-size:
-      9px;
+    font-size: 9px;
   }
 
   .header-buttons-group {
+    right: 8px;
+    left: auto;
 
-    right:
-      8px;
+    gap: 4px;
 
-    left:
-      auto;
-
-    gap:
-      4px;
-
-    padding:
-      4px;
+    padding: 4px;
   }
 
   .header-btn {
+    width: 34px;
+    height: 34px;
 
-    width:
-      34px;
-
-    height:
-      34px;
-
-    font-size:
-      13px;
+    font-size: 13px;
   }
 
   .dropdown-menu,
   .archive-menu {
+    width: 245px;
 
-    width:
-      245px;
-
-    right:
-      0;
-
-    left:
-      auto;
+    right: 0;
+    left: auto;
   }
 
   .gauge-panel {
+    top: auto;
+    right: 10px;
+    bottom: 10px;
 
-    top:
-      auto;
+    width: 215px;
 
-    right:
-      10px;
-
-    bottom:
-      10px;
-
-    width:
-      215px;
-
-    padding:
-      10px;
+    padding: 10px;
   }
 
   .gauge {
-
-    width:
-      105px;
-
-    height:
-      105px;
+    width: 105px;
+    height: 105px;
   }
 
   .gauge::before {
-
-    width:
-      80px;
-
-    height:
-      80px;
+    width: 80px;
+    height: 80px;
   }
 
   .gauge-value {
-
-    font-size:
-      24px;
+    font-size: 24px;
   }
 
   .gauge-legend-chip {
-
-    font-size:
-      7px;
+    font-size: 7px;
   }
 
 }
@@ -1501,19 +902,13 @@ body.night #nightOverlay {
 @media (max-width: 480px) {
 
   .header-logo {
+    width: 42px;
+    height: 42px;
 
-    width:
-      42px;
-
-    height:
-      42px;
-
-    left:
-      5px;
+    left: 5px;
   }
 
   .header-center {
-
     padding:
       0
       110px
@@ -1522,42 +917,29 @@ body.night #nightOverlay {
   }
 
   .header-title {
-
-    font-size:
-      13px;
+    font-size: 13px;
   }
 
   .header-subtitle-badge {
-
-    font-size:
-      8px;
+    font-size: 8px;
 
     padding:
       2px 7px;
   }
 
   .header-buttons-group {
+    right: 5px;
 
-    right:
-      5px;
+    gap: 2px;
 
-    gap:
-      2px;
-
-    padding:
-      3px;
+    padding: 3px;
   }
 
   .header-btn {
+    width: 31px;
+    height: 31px;
 
-    width:
-      31px;
-
-    height:
-      31px;
-
-    font-size:
-      12px;
+    font-size: 12px;
   }
 
 }
@@ -1580,7 +962,6 @@ body.night #nightOverlay {
 >
 
 </div>
-
 
 <div class="header-buttons-group">
 
@@ -1639,7 +1020,6 @@ body.night #nightOverlay {
 
 </div>
 
-
 <div class="dropdown">
 
 <button
@@ -1687,7 +1067,6 @@ body.night #nightOverlay {
 
 </div>
 
-
 <button
   id="fitButton"
   class="header-btn primary"
@@ -1697,7 +1076,6 @@ body.night #nightOverlay {
 >
 🌐
 </button>
-
 
 <button
   id="modeButton"
@@ -1709,7 +1087,6 @@ body.night #nightOverlay {
 ☀️
 </button>
 
-
 <button
   id="aboutButton"
   class="header-btn"
@@ -1719,7 +1096,6 @@ body.night #nightOverlay {
 >
 ℹ️
 </button>
-
 
 <a
   id="excelButton"
@@ -1734,7 +1110,6 @@ body.night #nightOverlay {
 </a>
 
 </div>
-
 
 <div class="header-center">
 
@@ -1751,7 +1126,7 @@ body.night #nightOverlay {
 <span class="bullet"></span>
 
 <span id="forecastDateBadge">
-در حال بارگذاری تاریخ پیش‌بینی
+پیش‌بینی برای فردا
 </span>
 
 </div>
@@ -1760,20 +1135,17 @@ body.night #nightOverlay {
 
 </header>
 
-
 <div id="map-wrap">
 
 <div id="map"></div>
 
 <div id="nightOverlay"></div>
 
-
 <div class="gauge-panel">
 
 <div class="gauge-title">
 وضعیت انتخاب‌شده
 </div>
-
 
 <div class="gauge">
 
@@ -1797,7 +1169,6 @@ body.night #nightOverlay {
 
 </div>
 
-
 <div
   id="gaugeLocation"
   class="gauge-location"
@@ -1805,42 +1176,34 @@ body.night #nightOverlay {
 —
 </div>
 
-
 <div class="gauge-legend-bar">
 
 <div class="gauge-legend-items">
 
 <span
   class="gauge-legend-chip"
-  style="background:#2E7D32"
->
-کم
-</span>
-
-<span
-  class="gauge-legend-chip"
-  style="background:#FDD835;color:#222"
+  style="background:#c7a900"
 >
 متوسط
 </span>
 
 <span
   class="gauge-legend-chip"
-  style="background:#FB8C00"
+  style="background:#fb8c00"
 >
 زیاد
 </span>
 
 <span
   class="gauge-legend-chip"
-  style="background:#E53935"
+  style="background:#e53935"
 >
 خیلی زیاد
 </span>
 
 <span
   class="gauge-legend-chip"
-  style="background:#880E4F"
+  style="background:#880e4f"
 >
 بحرانی
 </span>
@@ -1852,7 +1215,6 @@ body.night #nightOverlay {
 </div>
 
 </div>
-
 
 <div
   id="aboutOverlay"
@@ -1887,7 +1249,6 @@ body.night #nightOverlay {
 
 </div>
 
-
 <div class="about-text">
 
 <p>
@@ -1897,7 +1258,6 @@ body.night #nightOverlay {
 <p>
 شاخص خطر حریق از ترکیب سه مؤلفه اصلی هواشناسی، سوخت و توپوگرافی تولید می‌شود.
 </p>
-
 
 <table class="about-table">
 
@@ -1941,7 +1301,6 @@ body.night #nightOverlay {
 
 </table>
 
-
 <div class="about-note">
 💡 با کلیک روی نقشه، مقدار شاخص خطر حریق در نقطه انتخاب‌شده نمایش داده می‌شود.
 </div>
@@ -1954,16 +1313,13 @@ body.night #nightOverlay {
 
 </div>
 
-
 <script
   src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
 </script>
 
-
 <script>
 
 "use strict";
-
 
 /* ============================================================
    APP STATE
@@ -1974,70 +1330,172 @@ const APP_STATE = {
   map: null,
 
   layers: {
-
     fars: null,
-
     fli: null,
-
     protected: null,
-
     hunting: null
-
   },
 
   data: {
-
     fliGrid: null,
-
     fliMetadata: null,
-
     archiveDates: [],
-
-    currentArchiveDate:
-      "latest"
-
+    currentArchiveDate: "latest"
   },
 
   ui: {
-
-    nightMode:
-      false,
-
-    locationFilter:
-      "all"
-
+    nightMode: false,
+    currentPopup: null,
+    locationFilter: "all",
+    excelObjectUrl: null
   }
 
 };
 
-
 /* ============================================================
-   FINAL FLI PALETTE
+   DATE - IRAN TIME
    ============================================================ */
 
-const FLI_PALETTE = {
+/*
+ * این تابع تاریخ فردا را فقط بر اساس تاریخ ایران
+ * (Asia/Tehran) محاسبه می‌کند.
+ *
+ * تاریخ میلادی ابتدا از ساعت ایران استخراج می‌شود،
+ * سپس یک روز به آن اضافه می‌شود و در نهایت با تقویم
+ * فارسی نمایش داده می‌شود.
+ *
+ * بنابراین timezone سیستم کاربر هیچ تأثیری ندارد.
+ */
+function setupTomorrowDate() {
 
-  nodata:
-    "#ECEFF1",
+  const badge =
+    document.getElementById(
+      "forecastDateBadge"
+    );
 
-  low:
-    "#2E7D32",
+  if (!badge) {
+    return;
+  }
 
-  moderate:
-    "#FDD835",
+  try {
 
-  high:
-    "#FB8C00",
+    /*
+     * دریافت تاریخ فعلی ایران
+     */
+    const iranParts =
+      new Intl.DateTimeFormat(
+        "en-US",
+        {
+          timeZone: "Asia/Tehran",
+          year: "numeric",
+          month: "numeric",
+          day: "numeric"
+        }
+      ).formatToParts(
+        new Date()
+      );
 
-  veryHigh:
-    "#E53935",
+    const year =
+      Number(
+        iranParts.find(
+          part =>
+            part.type === "year"
+        ).value
+      );
 
-  critical:
-    "#880E4F"
+    const month =
+      Number(
+        iranParts.find(
+          part =>
+            part.type === "month"
+        ).value
+      );
 
-};
+    const day =
+      Number(
+        iranParts.find(
+          part =>
+            part.type === "day"
+        ).value
+      );
 
+    /*
+     * ساخت فردا به‌صورت مستقل از timezone مرورگر
+     */
+    const tomorrow =
+      new Date(
+        Date.UTC(
+          year,
+          month - 1,
+          day + 1,
+          12,
+          0,
+          0
+        )
+      );
 
+    /*
+     * دریافت اجزای تاریخ شمسی فردا
+     */
+    const persianParts =
+      new Intl.DateTimeFormat(
+        "fa-IR-u-ca-persian",
+        {
+          timeZone: "Asia/Tehran",
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric"
+        }
+      ).formatToParts(
+        tomorrow
+      );
+
+    const weekday =
+      persianParts.find(
+        part =>
+          part.type === "weekday"
+      )?.value || "";
+
+    const persianDay =
+      persianParts.find(
+        part =>
+          part.type === "day"
+      )?.value || "";
+
+    const persianMonth =
+      persianParts.find(
+        part =>
+          part.type === "month"
+      )?.value || "";
+
+    const persianYear =
+      persianParts.find(
+        part =>
+          part.type === "year"
+      )?.value || "";
+
+    /*
+     * ترتیب نمایش کاملاً دستی:
+     *
+     * پیش‌بینی برای یکشنبه ۱۵ شهریور ۱۴۰۵
+     */
+    badge.textContent =
+      `پیش‌بینی برای ${weekday} ${persianDay} ${persianMonth} ${persianYear}`;
+
+  } catch (error) {
+
+    console.warn(
+      "Iran forecast date error:",
+      error
+    );
+
+    badge.textContent =
+      "پیش‌بینی برای فردا";
+
+  }
+
+}
 /* ============================================================
    FETCH
    ============================================================ */
@@ -2062,11 +1520,8 @@ async function fetchWithTimeout(
       await fetch(
         url,
         {
-          signal:
-            controller.signal,
-
-          cache:
-            "no-store"
+          signal: controller.signal,
+          cache: "no-store"
         }
       );
 
@@ -2106,14 +1561,11 @@ async function fetchWithTimeout(
 
 }
 
-
 /* ============================================================
    NUMBER
    ============================================================ */
 
-function formatNumber(
-  value
-) {
+function formatNumber(value) {
 
   const number =
     Number(value);
@@ -2129,212 +1581,53 @@ function formatNumber(
   return number.toLocaleString(
     "fa-IR",
     {
-      maximumFractionDigits:
-        2
+      maximumFractionDigits: 2
     }
   );
 
 }
 
-
 /* ============================================================
    RISK
    ============================================================ */
 
-function getRisk(
-  value
-) {
+function getRisk(value) {
 
-  const num =
-    Number(value);
+  const num = Number(value);
 
-  if (
-    !Number.isFinite(num)
-  ) {
-
+  if (!Number.isFinite(num)) {
     return {
-
-      label:
-        "بدون داده",
-
-      color:
-        FLI_PALETTE.nodata
-
+      label: "بدون داده",
+      color: FLI_PALETTE.nodata
     };
-
   }
 
-  if (num < 20) {
-
+  if (num < 25) {
     return {
-
-      label:
-        "کم",
-
-      color:
-        FLI_PALETTE.low
-
+      label: "متوسط",
+      color: FLI_PALETTE.moderate
     };
-
   }
 
-  if (num < 40) {
-
+  if (num < 50) {
     return {
-
-      label:
-        "متوسط",
-
-      color:
-        FLI_PALETTE.moderate
-
+      label: "زیاد",
+      color: FLI_PALETTE.high
     };
-
   }
 
-  if (num < 60) {
-
+  if (num < 75) {
     return {
-
-      label:
-        "زیاد",
-
-      color:
-        FLI_PALETTE.high
-
+      label: "خیلی زیاد",
+      color: FLI_PALETTE.veryHigh
     };
-
-  }
-
-  if (num < 80) {
-
-    return {
-
-      label:
-        "خیلی زیاد",
-
-      color:
-        FLI_PALETTE.veryHigh
-
-    };
-
   }
 
   return {
-
-    label:
-      "بحرانی",
-
-    color:
-      FLI_PALETTE.critical
-
+    label: "بحرانی",
+    color: FLI_PALETTE.critical
   };
-
 }
-
-
-/* ============================================================
-   FEATURE FLI VALUE
-   ============================================================ */
-
-function getFeatureFLIValue(
-  feature
-) {
-
-  const properties =
-    feature?.properties || {};
-
-  const candidates = [
-
-    properties.fli,
-
-    properties.FLI,
-
-    properties.value,
-
-    properties.Value,
-
-    properties.index,
-
-    properties.Index,
-
-    properties.mean,
-
-    properties.MEAN,
-
-    properties.fli_mean,
-
-    properties.FLI_mean,
-
-    properties.fli_value,
-
-    properties.FLI_value
-
-  ];
-
-  for (
-    const candidate of candidates
-  ) {
-
-    const value =
-      Number(candidate);
-
-    if (
-      Number.isFinite(value) &&
-      value >= 0 &&
-      value <= 100
-    ) {
-
-      return value;
-
-    }
-
-  }
-
-  return null;
-
-}
-
-
-/* ============================================================
-   FEATURE COLOR
-   ============================================================ */
-
-function getFeatureColor(
-  feature
-) {
-
-  const value =
-    getFeatureFLIValue(
-      feature
-    );
-
-  if (
-    Number.isFinite(value)
-  ) {
-
-    return getRisk(
-      value
-    ).color;
-
-  }
-
-  const suppliedColor =
-    feature?.properties?.color;
-
-  if (
-    suppliedColor &&
-    typeof suppliedColor === "string"
-  ) {
-
-    return suppliedColor;
-
-  }
-
-  return FLI_PALETTE.nodata;
-
-}
-
 
 /* ============================================================
    GAUGE
@@ -2384,7 +1677,7 @@ function updateGauge(
       "بدون داده";
 
     labelElement.style.color =
-      FLI_PALETTE.nodata;
+      "#777";
 
     locationElement.textContent =
       subtitle || "—";
@@ -2410,7 +1703,6 @@ function updateGauge(
 
 }
 
-
 /* ============================================================
    MAP
    ============================================================ */
@@ -2421,77 +1713,24 @@ function initMap() {
     L.map(
       "map",
       {
-
-        zoomControl:
-          false,
-
-        preferCanvas:
-          true,
-
-        attributionControl:
-          true
-
+        zoomControl: false,
+        preferCanvas: true,
+        attributionControl: true
       }
     );
-
-
-  const fliPane =
-    APP_STATE.map.createPane(
-      "fliRiskPane"
-    );
-
-  fliPane.style.zIndex =
-    "400";
-
-
-  const farsPane =
-    APP_STATE.map.createPane(
-      "farsPane"
-    );
-
-  farsPane.style.zIndex =
-    "550";
-
-
-  const filterPane =
-    APP_STATE.map.createPane(
-      "filterPane"
-    );
-
-  filterPane.style.zIndex =
-    "600";
-
-
-  const popupPane =
-    APP_STATE.map.getPane(
-      "popupPane"
-    );
-
-  if (popupPane) {
-
-    popupPane.style.zIndex =
-      "1000";
-
-  }
-
 
   L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     {
-
-      maxZoom:
-        18,
-
+      maxZoom: 18,
       attribution:
         "© OpenStreetMap contributors"
-
     }
   ).addTo(
     APP_STATE.map
   );
 
 }
-
 
 /* ============================================================
    FARS
@@ -2511,29 +1750,13 @@ async function loadFars() {
     L.geoJSON(
       geojson,
       {
-
-        pane:
-          "farsPane",
-
         style: {
-
-          color:
-            "#20252a",
-
-          weight:
-            2.2,
-
-          opacity:
-            .95,
-
-          fill:
-            false
-
+          color: "#20252a",
+          weight: 2.2,
+          opacity: .95,
+          fill: false
         },
-
-        interactive:
-          false
-
+        interactive: false
       }
     ).addTo(
       APP_STATE.map
@@ -2542,7 +1765,6 @@ async function loadFars() {
   return geojson;
 
 }
-
 
 /* ============================================================
    FLI
@@ -2563,40 +1785,29 @@ async function loadFLI() {
       geojson,
       {
 
-        pane:
-          "fliRiskPane",
+        style: feature => {
 
-        style:
-          feature => {
+          const color =
+            feature.properties?.color ||
+            "#777";
 
-            const color =
-              getFeatureColor(
-                feature
-              );
+          return {
 
-            return {
+            color: color,
 
-              color:
-                color,
+            weight: .15,
 
-              weight:
-                .15,
+            opacity: .85,
 
-              opacity:
-                .85,
+            fillColor: color,
 
-              fillColor:
-                color,
+            fillOpacity: .72
 
-              fillOpacity:
-                .72
+          };
 
-            };
+        },
 
-          },
-
-        interactive:
-          false
+        interactive: false
 
       }
     ).addTo(
@@ -2607,40 +1818,32 @@ async function loadFLI() {
 
 }
 
-
 /* ============================================================
    FLI METADATA
    ============================================================ */
 
 async function loadFLIData() {
 
-  const response =
-    await fetchWithTimeout(
-      "data/web/fli_latest.json"
-    );
+  try {
 
-  const metadata =
-    await response.json();
+    const response =
+      await fetchWithTimeout(
+        "data/web/fli_latest.json"
+      );
 
-  const forecastDate =
-    metadata?.forecast_date ||
-    metadata?.target_date;
+    APP_STATE.data.fliMetadata =
+      await response.json();
 
-  if (!forecastDate) {
+  } catch (error) {
 
-    throw new Error(
-      "Latest FLI metadata has no forecast date."
+    console.warn(
+      "FLI metadata:",
+      error
     );
 
   }
 
-  APP_STATE.data.fliMetadata =
-    metadata;
-
-  return metadata;
-
 }
-
 
 /* ============================================================
    GRID
@@ -2648,35 +1851,43 @@ async function loadFLIData() {
 
 async function loadGrid() {
 
-  const response =
-    await fetchWithTimeout(
-      "data/web/fli_latest_grid.json"
-    );
+  try {
 
-  const grid =
-    await response.json();
+    const response =
+      await fetchWithTimeout(
+        "data/web/fli_latest_grid.json"
+      );
 
-  if (
-    !grid ||
-    !grid.bounds ||
-    !Array.isArray(
-      grid.values
-    )
-  ) {
+    const grid =
+      await response.json();
 
-    throw new Error(
-      "Invalid FLI grid structure."
+    if (
+      grid &&
+      grid.bounds &&
+      Array.isArray(grid.values)
+    ) {
+
+      APP_STATE.data.fliGrid =
+        grid;
+
+    } else {
+
+      console.warn(
+        "Invalid FLI grid structure."
+      );
+
+    }
+
+  } catch (error) {
+
+    console.warn(
+      "FLI grid:",
+      error
     );
 
   }
 
-  APP_STATE.data.fliGrid =
-    grid;
-
-  return grid;
-
 }
-
 
 /* ============================================================
    ARCHIVE DATE FORMAT
@@ -2699,39 +1910,24 @@ function formatArchiveDate(
 
   const date =
     new Date(
-      Date.UTC(
-        Number(parts[0]),
-        Number(parts[1]) - 1,
-        Number(parts[2]),
-        12,
-        0,
-        0
-      )
+      Number(parts[0]),
+      Number(parts[1]) - 1,
+      Number(parts[2]),
+      12,
+      0,
+      0
     );
 
   try {
 
-    return new Intl.DateTimeFormat(
+    return date.toLocaleDateString(
       "fa-IR-u-ca-persian",
       {
-
-        timeZone:
-          "UTC",
-
-        year:
-          "numeric",
-
-        month:
-          "long",
-
-        day:
-          "numeric",
-
-        weekday:
-          "long"
-
+        year: "numeric",
+        month: "long",
+        day: "numeric"
       }
-    ).format(date);
+    );
 
   } catch (error) {
 
@@ -2741,10 +1937,23 @@ function formatArchiveDate(
 
 }
 
-
 /* ============================================================
    FORECAST BADGE
    ============================================================ */
+
+/*
+ * اصلاح مهم:
+ *
+ * اگر currentArchiveDate = latest باشد،
+ * تاریخ تابلو فقط از setupTomorrowDate()
+ * گرفته می‌شود.
+ *
+ * بنابراین metadata قدیمی دیگر نمی‌تواند
+ * تاریخ تابلو را از فردا به امروز برگرداند.
+ *
+ * اگر یک تاریخ آرشیوی انتخاب شده باشد،
+ * همان تاریخ آرشیو نمایش داده می‌شود.
+ */
 
 function updateForecastBadgeFromMetadata() {
 
@@ -2754,36 +1963,82 @@ function updateForecastBadgeFromMetadata() {
     );
 
   if (!badge) {
+    return;
+  }
+
+  /*
+   * حالت آخرین پیش‌بینی
+   */
+  if (
+    APP_STATE.data.currentArchiveDate ===
+    "latest"
+  ) {
+
+    setupTomorrowDate();
 
     return;
 
   }
 
-  const metadata =
-    APP_STATE.data.fliMetadata ||
-    {};
+  /*
+   * حالت آرشیو
+   */
+  const archiveDate =
+    APP_STATE.data.currentArchiveDate;
 
-  const forecastDate =
-    metadata.forecast_date ||
-    metadata.target_date;
-
-  if (!forecastDate) {
+  if (
+    archiveDate &&
+    archiveDate !== "latest"
+  ) {
 
     badge.textContent =
-      "تاریخ پیش‌بینی نامشخص است";
+      `پیش‌بینی برای ${formatArchiveDate(archiveDate)}`;
 
     return;
 
   }
 
-  badge.textContent =
-    `پیش‌بینی برای ${formatArchiveDate(forecastDate)}`;
+  /*
+   * fallback
+   */
+  setupTomorrowDate();
 
 }
 
+/* ============================================================
+   ARCHIVE EXCEL
+   ============================================================ */
+
+function releaseArchiveExcelObjectUrl() {
+
+  if (
+    APP_STATE.ui.excelObjectUrl
+  ) {
+
+    try {
+
+      URL.revokeObjectURL(
+        APP_STATE.ui.excelObjectUrl
+      );
+
+    } catch (error) {
+
+      console.warn(
+        "Excel object URL cleanup:",
+        error
+      );
+
+    }
+
+    APP_STATE.ui.excelObjectUrl =
+      null;
+
+  }
+
+}
 
 /* ============================================================
-   EXCEL - LATEST
+   RESET EXCEL
    ============================================================ */
 
 function resetExcelButtonToLatest() {
@@ -2794,19 +2049,16 @@ function resetExcelButtonToLatest() {
     );
 
   if (!button) {
-
     return;
-
   }
+
+  releaseArchiveExcelObjectUrl();
 
   button.href =
     "data/report/firis_report.xlsx";
 
   button.target =
     "_blank";
-
-  button.rel =
-    "noopener";
 
   button.removeAttribute(
     "download"
@@ -2817,9 +2069,566 @@ function resetExcelButtonToLatest() {
 
 }
 
+/* ============================================================
+   BUILD ARCHIVE EXCEL
+   ============================================================ */
+
+function buildArchiveExcelWorkbook() {
+
+  if (
+    typeof XLSX === "undefined"
+  ) {
+
+    throw new Error(
+      "کتابخانه Excel بارگذاری نشده است."
+    );
+
+  }
+
+  const metadata =
+    APP_STATE.data.fliMetadata || {};
+
+  const grid =
+    APP_STATE.data.fliGrid;
+
+  const archiveDate =
+    APP_STATE.data.currentArchiveDate;
+
+  if (
+    !archiveDate ||
+    archiveDate === "latest"
+  ) {
+
+    throw new Error(
+      "تاریخ آرشیو انتخاب نشده است."
+    );
+
+  }
+
+  if (
+    !grid ||
+    !Array.isArray(
+      grid.values
+    )
+  ) {
+
+    throw new Error(
+      "داده Grid آرشیو وجود ندارد."
+    );
+
+  }
+
+  const forecastDate =
+    metadata.forecast_date ||
+    metadata.target_date ||
+    archiveDate;
+
+  if (
+    String(forecastDate) !==
+    String(archiveDate)
+  ) {
+
+    throw new Error(
+      `تاریخ Metadata آرشیو (${forecastDate}) ` +
+      `با تاریخ انتخاب‌شده (${archiveDate}) یکسان نیست.`
+    );
+
+  }
+
+  const values = [];
+
+  for (
+    const row of grid.values
+  ) {
+
+    if (
+      !Array.isArray(row)
+    ) {
+
+      continue;
+
+    }
+
+    for (
+      const item of row
+    ) {
+
+      const number =
+        Number(item);
+
+      if (
+        Number.isFinite(number) &&
+        number >= 0 &&
+        number <= 100
+      ) {
+
+        values.push(
+          number
+        );
+
+      }
+
+    }
+
+  }
+
+  if (
+    values.length === 0
+  ) {
+
+    throw new Error(
+      "هیچ مقدار معتبر FLI در آرشیو پیدا نشد."
+    );
+
+  }
+
+  const sum =
+    values.reduce(
+      (
+        total,
+        value
+      ) => total + value,
+      0
+    );
+
+  const min =
+    Math.min(
+      ...values
+    );
+
+  const max =
+    Math.max(
+      ...values
+    );
+
+  const mean =
+    sum /
+    values.length;
+
+  const bounds =
+    parseBounds(
+      grid.bounds
+    );
+
+  const rows =
+    Number(grid.rows);
+
+  const cols =
+    Number(grid.cols);
+
+  const resolutionX =
+    bounds &&
+    cols > 0
+      ?
+        (
+          bounds.east -
+          bounds.west
+        ) /
+        cols
+      :
+        null;
+
+  const resolutionY =
+    bounds &&
+    rows > 0
+      ?
+        (
+          bounds.north -
+          bounds.south
+        ) /
+        rows
+      :
+        null;
+
+  const summaryRows = [
+
+    [
+      "گزارش خطر حریق استان فارس"
+    ],
+
+    [],
+
+    [
+      "تاریخ پیش‌بینی",
+      forecastDate
+    ],
+
+    [
+      "فایل FLI",
+      `fli_fars_${forecastDate}.tif`
+    ],
+
+    [
+      "سیستم مختصات",
+      metadata.crs ||
+      "EPSG:4326"
+    ],
+
+    [
+      "تعداد سلول معتبر",
+      values.length
+    ],
+
+    [
+      "حداقل FLI",
+      Number(
+        min.toFixed(2)
+      )
+    ],
+
+    [
+      "حداکثر FLI",
+      Number(
+        max.toFixed(2)
+      )
+    ],
+
+    [
+      "میانگین FLI",
+      Number(
+        mean.toFixed(2)
+      )
+    ],
+
+    [
+      "طبقه خطر استان",
+      getRisk(mean).label
+    ],
+
+    [
+      "رزولوشن X",
+      resolutionX !== null
+        ?
+          Number(
+            resolutionX.toFixed(9)
+          )
+        :
+          null
+    ],
+
+    [
+      "رزولوشن Y",
+      resolutionY !== null
+        ?
+          Number(
+            resolutionY.toFixed(9)
+          )
+        :
+          null
+    ]
+
+  ];
+
+  const classDefinitions = [
+
+    ["متوسط", 0, 25],
+
+    ["زیاد", 25, 50],
+
+    ["خیلی زیاد", 50, 75],
+
+    ["بحرانی", 75, 100.000001]
+
+  ];
+
+  const classRows = [
+
+    [
+      "طبقه خطر",
+      "حداقل FLI",
+      "حداکثر FLI",
+      "تعداد سلول",
+      "درصد از کل"
+    ]
+
+  ];
+
+  for (
+    const item of
+    classDefinitions
+  ) {
+
+    const label =
+      item[0];
+
+    const minimum =
+      item[1];
+
+    const maximum =
+      item[2];
+
+    const count =
+      values.filter(
+        value =>
+          value >= minimum &&
+          value < maximum
+      ).length;
+
+    const percent =
+      values.length > 0
+        ?
+          (
+            100 *
+            count /
+            values.length
+          )
+        :
+          0;
+
+    classRows.push(
+      [
+        label,
+        minimum,
+        Math.min(
+          maximum,
+          100
+        ),
+        count,
+        Number(
+          percent.toFixed(2)
+        )
+      ]
+    );
+
+  }
+
+  function collectRegionRows(
+    layer,
+    regionTitle
+  ) {
+
+    const rows = [
+
+      [
+        "ردیف",
+        "نام منطقه",
+        "نوع منطقه",
+        "میانگین FLI",
+        "حداقل FLI",
+        "حداکثر FLI",
+        "تعداد سلول معتبر",
+        "طبقه خطر"
+      ]
+
+    ];
+
+    if (!layer) {
+      return rows;
+    }
+
+    const features =
+      layer
+        .getLayers()
+        .map(
+          item =>
+            item.toGeoJSON()
+        );
+
+    features.forEach(
+      (
+        feature,
+        index
+      ) => {
+
+        const name =
+          getRegionName(
+            feature,
+            `${regionTitle} ${index + 1}`
+          );
+
+        const statistics =
+          regionStatistics(
+            feature
+          );
+
+        rows.push(
+          [
+
+            index + 1,
+
+            name,
+
+            regionTitle,
+
+            statistics
+              ?
+                Number(
+                  statistics.mean.toFixed(2)
+                )
+              :
+                null,
+
+            statistics
+              ?
+                Number(
+                  statistics.min.toFixed(2)
+                )
+              :
+                null,
+
+            statistics
+              ?
+                Number(
+                  statistics.max.toFixed(2)
+                )
+              :
+                null,
+
+            statistics
+              ?
+                statistics.count
+              :
+                0,
+
+            statistics
+              ?
+                getRisk(
+                  statistics.mean
+                ).label
+              :
+                "بدون داده"
+
+          ]
+        );
+
+      }
+    );
+
+    return rows;
+
+  }
+
+  const workbook =
+    XLSX.utils.book_new();
+
+  const summarySheet =
+    XLSX.utils.aoa_to_sheet(
+      summaryRows
+    );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    summarySheet,
+    "خلاصه"
+  );
+
+  const protectedRows =
+    collectRegionRows(
+      APP_STATE.layers.protected,
+      "مناطق چهارگانه"
+    );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(
+      protectedRows
+    ),
+    "مناطق_چهارگانه"
+  );
+
+  const huntingRows =
+    collectRegionRows(
+      APP_STATE.layers.hunting,
+      "مناطق شکار ممنوع"
+    );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(
+      huntingRows
+    ),
+    "مناطق_شکار_ممنوع"
+  );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(
+      classRows
+    ),
+    "طبقات_خطر"
+  );
+
+  const technicalRows = [
+
+    [
+      "CRS",
+      metadata.crs ||
+      "EPSG:4326"
+    ],
+
+    [
+      "Width",
+      cols
+    ],
+
+    [
+      "Height",
+      rows
+    ],
+
+    [
+      "Resolution X",
+      resolutionX !== null
+        ?
+          Number(
+            resolutionX.toFixed(9)
+          )
+        :
+          null
+    ],
+
+    [
+      "Resolution Y",
+      resolutionY !== null
+        ?
+          Number(
+            resolutionY.toFixed(9)
+          )
+        :
+          null
+    ],
+
+    [
+      "Left",
+      bounds?.west ?? null
+    ],
+
+    [
+      "Bottom",
+      bounds?.south ?? null
+    ],
+
+    [
+      "Right",
+      bounds?.east ?? null
+    ],
+
+    [
+      "Top",
+      bounds?.north ?? null
+    ],
+
+    [
+      "Forecast date",
+      forecastDate
+    ]
+
+  ];
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(
+      technicalRows
+    ),
+    "اطلاعات_فنی"
+  );
+
+  return workbook;
+
+}
 
 /* ============================================================
-   EXCEL - ARCHIVE
+   PREPARE ARCHIVE EXCEL
    ============================================================ */
 
 function prepareArchiveExcelButton() {
@@ -2830,9 +2639,7 @@ function prepareArchiveExcelButton() {
     );
 
   if (!button) {
-
     return;
-
   }
 
   const date =
@@ -2849,23 +2656,79 @@ function prepareArchiveExcelButton() {
 
   }
 
-  button.href =
-    `data/web/archive/${date}/firis_report.xlsx`;
+  try {
 
-  button.target =
-    "_blank";
+    const workbook =
+      buildArchiveExcelWorkbook();
 
-  button.rel =
-    "noopener";
+    const binary =
+      XLSX.write(
+        workbook,
+        {
+          bookType: "xlsx",
+          type: "array"
+        }
+      );
 
-  button.download =
-    `firis_report_${date}.xlsx`;
+    const blob =
+      new Blob(
+        [
+          binary
+        ],
+        {
+          type:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+      );
 
-  button.title =
-    `دانلود گزارش Excel آرشیو ${formatArchiveDate(date)}`;
+    releaseArchiveExcelObjectUrl();
+
+    const objectUrl =
+      URL.createObjectURL(
+        blob
+      );
+
+    APP_STATE.ui.excelObjectUrl =
+      objectUrl;
+
+    button.href =
+      objectUrl;
+
+    button.target =
+      "_blank";
+
+    button.download =
+      `firis_report_${date}.xlsx`;
+
+    button.title =
+      `گزارش Excel آرشیو ${formatArchiveDate(date)}`;
+
+  } catch (error) {
+
+    console.error(
+      "Archive Excel preparation error:",
+      error
+    );
+
+    releaseArchiveExcelObjectUrl();
+
+    button.href =
+      "#";
+
+    button.removeAttribute(
+      "download"
+    );
+
+    button.removeAttribute(
+      "target"
+    );
+
+    button.title =
+      "گزارش Excel آرشیو آماده نشد.";
+
+  }
 
 }
-
 
 /* ============================================================
    LOAD ARCHIVE DATES
@@ -2879,9 +2742,7 @@ async function loadArchiveDates() {
     );
 
   if (!select) {
-
     return;
-
   }
 
   try {
@@ -2899,7 +2760,9 @@ async function loadArchiveDates() {
         ?
           data
         :
-          Array.isArray(data?.dates)
+          Array.isArray(
+            data?.dates
+          )
             ?
               data.dates
             :
@@ -2915,15 +2778,7 @@ async function loadArchiveDates() {
               :
                 item?.date
         )
-        .filter(
-          Boolean
-        )
-        .filter(
-          date =>
-            /^\d{4}-\d{2}-\d{2}$/.test(
-              String(date)
-            )
-        )
+        .filter(Boolean)
         .sort();
 
     select.innerHTML =
@@ -2977,28 +2832,9 @@ async function loadArchiveDates() {
       error
     );
 
-    select.innerHTML =
-      "";
-
-    const latestOption =
-      document.createElement(
-        "option"
-      );
-
-    latestOption.value =
-      "latest";
-
-    latestOption.textContent =
-      "آخرین پیش‌بینی";
-
-    select.appendChild(
-      latestOption
-    );
-
   }
 
 }
-
 
 /* ============================================================
    LOAD ARCHIVE FORECAST
@@ -3008,23 +2844,20 @@ async function loadArchiveForecast(
   date
 ) {
 
-  /* ----------------------------------------------------------
-     LATEST
-     ---------------------------------------------------------- */
+  /*
+   * ==========================================================
+   * LATEST
+   * ==========================================================
+   */
 
   if (
     !date ||
     date === "latest"
   ) {
 
-    await Promise.all([
+    await loadFLIData();
 
-      loadFLIData(),
-
-      loadGrid()
-
-    ]);
-
+    await loadGrid();
 
     if (
       APP_STATE.layers.fli &&
@@ -3039,16 +2872,18 @@ async function loadArchiveForecast(
 
     }
 
-
     await loadFLI();
 
+    /*
+     * بسیار مهم:
+     * ابتدا currentArchiveDate روی latest قرار می‌گیرد،
+     * سپس badge فقط بر اساس تاریخ فردا تنظیم می‌شود.
+     */
 
     APP_STATE.data.currentArchiveDate =
       "latest";
 
-
     updateForecastBadgeFromMetadata();
-
 
     resetExcelButtonToLatest();
 
@@ -3056,14 +2891,14 @@ async function loadArchiveForecast(
 
   }
 
-
-  /* ----------------------------------------------------------
-     ARCHIVE
-     ---------------------------------------------------------- */
+  /*
+   * ==========================================================
+   * ARCHIVE
+   * ==========================================================
+   */
 
   const base =
     `data/web/archive/${date}/`;
-
 
   const responses =
     await Promise.all([
@@ -3082,7 +2917,6 @@ async function loadArchiveForecast(
 
     ]);
 
-
   const metadata =
     await responses[0].json();
 
@@ -3092,11 +2926,9 @@ async function loadArchiveForecast(
   const polygons =
     await responses[2].json();
 
-
   const metadataDate =
     metadata?.forecast_date ||
     metadata?.target_date;
-
 
   if (
     String(metadataDate) !==
@@ -3109,7 +2941,6 @@ async function loadArchiveForecast(
     );
 
   }
-
 
   if (
     !grid ||
@@ -3124,7 +2955,6 @@ async function loadArchiveForecast(
 
   }
 
-
   if (
     !polygons ||
     polygons.type !==
@@ -3137,25 +2967,6 @@ async function loadArchiveForecast(
 
   }
 
-
-  const polygonDate =
-    polygons?.properties?.forecast_date;
-
-
-  if (
-    polygonDate &&
-    String(polygonDate) !==
-      String(date)
-  ) {
-
-    throw new Error(
-      `تاریخ Polygon آرشیو اشتباه است: ` +
-      `انتخاب=${date}، داده=${polygonDate}`
-    );
-
-  }
-
-
   APP_STATE.data.fliMetadata =
     metadata;
 
@@ -3164,7 +2975,6 @@ async function loadArchiveForecast(
 
   APP_STATE.data.currentArchiveDate =
     date;
-
 
   if (
     APP_STATE.layers.fli &&
@@ -3179,62 +2989,51 @@ async function loadArchiveForecast(
 
   }
 
-
   APP_STATE.layers.fli =
     L.geoJSON(
       polygons,
       {
 
-        pane:
-          "fliRiskPane",
+        style: feature => {
 
-        style:
-          feature => {
+          const color =
+            feature.properties?.color ||
+            "#777";
 
-            const color =
-              getFeatureColor(
-                feature
-              );
+          return {
 
-            return {
+            color: color,
 
-              color:
-                color,
+            weight: .15,
 
-              weight:
-                .15,
+            opacity: .85,
 
-              opacity:
-                .85,
+            fillColor: color,
 
-              fillColor:
-                color,
+            fillOpacity: .72
 
-              fillOpacity:
-                .72
+          };
 
-            };
+        },
 
-          },
-
-        interactive:
-          false
+        interactive: false
 
       }
     );
-
 
   APP_STATE.layers.fli.addTo(
     APP_STATE.map
   );
 
+  /*
+   * در آرشیو، تاریخ انتخاب‌شده نمایش داده می‌شود.
+   */
 
   updateForecastBadgeFromMetadata();
 
   prepareArchiveExcelButton();
 
 }
-
 
 /* ============================================================
    ARCHIVE FILTER
@@ -3267,19 +3066,16 @@ function setupArchiveFilter() {
 
   }
 
-
   button.addEventListener(
     "click",
     event => {
 
       event.stopPropagation();
 
-
       const locationMenu =
         document.getElementById(
           "layersMenu"
         );
-
 
       if (locationMenu) {
 
@@ -3289,14 +3085,12 @@ function setupArchiveFilter() {
 
       }
 
-
       menu.classList.toggle(
         "show"
       );
 
     }
   );
-
 
   menu.addEventListener(
     "click",
@@ -3307,14 +3101,12 @@ function setupArchiveFilter() {
     }
   );
 
-
   select.addEventListener(
     "change",
     async event => {
 
       const date =
         event.target.value;
-
 
       try {
 
@@ -3329,14 +3121,9 @@ function setupArchiveFilter() {
           error
         );
 
-
         select.value =
           APP_STATE.data.currentArchiveDate ||
           "latest";
-
-
-        updateForecastBadgeFromMetadata();
-
 
         if (
           APP_STATE.data.currentArchiveDate ===
@@ -3345,13 +3132,14 @@ function setupArchiveFilter() {
 
           resetExcelButtonToLatest();
 
+          setupTomorrowDate();
+
         }
 
       }
 
     }
   );
-
 
   document.addEventListener(
     "click",
@@ -3377,7 +3165,6 @@ function setupArchiveFilter() {
 
 }
 
-
 /* ============================================================
    EXCEL BUTTON
    ============================================================ */
@@ -3390,11 +3177,8 @@ function setupExcelButton() {
     );
 
   if (!button) {
-
     return;
-
   }
-
 
   button.addEventListener(
     "click",
@@ -3403,51 +3187,29 @@ function setupExcelButton() {
       const currentDate =
         APP_STATE.data.currentArchiveDate;
 
-
       if (
         currentDate &&
         currentDate !== "latest"
       ) {
 
-        const archiveExcelUrl =
-          `data/web/archive/${currentDate}/firis_report.xlsx`;
+        if (
+          !button.href ||
+          button.href === "#" ||
+          !APP_STATE.ui.excelObjectUrl
+        ) {
 
+          event.preventDefault();
 
-        button.href =
-          archiveExcelUrl;
+          prepareArchiveExcelButton();
 
-        button.target =
-          "_blank";
-
-        button.rel =
-          "noopener";
-
-        button.download =
-          `firis_report_${currentDate}.xlsx`;
-
-        return;
+        }
 
       }
-
-
-      button.href =
-        "data/report/firis_report.xlsx";
-
-      button.target =
-        "_blank";
-
-      button.rel =
-        "noopener";
-
-      button.removeAttribute(
-        "download"
-      );
 
     }
   );
 
 }
-
 
 /* ============================================================
    PROTECTED
@@ -3463,31 +3225,22 @@ async function loadProtected() {
   const geojson =
     await response.json();
 
-
   APP_STATE.layers.protected =
     L.geoJSON(
       geojson,
       {
 
-        pane:
-          "filterPane",
-
         style: {
 
-          color:
-            "#1565c0",
+          color: "#1565c0",
 
-          weight:
-            1.7,
+          weight: 1.7,
 
-          opacity:
-            .95,
+          opacity: .95,
 
-          fillColor:
-            "#42a5f5",
+          fillColor: "#42a5f5",
 
-          fillOpacity:
-            .10
+          fillOpacity: .10
 
         },
 
@@ -3508,11 +3261,9 @@ async function loadProtected() {
       }
     );
 
-
   return APP_STATE.layers.protected;
 
 }
-
 
 /* ============================================================
    HUNTING
@@ -3528,31 +3279,22 @@ async function loadHunting() {
   const geojson =
     await response.json();
 
-
   APP_STATE.layers.hunting =
     L.geoJSON(
       geojson,
       {
 
-        pane:
-          "filterPane",
-
         style: {
 
-          color:
-            "#7b1fa2",
+          color: "#7b1fa2",
 
-          weight:
-            1.7,
+          weight: 1.7,
 
-          opacity:
-            .95,
+          opacity: .95,
 
-          fillColor:
-            "#ab47bc",
+          fillColor: "#ab47bc",
 
-          fillOpacity:
-            .10
+          fillOpacity: .10
 
         },
 
@@ -3573,11 +3315,9 @@ async function loadHunting() {
       }
     );
 
-
   return APP_STATE.layers.hunting;
 
 }
-
 
 /* ============================================================
    BOUNDS
@@ -3588,132 +3328,83 @@ function parseBounds(
 ) {
 
   if (
-    bounds &&
-    typeof bounds === "object" &&
-    !Array.isArray(bounds)
+    !Array.isArray(bounds) ||
+    bounds.length < 2
   ) {
 
-    const west =
-      Number(bounds.west);
-
-    const south =
-      Number(bounds.south);
-
-    const east =
-      Number(bounds.east);
-
-    const north =
-      Number(bounds.north);
-
-
-    if (
-      Number.isFinite(west) &&
-      Number.isFinite(south) &&
-      Number.isFinite(east) &&
-      Number.isFinite(north) &&
-      west < east &&
-      south < north
-    ) {
-
-      return {
-
-        south:
-          south,
-
-        north:
-          north,
-
-        west:
-          west,
-
-        east:
-          east
-
-      };
-
-    }
+    return null;
 
   }
 
+  const a =
+    bounds[0];
+
+  const b =
+    bounds[1];
 
   if (
-    Array.isArray(bounds) &&
-    bounds.length >= 2
+    !Array.isArray(a) ||
+    !Array.isArray(b) ||
+    a.length < 2 ||
+    b.length < 2
   ) {
 
-    const a =
-      bounds[0];
-
-    const b =
-      bounds[1];
-
-
-    if (
-      Array.isArray(a) &&
-      Array.isArray(b) &&
-      a.length >= 2 &&
-      b.length >= 2
-    ) {
-
-      const y1 =
-        Number(a[0]);
-
-      const x1 =
-        Number(a[1]);
-
-      const y2 =
-        Number(b[0]);
-
-      const x2 =
-        Number(b[1]);
-
-
-      if (
-        Number.isFinite(y1) &&
-        Number.isFinite(x1) &&
-        Number.isFinite(y2) &&
-        Number.isFinite(x2)
-      ) {
-
-        return {
-
-          south:
-            Math.min(
-              y1,
-              y2
-            ),
-
-          north:
-            Math.max(
-              y1,
-              y2
-            ),
-
-          west:
-            Math.min(
-              x1,
-              x2
-            ),
-
-          east:
-            Math.max(
-              x1,
-              x2
-            )
-
-        };
-
-      }
-
-    }
+    return null;
 
   }
 
+  const y1 =
+    Number(a[0]);
 
-  return null;
+  const x1 =
+    Number(a[1]);
+
+  const y2 =
+    Number(b[0]);
+
+  const x2 =
+    Number(b[1]);
+
+  if (
+    !Number.isFinite(y1) ||
+    !Number.isFinite(x1) ||
+    !Number.isFinite(y2) ||
+    !Number.isFinite(x2)
+  ) {
+
+    return null;
+
+  }
+
+  return {
+
+    south:
+      Math.min(
+        y1,
+        y2
+      ),
+
+    north:
+      Math.max(
+        y1,
+        y2
+      ),
+
+    west:
+      Math.min(
+        x1,
+        x2
+      ),
+
+    east:
+      Math.max(
+        x1,
+        x2
+      )
+
+  };
 
 }
-
 
 /* ============================================================
    COORDINATES
@@ -3742,7 +3433,6 @@ function validateCoords(
 
 }
 
-
 /* ============================================================
    GRID CELL
    ============================================================ */
@@ -3763,10 +3453,8 @@ function getPointValue(
 
   }
 
-
   const grid =
     APP_STATE.data.fliGrid;
-
 
   if (!grid) {
 
@@ -3774,12 +3462,10 @@ function getPointValue(
 
   }
 
-
   const bounds =
     parseBounds(
       grid.bounds
     );
-
 
   if (!bounds) {
 
@@ -3787,13 +3473,11 @@ function getPointValue(
 
   }
 
-
   const rows =
     Number(grid.rows);
 
   const cols =
     Number(grid.cols);
-
 
   if (
     !Number.isInteger(rows) ||
@@ -3809,14 +3493,12 @@ function getPointValue(
 
   }
 
-
   const {
     south,
     west,
     north,
     east
   } = bounds;
-
 
   const latRange =
     north -
@@ -3826,7 +3508,6 @@ function getPointValue(
     east -
     west;
 
-
   if (
     latRange <= 0 ||
     lonRange <= 0
@@ -3835,7 +3516,6 @@ function getPointValue(
     return null;
 
   }
-
 
   if (
     lat < south ||
@@ -3848,7 +3528,6 @@ function getPointValue(
 
   }
 
-
   let row =
     Math.floor(
       (
@@ -3857,7 +3536,6 @@ function getPointValue(
       ) *
       rows
     );
-
 
   let col =
     Math.floor(
@@ -3868,7 +3546,6 @@ function getPointValue(
       cols
     );
 
-
   row =
     Math.max(
       0,
@@ -3877,7 +3554,6 @@ function getPointValue(
         row
       )
     );
-
 
   col =
     Math.max(
@@ -3888,24 +3564,10 @@ function getPointValue(
       )
     );
 
-
-  const rawValue =
-    grid.values?.[row]?.[col];
-
-
-  if (
-    rawValue === null ||
-    rawValue === undefined
-  ) {
-
-    return null;
-
-  }
-
-
   const value =
-    Number(rawValue);
-
+    Number(
+      grid.values?.[row]?.[col]
+    );
 
   if (
     Number.isFinite(value) &&
@@ -3917,11 +3579,9 @@ function getPointValue(
 
   }
 
-
   return null;
 
 }
-
 
 /* ============================================================
    POINT INSIDE FARS
@@ -3944,12 +3604,10 @@ function pointInsideFars(
 
   }
 
-
   const point =
     turf.point(
       [lon, lat]
     );
-
 
   for (
     const layer of
@@ -3961,7 +3619,6 @@ function pointInsideFars(
       if (
         turf.booleanPointInPolygon(
           point,
-          layer.feature?.geometry ||
           layer.toGeoJSON()
         )
       ) {
@@ -3981,11 +3638,9 @@ function pointInsideFars(
 
   }
 
-
   return false;
 
 }
-
 
 /* ============================================================
    REGION STATISTICS
@@ -3998,19 +3653,16 @@ function regionStatistics(
   const grid =
     APP_STATE.data.fliGrid;
 
-
   if (!grid) {
 
     return null;
 
   }
 
-
   const bounds =
     parseBounds(
       grid.bounds
     );
-
 
   if (!bounds) {
 
@@ -4018,13 +3670,11 @@ function regionStatistics(
 
   }
 
-
   const rows =
     Number(grid.rows);
 
   const cols =
     Number(grid.cols);
-
 
   if (
     !Number.isInteger(rows) ||
@@ -4040,9 +3690,7 @@ function regionStatistics(
 
   }
 
-
   let bbox;
-
 
   try {
 
@@ -4062,7 +3710,6 @@ function regionStatistics(
 
   }
 
-
   if (
     !Array.isArray(bbox) ||
     bbox.length !== 4
@@ -4071,7 +3718,6 @@ function regionStatistics(
     return null;
 
   }
-
 
   const minLon =
     Number(bbox[0]);
@@ -4085,14 +3731,12 @@ function regionStatistics(
   const maxLat =
     Number(bbox[3]);
 
-
   const {
     south,
     west,
     north,
     east
   } = bounds;
-
 
   const latRange =
     north -
@@ -4101,7 +3745,6 @@ function regionStatistics(
   const lonRange =
     east -
     west;
-
 
   if (
     latRange <= 0 ||
@@ -4112,7 +3755,6 @@ function regionStatistics(
 
   }
 
-
   let startRow =
     Math.floor(
       (
@@ -4121,7 +3763,6 @@ function regionStatistics(
       ) *
       rows
     );
-
 
   let endRow =
     Math.ceil(
@@ -4132,7 +3773,6 @@ function regionStatistics(
       rows
     ) - 1;
 
-
   let startCol =
     Math.floor(
       (
@@ -4141,7 +3781,6 @@ function regionStatistics(
       ) *
       cols
     );
-
 
   let endCol =
     Math.ceil(
@@ -4152,7 +3791,6 @@ function regionStatistics(
       cols
     ) - 1;
 
-
   startRow =
     Math.max(
       0,
@@ -4161,7 +3799,6 @@ function regionStatistics(
         startRow
       )
     );
-
 
   endRow =
     Math.max(
@@ -4172,7 +3809,6 @@ function regionStatistics(
       )
     );
 
-
   startCol =
     Math.max(
       0,
@@ -4181,7 +3817,6 @@ function regionStatistics(
         startCol
       )
     );
-
 
   endCol =
     Math.max(
@@ -4192,7 +3827,6 @@ function regionStatistics(
       )
     );
 
-
   if (
     startRow > endRow ||
     startCol > endCol
@@ -4202,19 +3836,13 @@ function regionStatistics(
 
   }
 
+  let sum = 0;
 
-  let sum =
-    0;
+  let count = 0;
 
-  let count =
-    0;
+  let min = Infinity;
 
-  let min =
-    Infinity;
-
-  let max =
-    -Infinity;
-
+  let max = -Infinity;
 
   for (
     let row = startRow;
@@ -4230,30 +3858,16 @@ function regionStatistics(
       ) *
       latRange;
 
-
     for (
       let col = startCol;
       col <= endCol;
       col++
     ) {
 
-      const rawValue =
-        grid.values?.[row]?.[col];
-
-
-      if (
-        rawValue === null ||
-        rawValue === undefined
-      ) {
-
-        continue;
-
-      }
-
-
       const value =
-        Number(rawValue);
-
+        Number(
+          grid.values?.[row]?.[col]
+        );
 
       if (
         !Number.isFinite(value) ||
@@ -4265,7 +3879,6 @@ function regionStatistics(
 
       }
 
-
       const lon =
         west +
         (
@@ -4274,12 +3887,10 @@ function regionStatistics(
         ) *
         lonRange;
 
-
       const point =
         turf.point(
           [lon, lat]
         );
-
 
       try {
 
@@ -4290,28 +3901,23 @@ function regionStatistics(
           )
         ) {
 
-          sum +=
-            value;
+          sum += value;
 
           count++;
-
 
           if (
             value < min
           ) {
 
-            min =
-              value;
+            min = value;
 
           }
-
 
           if (
             value > max
           ) {
 
-            max =
-              value;
+            max = value;
 
           }
 
@@ -4330,7 +3936,6 @@ function regionStatistics(
 
   }
 
-
   if (
     count === 0
   ) {
@@ -4338,7 +3943,6 @@ function regionStatistics(
     return null;
 
   }
-
 
   return {
 
@@ -4358,7 +3962,6 @@ function regionStatistics(
 
 }
 
-
 /* ============================================================
    REGION NAME
    ============================================================ */
@@ -4371,35 +3974,22 @@ function getRegionName(
   const properties =
     feature?.properties || {};
 
-
   const keys = [
 
     "name",
-
     "NAME",
-
     "Name",
-
     "shapeName",
-
     "ShapeName",
-
     "NAME_1",
-
     "NAME_FA",
-
     "name_fa",
-
     "title",
-
     "TITLE",
-
     "نام",
-
     "نام منطقه"
 
   ];
-
 
   const found =
     keys
@@ -4413,7 +4003,6 @@ function getRegionName(
           String(value).trim()
       );
 
-
   return found
     ?
       String(found)
@@ -4421,7 +4010,6 @@ function getRegionName(
       fallback;
 
 }
-
 
 /* ============================================================
    REGION TYPE
@@ -4439,7 +4027,6 @@ function getRegionTypeTitle(
 
   }
 
-
   if (
     regionType === "hunting"
   ) {
@@ -4448,11 +4035,9 @@ function getRegionTypeTitle(
 
   }
 
-
   return "محدوده";
 
 }
-
 
 /* ============================================================
    REGION POPUP
@@ -4469,19 +4054,16 @@ function bindRegion(
       regionType
     );
 
-
   const name =
     getRegionName(
       feature,
       regionTypeTitle
     );
 
-
   const statistics =
     regionStatistics(
       feature
     );
-
 
   const mean =
     statistics
@@ -4490,12 +4072,10 @@ function bindRegion(
       :
         null;
 
-
   const risk =
     getRisk(
       mean
     );
-
 
   const popup = `
 
@@ -4507,11 +4087,7 @@ function bindRegion(
 
       <div
         class="popup-risk"
-        style="background:${risk.color};color:${
-          risk.color === FLI_PALETTE.nodata
-            ? "#263238"
-            : "#fff"
-        }"
+        style="background:${risk.color}"
       >
         ${risk.label}
       </div>
@@ -4558,20 +4134,12 @@ function bindRegion(
 
   `;
 
-
   layer.bindPopup(
     popup,
     {
-
-      maxWidth:
-        280,
-
-      pane:
-        "popupPane"
-
+      maxWidth: 280
     }
   );
-
 
   layer.on(
     "click",
@@ -4587,7 +4155,6 @@ function bindRegion(
   );
 
 }
-
 
 /* ============================================================
    MAP CLICK
@@ -4605,7 +4172,6 @@ function setupMapClick() {
       const lon =
         event.latlng.lng;
 
-
       if (
         APP_STATE.ui.locationFilter !==
         "all"
@@ -4619,23 +4185,17 @@ function setupMapClick() {
             :
               APP_STATE.layers.hunting;
 
-
         if (!activeLayer) {
-
           return;
-
         }
-
 
         const point =
           turf.point(
             [lon, lat]
           );
 
-
         let inside =
           false;
-
 
         for (
           const layer of
@@ -4647,13 +4207,11 @@ function setupMapClick() {
             if (
               turf.booleanPointInPolygon(
                 point,
-                layer.feature?.geometry ||
                 layer.toGeoJSON()
               )
             ) {
 
-              inside =
-                true;
+              inside = true;
 
               break;
 
@@ -4670,11 +4228,8 @@ function setupMapClick() {
 
         }
 
-
         if (!inside) {
-
           return;
-
         }
 
       } else {
@@ -4692,13 +4247,11 @@ function setupMapClick() {
 
       }
 
-
       const value =
         getPointValue(
           lat,
           lon
         );
-
 
       updateGauge(
 
@@ -4717,7 +4270,6 @@ function setupMapClick() {
 
       );
 
-
       if (
         !Number.isFinite(
           Number(value)
@@ -4728,21 +4280,10 @@ function setupMapClick() {
 
       }
 
-
       const risk =
         getRisk(
           value
         );
-
-
-      const popupTextColor =
-        risk.color ===
-        FLI_PALETTE.nodata
-          ?
-            "#263238"
-          :
-            "#fff";
-
 
       const popup = `
 
@@ -4754,10 +4295,7 @@ function setupMapClick() {
 
           <div
             class="popup-risk"
-            style="
-              background:${risk.color};
-              color:${popupTextColor};
-            "
+            style="background:${risk.color}"
           >
             ${risk.label}
           </div>
@@ -4779,18 +4317,11 @@ function setupMapClick() {
 
       `;
 
-
       APP_STATE.map.openPopup(
         popup,
         event.latlng,
         {
-
-          maxWidth:
-            280,
-
-          pane:
-            "popupPane"
-
+          maxWidth: 280
         }
       );
 
@@ -4798,7 +4329,6 @@ function setupMapClick() {
   );
 
 }
-
 
 /* ============================================================
    LAYER VISIBILITY
@@ -4810,11 +4340,8 @@ function setLayerVisible(
 ) {
 
   if (!layer) {
-
     return;
-
   }
-
 
   if (visible) {
 
@@ -4848,7 +4375,6 @@ function setLayerVisible(
 
 }
 
-
 /* ============================================================
    FIT FARS
    ============================================================ */
@@ -4864,10 +4390,8 @@ function fitFars() {
 
   }
 
-
   const bounds =
     APP_STATE.layers.fars.getBounds();
-
 
   if (
     !bounds.isValid()
@@ -4877,23 +4401,14 @@ function fitFars() {
 
   }
 
-
   APP_STATE.map.fitBounds(
     bounds,
     {
-
-      padding:
-        [60, 60],
-
-      maxZoom:
-        8,
-
-      animate:
-        true
-
+      padding: [60, 60],
+      maxZoom: 8,
+      animate: true
     }
   );
-
 
   setTimeout(
     () => {
@@ -4905,7 +4420,6 @@ function fitFars() {
   );
 
 }
-
 
 /* ============================================================
    FIT LAYER
@@ -4923,10 +4437,8 @@ function fitLayer(
 
   }
 
-
   const bounds =
     layer.getBounds();
-
 
   if (
     !bounds.isValid()
@@ -4938,25 +4450,16 @@ function fitLayer(
 
   }
 
-
   APP_STATE.map.fitBounds(
     bounds,
     {
-
-      padding:
-        [70, 70],
-
-      maxZoom:
-        10,
-
-      animate:
-        true
-
+      padding: [70, 70],
+      maxZoom: 10,
+      animate: true
     }
   );
 
 }
-
 
 /* ============================================================
    UPDATE FILTER GAUGE
@@ -4972,7 +4475,6 @@ function updateFilterGauge(
       regionType
     );
 
-
   if (!layer) {
 
     updateGauge(
@@ -4985,7 +4487,6 @@ function updateFilterGauge(
 
   }
 
-
   let totalWeighted =
     0;
 
@@ -4995,7 +4496,6 @@ function updateFilterGauge(
   let regionCount =
     0;
 
-
   for (
     const regionLayer of
     layer.getLayers()
@@ -5004,12 +4504,10 @@ function updateFilterGauge(
     const feature =
       regionLayer.toGeoJSON();
 
-
     const statistics =
       regionStatistics(
         feature
       );
-
 
     if (
       !statistics ||
@@ -5023,20 +4521,16 @@ function updateFilterGauge(
 
     }
 
-
     totalWeighted +=
       statistics.mean *
       statistics.count;
 
-
     totalCells +=
       statistics.count;
-
 
     regionCount++;
 
   }
-
 
   if (
     totalCells <= 0
@@ -5052,11 +4546,9 @@ function updateFilterGauge(
 
   }
 
-
   const mean =
     totalWeighted /
     totalCells;
-
 
   updateGauge(
     mean,
@@ -5065,7 +4557,6 @@ function updateFilterGauge(
   );
 
 }
-
 
 /* ============================================================
    LOCATION FILTER
@@ -5085,7 +4576,6 @@ function applyLocationFilter(
 
   ];
 
-
   if (
     !validValues.includes(
       value
@@ -5097,28 +4587,23 @@ function applyLocationFilter(
 
   }
 
-
   APP_STATE.ui.locationFilter =
     value;
-
 
   setLayerVisible(
     APP_STATE.layers.fli,
     true
   );
 
-
   setLayerVisible(
     APP_STATE.layers.protected,
     false
   );
 
-
   setLayerVisible(
     APP_STATE.layers.hunting,
     false
   );
-
 
   if (
     value === "all"
@@ -5130,13 +4615,11 @@ function applyLocationFilter(
       "روی نقشه کلیک کنید"
     );
 
-
     fitFars();
 
     return;
 
   }
-
 
   if (
     value === "protected"
@@ -5147,12 +4630,10 @@ function applyLocationFilter(
       true
     );
 
-
     updateFilterGauge(
       APP_STATE.layers.protected,
       "protected"
     );
-
 
     fitLayer(
       APP_STATE.layers.protected
@@ -5161,7 +4642,6 @@ function applyLocationFilter(
     return;
 
   }
-
 
   if (
     value === "hunting"
@@ -5172,12 +4652,10 @@ function applyLocationFilter(
       true
     );
 
-
     updateFilterGauge(
       APP_STATE.layers.hunting,
       "hunting"
     );
-
 
     fitLayer(
       APP_STATE.layers.hunting
@@ -5188,7 +4666,6 @@ function applyLocationFilter(
   }
 
 }
-
 
 /* ============================================================
    LOCATION FILTER UI
@@ -5211,7 +4688,6 @@ function setupLocationFilter() {
       "locationFilter"
     );
 
-
   if (
     !button ||
     !menu ||
@@ -5222,19 +4698,16 @@ function setupLocationFilter() {
 
   }
 
-
   button.addEventListener(
     "click",
     event => {
 
       event.stopPropagation();
 
-
       const archiveMenu =
         document.getElementById(
           "archiveMenu"
         );
-
 
       if (archiveMenu) {
 
@@ -5244,14 +4717,12 @@ function setupLocationFilter() {
 
       }
 
-
       menu.classList.toggle(
         "show"
       );
 
     }
   );
-
 
   menu.addEventListener(
     "click",
@@ -5261,7 +4732,6 @@ function setupLocationFilter() {
 
     }
   );
-
 
   document.addEventListener(
     "click",
@@ -5285,7 +4755,6 @@ function setupLocationFilter() {
     }
   );
 
-
   select.addEventListener(
     "change",
     event => {
@@ -5293,7 +4762,6 @@ function setupLocationFilter() {
       applyLocationFilter(
         event.target.value
       );
-
 
       menu.classList.remove(
         "show"
@@ -5303,7 +4771,6 @@ function setupLocationFilter() {
   );
 
 }
-
 
 /* ============================================================
    FIT BUTTON
@@ -5316,13 +4783,9 @@ function setupFitButton() {
       "fitButton"
     );
 
-
   if (!button) {
-
     return;
-
   }
-
 
   button.addEventListener(
     "click",
@@ -5333,14 +4796,12 @@ function setupFitButton() {
           "locationFilter"
         );
 
-
       if (select) {
 
         select.value =
           "all";
 
       }
-
 
       applyLocationFilter(
         "all"
@@ -5350,7 +4811,6 @@ function setupFitButton() {
   );
 
 }
-
 
 /* ============================================================
    NIGHT MODE
@@ -5363,13 +4823,9 @@ function setupNightMode() {
       "modeButton"
     );
 
-
   if (!button) {
-
     return;
-
   }
-
 
   button.addEventListener(
     "click",
@@ -5378,12 +4834,10 @@ function setupNightMode() {
       APP_STATE.ui.nightMode =
         !APP_STATE.ui.nightMode;
 
-
       document.body.classList.toggle(
         "night",
         APP_STATE.ui.nightMode
       );
-
 
       button.textContent =
         APP_STATE.ui.nightMode
@@ -5391,7 +4845,6 @@ function setupNightMode() {
             "🌙"
           :
             "☀️";
-
 
       button.title =
         APP_STATE.ui.nightMode
@@ -5404,7 +4857,6 @@ function setupNightMode() {
   );
 
 }
-
 
 /* ============================================================
    ABOUT
@@ -5427,7 +4879,6 @@ function setupAbout() {
       "aboutClose"
     );
 
-
   if (
     !overlay ||
     !openButton ||
@@ -5437,7 +4888,6 @@ function setupAbout() {
     return;
 
   }
-
 
   openButton.addEventListener(
     "click",
@@ -5450,7 +4900,6 @@ function setupAbout() {
     }
   );
 
-
   closeButton.addEventListener(
     "click",
     () => {
@@ -5461,7 +4910,6 @@ function setupAbout() {
 
     }
   );
-
 
   overlay.addEventListener(
     "click",
@@ -5479,7 +4927,6 @@ function setupAbout() {
 
     }
   );
-
 
   document.addEventListener(
     "keydown",
@@ -5500,7 +4947,6 @@ function setupAbout() {
 
 }
 
-
 /* ============================================================
    START
    ============================================================ */
@@ -5509,13 +4955,12 @@ async function startApp() {
 
   try {
 
-    initMap();
-
-
     /*
-     * latest همزمان با Metadata و Grid واقعی بارگذاری می‌شود.
-     * تاریخ تابلو از fli_latest.json خوانده می‌شود.
+     * ابتدا تاریخ فردا را نمایش بده
      */
+    setupTomorrowDate();
+
+    initMap();
 
     await Promise.all([
 
@@ -5525,12 +4970,9 @@ async function startApp() {
 
     ]);
 
-
     await loadFars();
 
-
     await loadFLI();
-
 
     await Promise.all([
 
@@ -5540,32 +4982,20 @@ async function startApp() {
 
     ]);
 
-
     setLayerVisible(
       APP_STATE.layers.fli,
       true
     );
-
 
     setLayerVisible(
       APP_STATE.layers.protected,
       false
     );
 
-
     setLayerVisible(
       APP_STATE.layers.hunting,
       false
     );
-
-
-    /*
-     * مقدار پیش‌فرض فیلتر مکانی
-     */
-
-    APP_STATE.ui.locationFilter =
-      "all";
-
 
     setupMapClick();
 
@@ -5581,22 +5011,26 @@ async function startApp() {
 
     setupExcelButton();
 
-
     await loadArchiveDates();
 
+    /*
+     * مهم:
+     *
+     * اینجا دیگر metadata اجازه ندارد
+     * تاریخ latest را overwrite کند.
+     *
+     * چون حالت اولیه latest است،
+     * تاریخ تابلو = فردای ایران.
+     */
 
     APP_STATE.data.currentArchiveDate =
       "latest";
 
-
     updateForecastBadgeFromMetadata();
-
 
     resetExcelButtonToLatest();
 
-
     fitFars();
-
 
     setTimeout(
       () => {
@@ -5609,18 +5043,9 @@ async function startApp() {
       500
     );
 
-
     console.log(
       "FIRIS initialized successfully."
     );
-
-
-    console.log(
-      "Latest forecast date:",
-      APP_STATE.data.fliMetadata?.forecast_date ||
-      APP_STATE.data.fliMetadata?.target_date
-    );
-
 
   } catch (error) {
 
@@ -5629,12 +5054,10 @@ async function startApp() {
       error
     );
 
-
     const message =
       document.createElement(
         "div"
       );
-
 
     message.style.cssText = `
 
@@ -5646,7 +5069,7 @@ async function startApp() {
 
       transform:translateX(-50%);
 
-      z-index:99999;
+      z-index:9999;
 
       background:#b40000;
 
@@ -5666,16 +5089,10 @@ async function startApp() {
 
       direction:rtl;
 
-      max-width:90vw;
-
-      text-align:center;
-
     `;
-
 
     message.textContent =
       "خطا در بارگذاری داده‌های سامانه";
-
 
     document.body.appendChild(
       message
@@ -5684,7 +5101,6 @@ async function startApp() {
   }
 
 }
-
 
 /* ============================================================
    DOM READY
