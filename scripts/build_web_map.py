@@ -3,7 +3,7 @@
 FIRIS - Build Web GIS products from a dated FLI GeoTIFF.
 
 Input:
-    outputs/fli_fars_YYYY-MM-DD.tif
+    data/outputs/fli_fars_YYYY-MM-DD.tif
 
 Outputs:
     data/web/fli_latest.json
@@ -13,6 +13,15 @@ Outputs:
     data/web/archive/YYYY-MM-DD/fli.json
     data/web/archive/YYYY-MM-DD/fli_grid.json
     data/web/archive/YYYY-MM-DD/fli_polygons.geojson
+
+The generated "latest" files always represent the exact dated input raster.
+The archive for the same forecast date is generated from the same source in
+the same run.
+
+The grid JSON preserves the raster row/column arrangement and is used by the
+front-end for point queries and regional statistics.
+The polygon GeoJSON is classified into the four FIRIS risk classes and
+dissolved into contiguous polygons so the web map remains practical.
 """
 
 from __future__ import annotations
@@ -39,25 +48,12 @@ from shapely.ops import unary_union
 # RISK CLASSIFICATION
 # ============================================================
 
-# Web display classification:
-#
-# 0-40   -> متوسط
-# 40-60  -> زیاد
-# 60-80  -> خیلی زیاد
-# 80-100 -> بحرانی
-#
-# IMPORTANT:
-# The original FLI raster values remain unchanged.
-# Only the Web GIS display classification is changed.
-
 RISK_CLASSES = (
-    ("متوسط", 0.0, 40.0, "#FDD835"),
-    ("زیاد", 40.0, 60.0, "#FB8C00"),
-    ("خیلی زیاد", 60.0, 80.0, "#E53935"),
-    ("بحرانی", 80.0, 100.000001, "#880E4F"),
+    ("متوسط", 0.0, 25.0, "#C7A900"),
+    ("زیاد", 25.0, 50.0, "#FB8C00"),
+    ("خیلی زیاد", 50.0, 75.0, "#E53935"),
+    ("بحرانی", 75.0, 100.000001, "#880E4F"),
 )
-
-NODATA_COLOR = "#ECEFF1"
 
 RISK_CODE_TO_INFO = {
     index + 1: item
@@ -66,52 +62,33 @@ RISK_CODE_TO_INFO = {
 
 
 # ============================================================
-# WEB POLYGON CLEANUP
-# ============================================================
-
-# فقط لکه‌های بسیار کوچک برای نمایش Web GIS حذف می‌شوند.
-#
-# این فیلتر فقط روی Polygonهای خروجی وب اعمال می‌شود.
-# مقدار واقعی FLI و فایل fli_latest_grid.json هرگز تغییر نمی‌کند.
-
-MIN_POLYGON_CELLS = 9
-
-
-# ============================================================
 # ARGUMENTS
 # ============================================================
 
 def parse_args() -> argparse.Namespace:
-
     parser = argparse.ArgumentParser(
-        description=(
-            "Build FIRIS Web GIS products "
-            "from a dated FLI GeoTIFF."
-        )
+        description="Build FIRIS Web GIS products from a dated FLI GeoTIFF."
     )
 
     parser.add_argument(
         "--input",
         required=True,
         type=Path,
-        help="Input dated FLI GeoTIFF.",
+        help="Input dated FLI GeoTIFF."
     )
 
     parser.add_argument(
         "--output-dir",
         required=True,
         type=Path,
-        help="Web output directory, normally data/web.",
+        help="Web output directory, normally data/web."
     )
 
     parser.add_argument(
         "--archive-dir",
         default=None,
         type=Path,
-        help=(
-            "Optional archive root. "
-            "Defaults to <output-dir>/archive."
-        ),
+        help="Optional archive root. Defaults to <output-dir>/archive."
     )
 
     return parser.parse_args()
@@ -121,175 +98,88 @@ def parse_args() -> argparse.Namespace:
 # HELPERS
 # ============================================================
 
-DATE_PATTERN = re.compile(
-    r"fli_fars_(\d{4}-\d{2}-\d{2})\.tif$",
-    re.I,
-)
+DATE_PATTERN = re.compile(r"fli_fars_(\d{4}-\d{2}-\d{2})\.tif$", re.I)
 
 
-def require_file(
-    path: Path,
-    label: str,
-) -> None:
-
+def require_file(path: Path, label: str) -> None:
     if not path.is_file():
-
-        raise FileNotFoundError(
-            f"{label} not found: {path}"
-        )
+        raise FileNotFoundError(f"{label} not found: {path}")
 
 
-def extract_forecast_date(
-    path: Path,
-) -> str:
-
-    match = DATE_PATTERN.search(
-        path.name
-    )
-
+def extract_forecast_date(path: Path) -> str:
+    match = DATE_PATTERN.search(path.name)
     if match:
-
         return match.group(1)
 
-    match = re.search(
-        r"(\d{4}-\d{2}-\d{2})",
-        path.name,
-    )
-
+    # Fallback: accept any ISO date embedded in the filename.
+    match = re.search(r"(\d{4}-\d{2}-\d{2})", path.name)
     if match:
-
         return match.group(1)
 
     raise ValueError(
-        "Could not determine forecast date "
-        "from input filename. "
-        f"Expected fli_fars_YYYY-MM-DD.tif: "
-        f"{path.name}"
+        "Could not determine forecast date from input filename. "
+        f"Expected a name like fli_fars_YYYY-MM-DD.tif: {path.name}"
     )
 
 
-def risk_code(
-    value: float,
-) -> int:
-
-    for code, (
-        _label,
-        minimum,
-        maximum,
-        _color,
-    ) in enumerate(
-        RISK_CLASSES,
-        start=1,
-    ):
-
+def risk_code(value: float) -> int:
+    for code, (_, minimum, maximum, _) in enumerate(RISK_CLASSES, start=1):
         if minimum <= value < maximum:
-
             return code
-
     return 0
 
 
-def risk_info(
-    value: float,
-) -> tuple[str, float, float, str]:
-
+def risk_info(value: float) -> tuple[str, float, float, str]:
     if not math.isfinite(value):
+        return ("بدون داده", 0.0, 0.0, "#777")
 
-        return (
-            "بدون داده",
-            0.0,
-            0.0,
-            NODATA_COLOR,
-        )
-
-    for (
-        label,
-        minimum,
-        maximum,
-        color,
-    ) in RISK_CLASSES:
-
+    for label, minimum, maximum, color in RISK_CLASSES:
         if minimum <= value < maximum:
-
-            return (
-                label,
-                minimum,
-                maximum,
-                color,
-            )
+            return (label, minimum, maximum, color)
 
     if value < 0:
+        return ("بدون داده", 0.0, 0.0, "#777")
 
-        return (
-            "بدون داده",
-            0.0,
-            0.0,
-            NODATA_COLOR,
-        )
-
-    return (
-        "بحرانی",
-        80.0,
-        100.0,
-        "#880E4F",
-    )
+    return ("بحرانی", 75.0, 100.0, "#880E4F")
 
 
-def json_safe_number(
-    value: float | int | None,
-) -> float | int | None:
-
+def json_safe_number(value: float | int | None) -> float | int | None:
     if value is None:
-
         return None
 
     number = float(value)
 
     if not math.isfinite(number):
-
         return None
 
     return number
 
 
-def array_to_json_values(
-    array: np.ndarray,
-) -> list[list[float | None]]:
+def array_to_json_values(array: np.ndarray) -> list[list[float | None]]:
+    """
+    Convert the raster to a JSON-safe row-major grid.
 
+    Values are rounded to 4 decimal places. This keeps the click/grid
+    representation compact while retaining more precision than the UI
+    displays.
+    """
     result: list[list[float | None]] = []
 
     for row in array:
-
         out_row: list[float | None] = []
-
         for value in row:
-
             number = float(value)
-
             if not math.isfinite(number):
-
                 out_row.append(None)
-
             else:
-
-                out_row.append(
-                    round(number, 4)
-                )
-
+                out_row.append(round(number, 4))
         result.append(out_row)
 
     return result
 
 
-def atomic_write_json(
-    path: Path,
-    payload: Any,
-) -> None:
-
-    path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+def atomic_write_json(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
 
     fd, temp_name = tempfile.mkstemp(
         prefix=f".{path.name}.",
@@ -299,13 +189,11 @@ def atomic_write_json(
     )
 
     try:
-
         with os.fdopen(
             fd,
             "w",
             encoding="utf-8",
         ) as handle:
-
             json.dump(
                 payload,
                 handle,
@@ -313,18 +201,12 @@ def atomic_write_json(
                 separators=(",", ":"),
                 allow_nan=False,
             )
-
             handle.write("\n")
 
-        os.replace(
-            temp_name,
-            path,
-        )
+        os.replace(temp_name, path)
 
     finally:
-
         if os.path.exists(temp_name):
-
             os.unlink(temp_name)
 
 
@@ -332,212 +214,101 @@ def atomic_write_json(
 # READ FLI
 # ============================================================
 
-def read_fli(
-    path: Path,
-) -> tuple[
-    np.ndarray,
-    dict[str, Any],
-    dict[str, Any],
-]:
-
+def read_fli(path: Path) -> tuple[np.ndarray, dict[str, Any], dict[str, Any]]:
     with rasterio.open(path) as src:
-
         if src.count < 1:
-
-            raise ValueError(
-                "FLI raster has no bands."
-            )
+            raise ValueError("FLI raster has no bands.")
 
         if src.crs is None:
-
-            raise ValueError(
-                "FLI raster has no CRS."
-            )
+            raise ValueError("FLI raster has no CRS.")
 
         if src.crs.to_epsg() != 4326:
-
             raise ValueError(
-                "FLI raster must use EPSG:4326. "
-                f"Found: {src.crs}"
+                f"FLI raster must use EPSG:4326. Found: {src.crs}"
             )
 
-        data = src.read(1).astype(
-            np.float32,
-            copy=False,
-        )
+        data = src.read(1).astype(np.float32, copy=False)
 
         nodata = src.nodata
 
         valid = np.isfinite(data)
 
         if nodata is not None:
-
             try:
-
                 nodata_float = float(nodata)
-
                 if math.isnan(nodata_float):
-
                     valid &= ~np.isnan(data)
-
                 else:
-
                     valid &= ~np.isclose(
                         data,
                         nodata_float,
                         rtol=0.0,
                         atol=1e-8,
                     )
-
-            except (
-                TypeError,
-                ValueError,
-            ):
-
+            except (TypeError, ValueError):
                 pass
 
+        # FIRIS valid range.
         valid &= data >= 0.0
         valid &= data <= 100.0
 
-        clean = np.full_like(
-            data,
-            np.nan,
-            dtype=np.float32,
-        )
-
+        clean = np.full_like(data, np.nan, dtype=np.float32)
         clean[valid] = data[valid]
 
         bounds = src.bounds
 
         reference = {
-
-            "crs":
-                str(src.crs),
-
-            "width":
-                int(src.width),
-
-            "height":
-                int(src.height),
-
+            "crs": str(src.crs),
+            "width": int(src.width),
+            "height": int(src.height),
             "transform": [
-
                 float(src.transform.a),
-
                 float(src.transform.b),
-
                 float(src.transform.c),
-
                 float(src.transform.d),
-
                 float(src.transform.e),
-
                 float(src.transform.f),
-
             ],
-
             "bounds": {
-
-                "west":
-                    float(bounds.left),
-
-                "south":
-                    float(bounds.bottom),
-
-                "east":
-                    float(bounds.right),
-
-                "north":
-                    float(bounds.top),
+                "west": float(bounds.left),
+                "south": float(bounds.bottom),
+                "east": float(bounds.right),
+                "north": float(bounds.top),
             },
-
             "resolution": {
-
-                "x":
-                    float(abs(src.res[0])),
-
-                "y":
-                    float(abs(src.res[1])),
+                "x": float(abs(src.res[0])),
+                "y": float(abs(src.res[1])),
             },
-
             "nodata": (
-
                 None
-
                 if src.nodata is None
-
-                else json_safe_number(
-                    src.nodata
-                )
+                else json_safe_number(src.nodata)
             ),
         }
 
         stats = {
-
-            "count":
-                int(np.sum(valid)),
-
+            "count": int(np.sum(valid)),
             "min": (
-
                 None
-
                 if not np.any(valid)
-
-                else round(
-                    float(
-                        np.min(
-                            clean[valid]
-                        )
-                    ),
-                    6,
-                )
+                else round(float(np.min(clean[valid])), 6)
             ),
-
             "max": (
-
                 None
-
                 if not np.any(valid)
-
-                else round(
-                    float(
-                        np.max(
-                            clean[valid]
-                        )
-                    ),
-                    6,
-                )
+                else round(float(np.max(clean[valid])), 6)
             ),
-
             "mean": (
-
                 None
-
                 if not np.any(valid)
-
-                else round(
-                    float(
-                        np.mean(
-                            clean[valid]
-                        )
-                    ),
-                    6,
-                )
+                else round(float(np.mean(clean[valid])), 6)
             ),
         }
 
     if stats["count"] == 0:
+        raise ValueError("FLI raster contains no valid 0-100 pixels.")
 
-        raise ValueError(
-            "FLI raster contains no valid "
-            "0-100 pixels."
-        )
-
-    return (
-        clean,
-        reference,
-        stats,
-    )
+    return clean, reference, stats
 
 
 # ============================================================
@@ -549,34 +320,15 @@ def build_grid_json(
     reference: dict[str, Any],
     forecast_date: str,
 ) -> dict[str, Any]:
-
     return {
-
-        "forecast_date":
-            forecast_date,
-
-        "target_date":
-            forecast_date,
-
-        "crs":
-            reference["crs"],
-
-        "rows":
-            reference["height"],
-
-        "cols":
-            reference["width"],
-
-        "bounds":
-            reference["bounds"],
-
-        "resolution":
-            reference["resolution"],
-
-        "values":
-            array_to_json_values(
-                array
-            ),
+        "forecast_date": forecast_date,
+        "target_date": forecast_date,
+        "crs": reference["crs"],
+        "rows": reference["height"],
+        "cols": reference["width"],
+        "bounds": reference["bounds"],
+        "resolution": reference["resolution"],
+        "values": array_to_json_values(array),
     }
 
 
@@ -590,144 +342,48 @@ def build_metadata_json(
     stats: dict[str, Any],
     forecast_date: str,
 ) -> dict[str, Any]:
-
     return {
-
-        "project":
-            "FIRIS - Fars Integrated "
-            "Fire Information System",
-
-        "forecast_date":
-            forecast_date,
-
-        "target_date":
-            forecast_date,
-
-        "generated_at_utc":
-            datetime.now(
-                timezone.utc
-            ).isoformat(),
-
-        "source_file":
-            input_path.name,
-
-        "source_path":
-            str(input_path),
-
-        "crs":
-            reference["crs"],
-
-        "width":
-            reference["width"],
-
-        "height":
-            reference["height"],
-
-        "bounds":
-            reference["bounds"],
-
-        "resolution":
-            reference["resolution"],
-
-        "nodata":
-            reference["nodata"],
-
-        "statistics":
-            stats,
-
+        "project": "FIRIS - Fars Integrated Fire Information System",
+        "forecast_date": forecast_date,
+        "target_date": forecast_date,
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "source_file": input_path.name,
+        "source_path": str(input_path),
+        "crs": reference["crs"],
+        "width": reference["width"],
+        "height": reference["height"],
+        "bounds": reference["bounds"],
+        "resolution": reference["resolution"],
+        "nodata": reference["nodata"],
+        "statistics": stats,
         "risk_classes": [
-
             {
-
-                "label":
-                    label,
-
-                "minimum":
-                    minimum,
-
-                "maximum":
-                    min(
-                        maximum,
-                        100.0
-                    ),
-
-                "color":
-                    color,
+                "label": label,
+                "minimum": minimum,
+                "maximum": min(maximum, 100.0),
+                "color": color,
             }
-
-            for (
-                label,
-                minimum,
-                maximum,
-                color,
-            ) in RISK_CLASSES
+            for label, minimum, maximum, color in RISK_CLASSES
         ],
-
-        "classification_note":
-            (
-                "Web display uses four risk classes. "
-                "The previous low-risk class (0-20) "
-                "is merged into the medium-risk class "
-                "(0-40). Original FLI values remain "
-                "unchanged."
-            ),
-
         "grid": {
-
-            "row_order":
-                "north_to_south",
-
-            "column_order":
-                "west_to_east",
-
-            "coordinate_reference":
-                "EPSG:4326",
+            "row_order": "north_to_south",
+            "column_order": "west_to_east",
+            "coordinate_reference": "EPSG:4326",
         },
-
         "web_products": {
-
-            "latest_metadata":
-                "fli_latest.json",
-
-            "latest_grid":
-                "fli_latest_grid.json",
-
-            "latest_polygons":
-                "fli_polygons.geojson",
-
-            "archive_directory":
-                f"archive/{forecast_date}",
-        },
-
-        "polygon_cleanup": {
-
-            "general_minimum_polygon_cells":
-                MIN_POLYGON_CELLS,
-
-            "low_risk_component_filter":
-                "Disabled",
-
-            "description":
-                (
-                    "Only very small polygons are removed "
-                    "from the Web GIS vector layer. "
-                    "There is no separate low-risk class "
-                    "or low-risk connected-component sieve. "
-                    "The original FLI raster and grid "
-                    "remain unchanged."
-                ),
+            "latest_metadata": "fli_latest.json",
+            "latest_grid": "fli_latest_grid.json",
+            "latest_polygons": "fli_polygons.geojson",
+            "archive_directory": f"archive/{forecast_date}",
         },
     }
 
 
 # ============================================================
-# CLASSIFIED RASTER
+# CLASSIFIED POLYGONS
 # ============================================================
 
-def build_classified_raster(
-    array: np.ndarray,
-) -> np.ndarray:
-
+def build_classified_raster(array: np.ndarray) -> np.ndarray:
     classified = np.zeros(
         array.shape,
         dtype=np.uint8,
@@ -735,75 +391,46 @@ def build_classified_raster(
 
     finite = np.isfinite(array)
 
-    for code, (
-        _label,
-        minimum,
-        maximum,
-        _color,
-    ) in enumerate(
+    for code, (_, minimum, maximum, _) in enumerate(
         RISK_CLASSES,
         start=1,
     ):
-
         mask = (
-
             finite
-            &
-            (array >= minimum)
-            &
-            (array < maximum)
-
+            & (array >= minimum)
+            & (array < maximum)
         )
-
         classified[mask] = code
 
     return classified
 
 
-# ============================================================
-# POLYGONIZE
-# ============================================================
-
 def polygonize_classes(
     classified: np.ndarray,
     transform,
 ) -> dict[int, list[Any]]:
-
     """
-    Polygonize four Web GIS risk classes.
-
-    Class 0 / NoData is omitted.
+    Polygonize risk classes and dissolve contiguous polygons belonging to the
+    same class. Class 0 (NoData) is omitted.
     """
-
     groups: dict[int, list[Any]] = {
-
         code: []
-
         for code in RISK_CODE_TO_INFO
     }
 
     mask = classified > 0
 
     for geometry, value in shapes(
-
         classified,
-
         mask=mask,
-
         transform=transform,
-
         connectivity=4,
-
     ):
-
         code = int(value)
-
         if code <= 0:
             continue
 
-        geom = shape(
-            geometry
-        )
+        geom = shape(geometry)
 
         if geom.is_empty:
             continue
@@ -814,115 +441,28 @@ def polygonize_classes(
         if geom.is_empty:
             continue
 
-        groups.setdefault(
-            code,
-            [],
-        ).append(
-            geom
-        )
+        groups.setdefault(code, []).append(geom)
 
     return groups
 
-
-# ============================================================
-# FEATURE COLLECTION
-# ============================================================
 
 def make_feature_collection(
     classified: np.ndarray,
     transform,
     metadata: dict[str, Any],
 ) -> dict[str, Any]:
-
-    # IMPORTANT:
-    # No low-risk sieve is applied here.
-    #
-    # The old 0-20 class has been merged into
-    # the 0-40 "متوسط" class.
-
     grouped = polygonize_classes(
-
         classified,
-
         transform,
     )
 
     features: list[dict[str, Any]] = []
 
-    pixel_area = abs(
-
-        float(
-            transform.a *
-            transform.e
-        )
-
-        -
-
-        float(
-            transform.b *
-            transform.d
-        )
-    )
-
-    if pixel_area <= 0:
-
-        raise ValueError(
-            "Invalid raster transform: "
-            "pixel area is not positive."
-        )
-
-    min_polygon_area = (
-
-        pixel_area *
-        MIN_POLYGON_CELLS
-    )
-
-    original_polygon_count = 0
-    removed_small_polygons = 0
-    remaining_polygon_count = 0
-
     for code, geometries in grouped.items():
-
         if not geometries:
             continue
 
-        original_polygon_count += len(
-            geometries
-        )
-
-        filtered_geometries = []
-
-        for geom in geometries:
-
-            if geom.is_empty:
-                continue
-
-            if not geom.is_valid:
-                geom = geom.buffer(0)
-
-            if geom.is_empty:
-                continue
-
-            if geom.area < min_polygon_area:
-
-                removed_small_polygons += 1
-
-                continue
-
-            filtered_geometries.append(
-                geom
-            )
-
-        if not filtered_geometries:
-            continue
-
-        remaining_polygon_count += len(
-            filtered_geometries
-        )
-
-        dissolved = unary_union(
-            filtered_geometries
-        )
+        dissolved = unary_union(geometries)
 
         if dissolved.is_empty:
             continue
@@ -933,164 +473,46 @@ def make_feature_collection(
         if dissolved.is_empty:
             continue
 
-        (
-            label,
-            minimum,
-            maximum,
-            color,
-        ) = RISK_CODE_TO_INFO[code]
+        label, minimum, maximum, color = RISK_CODE_TO_INFO[code]
 
         features.append(
-
             {
-
-                "type":
-                    "Feature",
-
+                "type": "Feature",
                 "properties": {
-
-                    "risk_code":
-                        code,
-
-                    "risk":
-                        label,
-
-                    "label":
-                        label,
-
-                    "color":
-                        color,
-
-                    "minimum":
-                        minimum,
-
-                    "maximum":
-                        min(
-                            maximum,
-                            100.0,
-                        ),
-
-                    "forecast_date":
-                        metadata[
-                            "forecast_date"
-                        ],
+                    "risk_code": code,
+                    "risk": label,
+                    "label": label,
+                    "color": color,
+                    "minimum": minimum,
+                    "maximum": min(maximum, 100.0),
+                    "forecast_date": metadata["forecast_date"],
                 },
-
-                "geometry":
-                    mapping(
-                        dissolved
-                    ),
+                "geometry": mapping(dissolved),
             }
         )
 
     features.sort(
-
-        key=lambda item:
-            int(
-                item[
-                    "properties"
-                ][
-                    "risk_code"
-                ]
-            )
-
-    )
-
-    print()
-    print(
-        "WEB POLYGON CLEANUP"
-    )
-    print(
-        "-------------------"
-    )
-
-    print(
-        "Web risk classes            : 4"
-    )
-
-    print(
-        "Medium risk range           : 0-40"
-    )
-
-    print(
-        "General polygon minimum     : "
-        f"{MIN_POLYGON_CELLS} cells"
-    )
-
-    print(
-        "Low-risk component sieve    : Disabled"
-    )
-
-    print(
-        "Original polygons           : "
-        f"{original_polygon_count:,}"
-    )
-
-    print(
-        "Removed small polygons      : "
-        f"{removed_small_polygons:,}"
-    )
-
-    print(
-        "Remaining polygons          : "
-        f"{remaining_polygon_count:,}"
-    )
-
-    print(
-        "Final class features        : "
-        f"{len(features):,}"
+        key=lambda item: int(
+            item["properties"]["risk_code"]
+        )
     )
 
     return {
-
-        "type":
-            "FeatureCollection",
-
-        "name":
-            "FIRIS_FLI_Risk_Zones",
-
+        "type": "FeatureCollection",
+        "name": "FIRIS_FLI_Risk_Zones",
         "crs": {
-
-            "type":
-                "name",
-
+            "type": "name",
             "properties": {
-
-                "name":
-                    "EPSG:4326",
+                "name": "EPSG:4326",
             },
         },
-
         "properties": {
-
-            "forecast_date":
-                metadata[
-                    "forecast_date"
-                ],
-
-            "source_file":
-                metadata[
-                    "source_file"
-                ],
-
-            "generated_at_utc":
-                metadata[
-                    "generated_at_utc"
-                ],
-
-            "classification":
-                "FLI risk classes - 4 classes",
-
-            "minimum_polygon_cells":
-                MIN_POLYGON_CELLS,
-
-            "low_risk_component_filter":
-                "Disabled",
-
+            "forecast_date": metadata["forecast_date"],
+            "source_file": metadata["source_file"],
+            "generated_at_utc": metadata["generated_at_utc"],
+            "classification": "FLI risk classes",
         },
-
-        "features":
-            features,
+        "features": features,
     }
 
 
@@ -1103,27 +525,15 @@ def validate_metadata(
     expected_date: str,
     expected_source: str,
 ) -> None:
-
     with metadata_path.open(
         "r",
         encoding="utf-8",
     ) as handle:
-
-        metadata = json.load(
-            handle
-        )
+        metadata = json.load(handle)
 
     actual_date = (
-
-        metadata.get(
-            "forecast_date"
-        )
-
-        or
-
-        metadata.get(
-            "target_date"
-        )
+        metadata.get("forecast_date")
+        or metadata.get("target_date")
     )
 
     actual_source = metadata.get(
@@ -1132,25 +542,15 @@ def validate_metadata(
     )
 
     if str(actual_date) != expected_date:
-
         raise RuntimeError(
-
-            "Generated latest metadata "
-            "has the wrong forecast date: "
-
-            f"expected {expected_date}, "
-            f"got {actual_date}"
+            "Generated latest metadata has the wrong forecast date: "
+            f"expected {expected_date}, got {actual_date}"
         )
 
     if str(actual_source) != expected_source:
-
         raise RuntimeError(
-
-            "Generated latest metadata "
-            "has the wrong source file: "
-
-            f"expected {expected_source}, "
-            f"got {actual_source}"
+            "Generated latest metadata has the wrong source file: "
+            f"expected {expected_source}, got {actual_source}"
         )
 
 
@@ -1160,105 +560,48 @@ def validate_grid(
     expected_rows: int,
     expected_cols: int,
 ) -> None:
-
     with grid_path.open(
         "r",
         encoding="utf-8",
     ) as handle:
-
-        grid = json.load(
-            handle
-        )
+        grid = json.load(handle)
 
     actual_date = (
-
-        grid.get(
-            "forecast_date"
-        )
-
-        or
-
-        grid.get(
-            "target_date"
-        )
+        grid.get("forecast_date")
+        or grid.get("target_date")
     )
 
     if str(actual_date) != expected_date:
-
         raise RuntimeError(
-            "Generated latest grid has "
-            "the wrong forecast date: "
-            f"expected {expected_date}, "
-            f"got {actual_date}"
+            "Generated latest grid has the wrong forecast date: "
+            f"expected {expected_date}, got {actual_date}"
         )
 
-    if int(
-        grid.get(
-            "rows",
-            -1
-        )
-    ) != expected_rows:
+    if int(grid.get("rows", -1)) != expected_rows:
+        raise RuntimeError("Generated grid row count is incorrect.")
 
-        raise RuntimeError(
-            "Generated grid row count "
-            "is incorrect."
-        )
+    if int(grid.get("cols", -1)) != expected_cols:
+        raise RuntimeError("Generated grid column count is incorrect.")
 
-    if int(
-        grid.get(
-            "cols",
-            -1
-        )
-    ) != expected_cols:
+    values = grid.get("values")
 
-        raise RuntimeError(
-            "Generated grid column count "
-            "is incorrect."
-        )
-
-    values = grid.get(
-        "values"
-    )
-
-    if not isinstance(
-        values,
-        list
-    ):
-
-        raise RuntimeError(
-            "Generated grid values "
-            "are not a list."
-        )
+    if not isinstance(values, list):
+        raise RuntimeError("Generated grid values are not a list.")
 
     if len(values) != expected_rows:
-
         raise RuntimeError(
-            "Generated grid row count does "
-            "not match values length."
+            "Generated grid row count does not match values length."
         )
 
-    for row in values[
-        : min(
-            10,
-            len(values)
-        )
-    ]:
+    sample_rows = values[: min(10, len(values))]
 
-        if not isinstance(
-            row,
-            list
-        ):
-
-            raise RuntimeError(
-                "Generated grid contains "
-                "an invalid row."
-            )
+    for row in sample_rows:
+        if not isinstance(row, list):
+            raise RuntimeError("Generated grid contains an invalid row.")
 
         if len(row) != expected_cols:
-
             raise RuntimeError(
-                "Generated grid column count "
-                "does not match values width."
+                "Generated grid column count does not match values width."
             )
 
 
@@ -1266,57 +609,34 @@ def validate_polygons(
     polygon_path: Path,
     expected_date: str,
 ) -> None:
-
     with polygon_path.open(
         "r",
         encoding="utf-8",
     ) as handle:
+        geojson = json.load(handle)
 
-        geojson = json.load(
-            handle
-        )
-
-    if geojson.get(
-        "type"
-    ) != "FeatureCollection":
-
+    if geojson.get("type") != "FeatureCollection":
         raise RuntimeError(
-            "Generated FLI polygons are not "
-            "a FeatureCollection."
+            "Generated FLI polygons are not a FeatureCollection."
         )
 
-    properties = geojson.get(
-        "properties",
-        {}
-    )
+    properties = geojson.get("properties", {})
 
-    actual_date = properties.get(
-        "forecast_date"
+    actual_date = (
+        properties.get("forecast_date")
     )
 
     if str(actual_date) != expected_date:
-
         raise RuntimeError(
-
-            "Generated polygon forecast "
-            "date is incorrect: "
-
-            f"expected {expected_date}, "
-            f"got {actual_date}"
+            "Generated polygon forecast date is incorrect: "
+            f"expected {expected_date}, got {actual_date}"
         )
 
-    features = geojson.get(
-        "features"
-    )
+    features = geojson.get("features")
 
-    if not isinstance(
-        features,
-        list
-    ):
-
+    if not isinstance(features, list):
         raise RuntimeError(
-            "Generated polygon features "
-            "are invalid."
+            "Generated polygon features are invalid."
         )
 
 
@@ -1331,34 +651,22 @@ def write_product_set(
     reference: dict[str, Any],
     stats: dict[str, Any],
     forecast_date: str,
-) -> tuple[
-    Path,
-    Path,
-    Path,
-]:
-
+) -> tuple[Path, Path, Path]:
     destination.mkdir(
         parents=True,
         exist_ok=True,
     )
 
     metadata = build_metadata_json(
-
         input_path=input_path,
-
         reference=reference,
-
         stats=stats,
-
         forecast_date=forecast_date,
     )
 
     grid = build_grid_json(
-
         array=array,
-
         reference=reference,
-
         forecast_date=forecast_date,
     )
 
@@ -1367,77 +675,43 @@ def write_product_set(
     )
 
     polygons = make_feature_collection(
-
         classified=classified,
-
-        transform=_transform_from_reference(
-            reference
-        ),
-
+        transform=_transform_from_reference(reference),
         metadata=metadata,
     )
 
-    metadata_path = (
-
-        destination /
-        "fli_latest.json"
-    )
-
-    grid_path = (
-
-        destination /
-        "fli_latest_grid.json"
-    )
-
-    polygon_path = (
-
-        destination /
-        "fli_polygons.geojson"
-    )
+    metadata_path = destination / "fli_latest.json"
+    grid_path = destination / "fli_latest_grid.json"
+    polygon_path = destination / "fli_polygons.geojson"
 
     atomic_write_json(
-
         metadata_path,
-
         metadata,
     )
 
     atomic_write_json(
-
         grid_path,
-
         grid,
     )
 
     atomic_write_json(
-
         polygon_path,
-
         polygons,
     )
 
     return (
-
         metadata_path,
-
         grid_path,
-
         polygon_path,
     )
 
 
-def _transform_from_reference(
-    reference: dict[str, Any],
-):
-
+def _transform_from_reference(reference: dict[str, Any]):
     from affine import Affine
 
-    values = reference[
-        "transform"
-    ]
+    values = reference["transform"]
 
     return Affine(
-
         values[0],
         values[1],
         values[2],
@@ -1456,12 +730,7 @@ def archive_product_set(
     archive_root: Path,
     forecast_date: str,
 ) -> Path:
-
-    archive_dir = (
-
-        archive_root /
-        forecast_date
-    )
+    archive_dir = archive_root / forecast_date
 
     archive_dir.mkdir(
         parents=True,
@@ -1469,30 +738,18 @@ def archive_product_set(
     )
 
     shutil.copy2(
-
-        latest_dir /
-        "fli_latest.json",
-
-        archive_dir /
-        "fli.json",
+        latest_dir / "fli_latest.json",
+        archive_dir / "fli.json",
     )
 
     shutil.copy2(
-
-        latest_dir /
-        "fli_latest_grid.json",
-
-        archive_dir /
-        "fli_grid.json",
+        latest_dir / "fli_latest_grid.json",
+        archive_dir / "fli_grid.json",
     )
 
     shutil.copy2(
-
-        latest_dir /
-        "fli_polygons.geojson",
-
-        archive_dir /
-        "fli_polygons.geojson",
+        latest_dir / "fli_polygons.geojson",
+        archive_dir / "fli_polygons.geojson",
     )
 
     return archive_dir
@@ -1502,81 +759,39 @@ def validate_archive(
     archive_dir: Path,
     expected_date: str,
 ) -> None:
-
     required = {
-
         "fli.json",
-
         "fli_grid.json",
-
         "fli_polygons.geojson",
     }
 
     missing = [
-
         name
-
         for name in required
-
-        if not (
-            archive_dir /
-            name
-        ).is_file()
+        if not (archive_dir / name).is_file()
     ]
 
     if missing:
-
         raise RuntimeError(
-
-            "Archive is incomplete. "
-            "Missing: "
-
-            +
-
-            ", ".join(
-                missing
-            )
+            "Archive is incomplete. Missing: "
+            + ", ".join(missing)
         )
 
-    with (
-
-        archive_dir /
-        "fli.json"
-
-    ).open(
-
+    with (archive_dir / "fli.json").open(
         "r",
-
         encoding="utf-8",
-
     ) as handle:
-
-        metadata = json.load(
-            handle
-        )
+        metadata = json.load(handle)
 
     actual_date = (
-
-        metadata.get(
-            "forecast_date"
-        )
-
-        or
-
-        metadata.get(
-            "target_date"
-        )
+        metadata.get("forecast_date")
+        or metadata.get("target_date")
     )
 
     if str(actual_date) != expected_date:
-
         raise RuntimeError(
-
-            "Archive metadata date "
-            "is incorrect: "
-
-            f"expected {expected_date}, "
-            f"got {actual_date}"
+            "Archive metadata date is incorrect: "
+            f"expected {expected_date}, got {actual_date}"
         )
 
 
@@ -1585,7 +800,6 @@ def validate_archive(
 # ============================================================
 
 def main() -> None:
-
     args = parse_args()
 
     require_file(
@@ -1597,114 +811,56 @@ def main() -> None:
         args.input
     )
 
-    output_dir = (
-        args.output_dir.resolve()
+    output_dir = args.output_dir.resolve()
+
+    archive_root = (
+        args.archive_dir.resolve()
+        if args.archive_dir is not None
+        else output_dir / "archive"
     )
-
-    if args.archive_dir is not None:
-
-        archive_root = (
-            args.archive_dir.resolve()
-        )
-
-    else:
-
-        archive_root = (
-            output_dir /
-            "archive"
-        )
 
     print()
-    print(
-        "=" * 70
-    )
-    print(
-        "FIRIS WEB MAP BUILD"
-    )
-    print(
-        "=" * 70
-    )
+    print("=" * 70)
+    print("FIRIS WEB MAP BUILD")
+    print("=" * 70)
     print()
-
-    print(
-        f"Input FLI        : "
-        f"{args.input}"
-    )
-
-    print(
-        f"Forecast date    : "
-        f"{forecast_date}"
-    )
-
-    print(
-        f"Web output       : "
-        f"{output_dir}"
-    )
-
-    print(
-        f"Archive root     : "
-        f"{archive_root}"
-    )
+    print(f"Input FLI        : {args.input}")
+    print(f"Forecast date    : {forecast_date}")
+    print(f"Web output       : {output_dir}")
+    print(f"Archive root     : {archive_root}")
 
     # --------------------------------------------------------
     # READ INPUT
     # --------------------------------------------------------
 
-    (
-        array,
-        reference,
-        stats,
-    ) = read_fli(
+    array, reference, stats = read_fli(
         args.input
     )
 
     print()
-    print(
-        "INPUT FLI"
-    )
-    print(
-        "---------"
-    )
-
-    print(
-        f"CRS              : "
-        f"{reference['crs']}"
-    )
-
+    print("INPUT FLI")
+    print("---------")
+    print(f"CRS              : {reference['crs']}")
     print(
         f"Size             : "
         f"{reference['width']} x "
         f"{reference['height']}"
     )
-
     print(
         f"Resolution       : "
         f"{reference['resolution']['x']} x "
         f"{reference['resolution']['y']}"
     )
-
     print(
         f"Valid pixels     : "
         f"{stats['count']:,}"
     )
-
-    print(
-        f"Minimum          : "
-        f"{stats['min']}"
-    )
-
-    print(
-        f"Maximum          : "
-        f"{stats['max']}"
-    )
-
-    print(
-        f"Mean             : "
-        f"{stats['mean']}"
-    )
+    print(f"Minimum          : {stats['min']}")
+    print(f"Maximum          : {stats['max']}")
+    print(f"Mean             : {stats['mean']}")
 
     # --------------------------------------------------------
-    # STAGING
+    # TEMPORARY STAGING
     # --------------------------------------------------------
 
     output_dir.mkdir(
@@ -1717,35 +873,19 @@ def main() -> None:
         exist_ok=True,
     )
 
-    staging_parent = (
-        output_dir.parent
-    )
+    staging_parent = output_dir.parent
 
     with tempfile.TemporaryDirectory(
-
         prefix=".firis-web-build-",
-
-        dir=str(
-            staging_parent
-        ),
-
+        dir=str(staging_parent),
     ) as temp_root_string:
 
         temp_root = Path(
             temp_root_string
         )
 
-        temp_latest = (
-            temp_root /
-            "latest"
-        )
-
-        temp_archive = (
-
-            temp_root /
-            "archive" /
-            forecast_date
-        )
+        temp_latest = temp_root / "latest"
+        temp_archive = temp_root / "archive" / forecast_date
 
         temp_latest.mkdir(
             parents=True,
@@ -1758,297 +898,160 @@ def main() -> None:
         )
 
         # ----------------------------------------------------
-        # BUILD LATEST
+        # Build latest set
         # ----------------------------------------------------
 
-        (
-            metadata_path,
-            grid_path,
-            polygon_path,
-        ) = write_product_set(
-
+        metadata_path, grid_path, polygon_path = write_product_set(
             destination=temp_latest,
-
             input_path=args.input,
-
             array=array,
-
             reference=reference,
-
             stats=stats,
-
             forecast_date=forecast_date,
         )
 
         # ----------------------------------------------------
-        # ARCHIVE SAME PRODUCT SET
+        # Archive same exact product set
         # ----------------------------------------------------
 
         shutil.copy2(
-
             metadata_path,
-
-            temp_archive /
-            "fli.json",
+            temp_archive / "fli.json",
         )
 
         shutil.copy2(
-
             grid_path,
-
-            temp_archive /
-            "fli_grid.json",
+            temp_archive / "fli_grid.json",
         )
 
         shutil.copy2(
-
             polygon_path,
-
-            temp_archive /
-            "fli_polygons.geojson",
+            temp_archive / "fli_polygons.geojson",
         )
 
         # ----------------------------------------------------
-        # VALIDATE BEFORE LIVE OUTPUT
+        # Validation BEFORE touching live outputs
         # ----------------------------------------------------
 
         validate_metadata(
-
             metadata_path,
-
             expected_date=forecast_date,
-
             expected_source=args.input.name,
         )
 
         validate_grid(
-
             grid_path,
-
             expected_date=forecast_date,
-
-            expected_rows=reference[
-                "height"
-            ],
-
-            expected_cols=reference[
-                "width"
-            ],
+            expected_rows=reference["height"],
+            expected_cols=reference["width"],
         )
 
         validate_polygons(
-
             polygon_path,
-
             expected_date=forecast_date,
         )
 
         validate_archive(
-
             temp_archive,
-
             expected_date=forecast_date,
         )
 
         print()
-        print(
-            "✓ Staged Web GIS products validated."
-        )
-
-        print(
-            "✓ Latest date validated."
-        )
-
-        print(
-            "✓ Grid dimensions validated."
-        )
-
-        print(
-            "✓ Polygon metadata validated."
-        )
-
-        print(
-            "✓ Archive validated."
-        )
+        print("✓ Staged Web GIS products validated.")
+        print("✓ Latest date validated.")
+        print("✓ Grid dimensions validated.")
+        print("✓ Polygon metadata validated.")
+        print("✓ Archive validated.")
 
         # ----------------------------------------------------
-        # PUBLISH LATEST
+        # Publish latest atomically, file by file, after all
+        # products have already been successfully generated.
         # ----------------------------------------------------
 
-        for name in (
-
-            "fli_latest.json",
-
-            "fli_latest_grid.json",
-
-            "fli_polygons.geojson",
-
-        ):
-
-            os.replace(
-
-                temp_latest /
-                name,
-
-                output_dir /
-                name,
-            )
-
-        # ----------------------------------------------------
-        # PUBLISH ARCHIVE
-        # ----------------------------------------------------
-
-        live_archive = (
-
-            archive_root /
-            forecast_date
-        )
-
-        live_archive.mkdir(
-
+        output_dir.mkdir(
             parents=True,
-
             exist_ok=True,
         )
 
         for name in (
-
-            "fli.json",
-
-            "fli_grid.json",
-
+            "fli_latest.json",
+            "fli_latest_grid.json",
             "fli_polygons.geojson",
-
         ):
-
             os.replace(
+                temp_latest / name,
+                output_dir / name,
+            )
 
-                temp_archive /
-                name,
+        # ----------------------------------------------------
+        # Publish archive for this exact forecast date.
+        # ----------------------------------------------------
 
-                live_archive /
-                name,
+        live_archive = archive_root / forecast_date
+        live_archive.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        for name in (
+            "fli.json",
+            "fli_grid.json",
+            "fli_polygons.geojson",
+        ):
+            os.replace(
+                temp_archive / name,
+                live_archive / name,
             )
 
     # --------------------------------------------------------
-    # FINAL VALIDATION
+    # Final live validation
     # --------------------------------------------------------
 
-    live_metadata = (
-
-        output_dir /
-        "fli_latest.json"
-    )
-
-    live_grid = (
-
-        output_dir /
-        "fli_latest_grid.json"
-    )
-
-    live_polygons = (
-
-        output_dir /
-        "fli_polygons.geojson"
-    )
+    live_metadata = output_dir / "fli_latest.json"
+    live_grid = output_dir / "fli_latest_grid.json"
+    live_polygons = output_dir / "fli_polygons.geojson"
 
     validate_metadata(
-
         live_metadata,
-
         expected_date=forecast_date,
-
         expected_source=args.input.name,
     )
 
     validate_grid(
-
         live_grid,
-
         expected_date=forecast_date,
-
-        expected_rows=reference[
-            "height"
-        ],
-
-        expected_cols=reference[
-            "width"
-        ],
+        expected_rows=reference["height"],
+        expected_cols=reference["width"],
     )
 
     validate_polygons(
-
         live_polygons,
-
         expected_date=forecast_date,
     )
 
     validate_archive(
-
-        archive_root /
-        forecast_date,
-
+        archive_root / forecast_date,
         expected_date=forecast_date,
     )
 
     print()
-    print(
-        "=" * 70
-    )
-
-    print(
-        "FIRIS WEB MAP BUILD COMPLETED SUCCESSFULLY"
-    )
-
-    print(
-        "=" * 70
-    )
-
+    print("=" * 70)
+    print("FIRIS WEB MAP BUILD COMPLETED SUCCESSFULLY")
+    print("=" * 70)
     print()
-
-    print(
-        f"Forecast date    : "
-        f"{forecast_date}"
-    )
-
-    print(
-        f"Latest metadata  : "
-        f"{live_metadata}"
-    )
-
-    print(
-        f"Latest grid      : "
-        f"{live_grid}"
-    )
-
-    print(
-        f"Latest polygons  : "
-        f"{live_polygons}"
-    )
-
+    print(f"Forecast date    : {forecast_date}")
+    print(f"Latest metadata  : {live_metadata}")
+    print(f"Latest grid      : {live_grid}")
+    print(f"Latest polygons  : {live_polygons}")
     print(
         f"Archive          : "
         f"{archive_root / forecast_date}"
     )
-
     print()
-
-    print(
-        "✓ latest products belong to "
-        "the same dated FLI input."
-    )
-
-    print(
-        "✓ archive products belong to "
-        "the same forecast date."
-    )
-
-    print(
-        "✓ no older forecast can silently "
-        "become latest."
-    )
+    print("✓ latest products belong to the same dated FLI input.")
+    print("✓ archive products belong to the same forecast date.")
+    print("✓ no older forecast can silently become latest.")
 
 
 if __name__ == "__main__":
-
     main()
