@@ -2,18 +2,12 @@ name: Build FIRIS Fire Likelihood Index
 
 on:
 
-  # ============================================================
-  # اجرای خودکار فقط بعد از موفقیت Update FIRIS FWI
-  # ============================================================
   workflow_run:
     workflows:
       - "Update FIRIS FWI"
     types:
       - completed
 
-  # ============================================================
-  # اجرای دستی
-  # ============================================================
   workflow_dispatch:
 
 permissions:
@@ -27,10 +21,6 @@ jobs:
 
   build-firis:
 
-    # ============================================================
-    # اجرای خودکار فقط اگر FWI موفق بوده باشد
-    # اجرای دستی همیشه مجاز است
-    # ============================================================
     if: >
       github.event_name == 'workflow_dispatch'
       ||
@@ -47,24 +37,29 @@ jobs:
       # ========================================================
       # 1. CHECKOUT
       # ========================================================
+
       - name: 1. Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           persist-credentials: true
 
+
       # ========================================================
       # 2. SETUP PYTHON
       # ========================================================
+
       - name: 2. Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
 
+
       # ========================================================
       # 3. INSTALL DEPENDENCIES
       # ========================================================
+
       - name: 3. Install Required Dependencies
         shell: bash
         run: |
@@ -74,17 +69,17 @@ jobs:
 
           python -m pip install \
             numpy \
-            pandas \
             rasterio \
-            openpyxl \
             geopandas \
             shapely \
             requests \
             folium
 
+
       # ========================================================
       # 4. CALCULATE TODAY + TOMORROW IN IRAN
       # ========================================================
+
       - name: 4. Calculate FIRIS forecast date
         shell: bash
         run: |
@@ -143,30 +138,21 @@ jobs:
               )
           PY
 
+
       # ========================================================
       # 5. DEFINE EXACT INPUT PATHS
       # ========================================================
+
       - name: 5. Define FIRIS input paths
         shell: bash
         run: |
           set -euo pipefail
 
-          # ------------------------------------------------------
-          # FWI = exact forecast for tomorrow
-          # ------------------------------------------------------
           FWI_PATH="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
 
           FWI_METADATA="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.json"
 
-          # ------------------------------------------------------
-          # FUEL = coded raster
-          # ------------------------------------------------------
           FUEL_PATH="data/raw/fuel/fars_fuel.tif"
-
-          # ------------------------------------------------------
-          # FUEL TABLE
-          # ------------------------------------------------------
-          EXCEL_PATH="data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx"
 
           DEM_PATH="data/raw/topography/dem_fars.tif"
 
@@ -183,8 +169,6 @@ jobs:
           echo "FWI_METADATA=${FWI_METADATA}" >> "$GITHUB_ENV"
 
           echo "FUEL_PATH=${FUEL_PATH}" >> "$GITHUB_ENV"
-
-          echo "EXCEL_PATH=${EXCEL_PATH}" >> "$GITHUB_ENV"
 
           echo "DEM_PATH=${DEM_PATH}" >> "$GITHUB_ENV"
 
@@ -208,15 +192,16 @@ jobs:
           echo "FWI        : ${FWI_PATH}"
           echo "Metadata   : ${FWI_METADATA}"
           echo "Fuel       : ${FUEL_PATH}"
-          echo "Fuel Excel : ${EXCEL_PATH}"
           echo "DEM        : ${DEM_PATH}"
           echo "Boundary   : ${BOUNDARY_PATH}"
           echo "Output     : ${OUTPUT_DIR}"
           echo "Web output : ${WEB_OUTPUT_DIR}"
 
+
       # ========================================================
       # 6. VERIFY EXACT TOMORROW FWI
       # ========================================================
+
       - name: 6. Verify exact tomorrow FWI
         shell: bash
         run: |
@@ -227,7 +212,6 @@ jobs:
           echo "======================================================================"
 
           echo "Today Iran    : ${TODAY_IRAN}"
-
           echo "Required date : ${RUN_DATE}"
 
           echo ""
@@ -277,9 +261,11 @@ jobs:
 
           echo "OK: Exact tomorrow FWI exists."
 
+
       # ========================================================
       # 7. VALIDATE FWI METADATA DATE
       # ========================================================
+
       - name: 7. Validate FWI metadata date
         shell: bash
         run: |
@@ -339,9 +325,11 @@ jobs:
           )
           PY
 
+
       # ========================================================
       # 8. VALIDATE FWI RASTER
       # ========================================================
+
       - name: 8. Validate FWI raster
         shell: bash
         run: |
@@ -427,9 +415,11 @@ jobs:
           )
           PY
 
+
       # ========================================================
-      # 9. VERIFY STATIC INPUTS
+      # 9. VERIFY FIRIS STATIC INPUTS
       # ========================================================
+
       - name: 9. Verify FIRIS static inputs
         shell: bash
         run: |
@@ -442,7 +432,6 @@ jobs:
           for FILE in \
             "${FUEL_PATH}" \
             "${DEM_PATH}" \
-            "${EXCEL_PATH}" \
             "${BOUNDARY_PATH}"
           do
 
@@ -459,60 +448,57 @@ jobs:
 
           done
 
+
       # ========================================================
-      # 10. VALIDATE CODED FUEL RASTER
+      # 10. VALIDATE NEW CONTINUOUS FUEL RASTER
       # ========================================================
-      - name: 10. Validate coded Fuel raster
+
+      - name: 10. Validate Sentinel-2 Fuel raster
         shell: bash
         run: |
           set -euo pipefail
 
           python - <<'PY'
-          import math
           import os
+          import sys
 
           import numpy as np
-          import pandas as pd
           import rasterio
 
-          fuel_path = os.environ["FUEL_PATH"]
-
-          excel_path = os.environ["EXCEL_PATH"]
+          path = os.environ["FUEL_PATH"]
 
           print("=" * 70)
-          print("FUEL RASTER VALIDATION")
+          print("SENTINEL-2 FUEL RASTER VALIDATION")
           print("=" * 70)
 
           print(
-              f"Fuel raster : {fuel_path}"
+              f"Fuel raster : {path}"
           )
 
-          print(
-              f"Fuel Excel  : {excel_path}"
-          )
-
-          print("")
-
-          # ----------------------------------------------------
-          # Read coded Fuel raster
-          # ----------------------------------------------------
-          with rasterio.open(fuel_path) as src:
+          with rasterio.open(path) as src:
 
               print(
-                  f"Fuel CRS        : {src.crs}"
+                  f"CRS        : {src.crs}"
               )
 
               print(
-                  f"Fuel size       : "
-                  f"{src.width} x {src.height}"
+                  f"Width      : {src.width}"
               )
 
               print(
-                  f"Fuel resolution : {src.res}"
+                  f"Height     : {src.height}"
               )
 
               print(
-                  f"Fuel bounds     : {src.bounds}"
+                  f"Resolution : {src.res}"
+              )
+
+              print(
+                  f"Bounds     : {src.bounds}"
+              )
+
+              print(
+                  f"Data type  : {src.dtypes[0]}"
               )
 
               values = src.read(
@@ -520,163 +506,120 @@ jobs:
                   masked=True
               )
 
-              compressed = values.compressed()
+              valid = values.compressed()
 
-              if compressed.size == 0:
+              if valid.size == 0:
 
                   raise SystemExit(
                       "ERROR: Fuel raster contains no valid pixels."
                   )
 
-              unique_values = np.unique(
-                  compressed
+              minimum = float(
+                  np.min(valid)
               )
 
-          # ----------------------------------------------------
-          # IMPORTANT:
-          # Read the correct Fuelbeds_metric sheet.
-          # ----------------------------------------------------
-          df = pd.read_excel(
-              excel_path,
-              sheet_name="Fuelbeds_metric",
-              engine="openpyxl"
-          )
-
-          print("")
-
-          print(
-              "Excel sheet : Fuelbeds_metric"
-          )
-
-          print(
-              f"Excel rows  : {len(df)}"
-          )
-
-          print(
-              f"Excel columns: {len(df.columns)}"
-          )
-
-          if "JOIN_VALUE" not in df.columns:
-
-              raise SystemExit(
-                  "ERROR: JOIN_VALUE column is missing "
-                  "from Fuelbeds_metric."
+              maximum = float(
+                  np.max(valid)
               )
 
-          # ----------------------------------------------------
-          # Build Excel JOIN_VALUE set
-          # ----------------------------------------------------
-          excel_codes = set()
+              mean = float(
+                  np.mean(valid)
+              )
 
-          for value in (
-              df["JOIN_VALUE"]
-              .dropna()
-              .tolist()
-          ):
+              std = float(
+                  np.std(valid)
+              )
 
-              try:
+              valid_pixels = int(
+                  valid.size
+              )
 
-                  numeric = float(value)
+              total_pixels = int(
+                  src.width * src.height
+              )
 
-                  if math.isfinite(
-                      numeric
-                  ):
+              coverage = (
+                  100.0
+                  *
+                  valid_pixels
+                  /
+                  total_pixels
+              )
 
-                      excel_codes.add(
-                          numeric
-                      )
+              print(
+                  f"Valid pixels : {valid_pixels}"
+              )
 
-              except (
-                  TypeError,
-                  ValueError
+              print(
+                  f"Total pixels : {total_pixels}"
+              )
+
+              print(
+                  f"Coverage     : {coverage:.4f}%"
+              )
+
+              print(
+                  f"Min          : {minimum:.6f}"
+              )
+
+              print(
+                  f"Max          : {maximum:.6f}"
+              )
+
+              print(
+                  f"Mean         : {mean:.6f}"
+              )
+
+              print(
+                  f"Std          : {std:.6f}"
+              )
+
+              if minimum < 0.0:
+
+                  raise SystemExit(
+                      "ERROR: Fuel contains values below 0."
+                  )
+
+              if maximum > 1.0:
+
+                  raise SystemExit(
+                      "ERROR: Fuel contains values above 1."
+                  )
+
+              if (
+                  src.crs is None
+                  or
+                  src.crs.to_epsg() != 4326
               ):
 
-                  continue
-
-          # ----------------------------------------------------
-          # Build raster code set
-          # ----------------------------------------------------
-          raster_codes = set(
-              float(value)
-              for value in unique_values
-          )
-
-          mapped = sorted(
-              raster_codes.intersection(
-                  excel_codes
-              )
-          )
-
-          unmapped = sorted(
-              raster_codes.difference(
-                  excel_codes
-              )
-          )
+                  raise SystemExit(
+                      "ERROR: Fuel must be EPSG:4326."
+                  )
 
           print("")
 
           print(
-              "FUEL CODE MATCHING"
+              "OK: Sentinel-2 Fuel raster is valid."
           )
 
           print(
-              "------------------"
+              "OK: Fuel is continuous and normalized to 0-1."
           )
 
           print(
-              f"Unique raster codes : "
-              f"{len(raster_codes)}"
+              "OK: No Excel table is required."
           )
 
           print(
-              f"Mapped codes        : "
-              f"{len(mapped)}"
-          )
-
-          print(
-              f"Unmapped codes      : "
-              f"{len(unmapped)}"
-          )
-
-          if mapped:
-
-              print("")
-              print("Mapped codes:")
-
-              for code in mapped[:30]:
-
-                  print(
-                      f"  - {code}"
-                  )
-
-          if unmapped:
-
-              print("")
-              print(
-                  "First unmapped codes:"
-              )
-
-              for code in unmapped[:30]:
-
-                  print(
-                      f"  - {code}"
-                  )
-
-              raise SystemExit(
-                  "ERROR: Fuel raster contains codes "
-                  "that are not present in JOIN_VALUE."
-              )
-
-          print("")
-
-          print(
-              "OK: Fuel raster codes match JOIN_VALUE."
+              "OK: JOIN_VALUE is not required."
           )
           PY
+
 
       # ========================================================
       # 11. BUILD FIRIS
       # ========================================================
+
       - name: 11. Build FIRIS Fire Likelihood Index
         shell: bash
         run: |
@@ -687,26 +630,27 @@ jobs:
           echo "======================================================================"
 
           echo "Today Iran : ${TODAY_IRAN}"
-
           echo "Forecast   : ${RUN_DATE}"
 
           echo ""
 
           echo "USING FWI:"
-
           echo "${FWI_PATH}"
 
           echo ""
 
           echo "USING FUEL:"
-
           echo "${FUEL_PATH}"
 
           echo ""
 
-          echo "USING FUEL EXCEL:"
+          echo "USING DEM:"
+          echo "${DEM_PATH}"
 
-          echo "${EXCEL_PATH}"
+          echo ""
+
+          echo "USING BOUNDARY:"
+          echo "${BOUNDARY_PATH}"
 
           echo ""
 
@@ -714,14 +658,15 @@ jobs:
             --fwi-raster "${FWI_PATH}" \
             --fuel-raster "${FUEL_PATH}" \
             --dem-raster "${DEM_PATH}" \
-            --fuel-excel "${EXCEL_PATH}" \
             --output-dir "${OUTPUT_DIR}" \
             --run-date "${RUN_DATE}" \
             --boundary "${BOUNDARY_PATH}"
 
+
       # ========================================================
       # 12. VERIFY FLI OUTPUT
       # ========================================================
+
       - name: 12. Verify FLI output
         if: success()
         shell: bash
@@ -760,9 +705,11 @@ jobs:
 
           echo "OK: FLI output exists."
 
+
       # ========================================================
       # 13. BUILD WEB MAP
       # ========================================================
+
       - name: 13. Build Web Map
         if: success()
         shell: bash
@@ -808,9 +755,11 @@ jobs:
 
           echo "OK: Web map products created."
 
+
       # ========================================================
       # 14. VERIFY WEB OUTPUT
       # ========================================================
+
       - name: 14. Verify Web outputs
         if: success()
         shell: bash
@@ -822,12 +771,19 @@ jobs:
           echo "======================================================================"
 
           REQUIRED_FILES=(
+
             "${WEB_OUTPUT_DIR}/fli_latest.json"
+
             "${WEB_OUTPUT_DIR}/fli_latest_grid.json"
+
             "${WEB_OUTPUT_DIR}/fli_polygons.geojson"
+
             "${WEB_OUTPUT_DIR}/archive/${RUN_DATE}/fli.json"
+
             "${WEB_OUTPUT_DIR}/archive/${RUN_DATE}/fli_grid.json"
+
             "${WEB_OUTPUT_DIR}/archive/${RUN_DATE}/fli_polygons.geojson"
+
           )
 
           for FILE in "${REQUIRED_FILES[@]}"; do
@@ -849,9 +805,11 @@ jobs:
 
           echo "All required Web outputs exist."
 
+
       # ========================================================
       # 15. VERIFY FORECAST DATE IN LATEST JSON
       # ========================================================
+
       - name: 15. Verify Web forecast date
         if: success()
         shell: bash
@@ -908,9 +866,11 @@ jobs:
           )
           PY
 
+
       # ========================================================
       # 16. COMMIT + PUSH
       # ========================================================
+
       - name: 16. Commit and Push FIRIS outputs
         if: success()
         shell: bash
