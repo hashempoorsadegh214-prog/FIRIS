@@ -1,6 +1,6 @@
 {
   "project": "FIRIS - Fars Integrated Fire Information System",
-  "generated_at_utc": "2026-09-13T22:34:25.134948+00:00",
+  "generated_at_utc": "2026-09-14T10:25:27.249094+00:00",
   "run_date": "2026-09-15",
   "boundary": "fars.geojson",
   "formula": "FLI = 100 * (0.45 * F_FWI + 0.35 * F_Fuel + 0.20 * F_Topo)",
@@ -9,14 +9,16 @@
     "F_Fuel": 0.35,
     "F_Topo": 0.2
   },
-  "fuel_formula": {
-    "FineFuel": 0.35,
-    "DeadWood": 0.3,
-    "WoodyCover": 0.15,
-    "Litter": 0.2,
-    "CanopyStructure": null,
-    "WoodyCover_used_once": true,
-    "weights_sum": 1.0
+  "fuel_model": {
+    "source": "Sentinel-2-derived continuous Fuel raster",
+    "input_path": "data/raw/fuel/fars_fuel.tif",
+    "input_range": "0-1",
+    "fuel_definition": "Vegetation Availability x Fuel Dryness",
+    "normalization": "P5-P95 robust normalization performed upstream in GEE",
+    "excel_used": false,
+    "JOIN_VALUE_used": false,
+    "Fuelbeds_metric_used": false,
+    "resampling_to_FWI": "nearest neighbour"
   },
   "slope_method": {
     "calculation": "Native DEM central finite differences",
@@ -73,24 +75,24 @@
     },
     "Fuel": {
       "crs": "EPSG:4326",
-      "width": 2506,
-      "height": 1619,
-      "cell_size_x": 0.0027769971134153806,
-      "cell_size_y": 0.0027769971134153806,
+      "width": 2299,
+      "height": 2088,
+      "cell_size_x": 0.002245788210298804,
+      "cell_size_y": 0.002245788210298804,
       "bounds": {
-        "left": 49.45121465613049,
-        "bottom": 26.832288289763955,
-        "right": 56.41036942234943,
-        "top": 31.328246616383456
+        "left": 50.57964207234966,
+        "bottom": 27.025815322735806,
+        "right": 55.742709167826604,
+        "top": 31.715021105839707
       },
-      "nodata": 2147483647.0,
+      "nodata": null,
       "transform": [
-        0.0027769971134153806,
+        0.002245788210298804,
         0.0,
-        49.45121465613049,
+        50.57964207234966,
         0.0,
-        -0.0027769971134153806,
-        31.328246616383456
+        -0.002245788210298804,
+        31.715021105839707
       ]
     },
     "DEM": {
@@ -123,7 +125,7 @@
   },
   "normalization": {
     "F_FWI": "clip(FWI / 100, 0, 1)",
-    "F_Fuel": "0.35 FineFuel + 0.30 DeadWood + 0.15 WoodyCover + 0.20 Litter",
+    "F_Fuel": "direct continuous Fuel raster value in the range 0-1",
     "F_Topo": "clip(slope_degrees / 45, 0, 1)"
   },
   "grid_validation": {
@@ -294,13 +296,13 @@
     "province_pixels": 1820658,
     "FWI_valid_pixels": 1820658,
     "FWI_valid_percent": 100.0,
-    "Fuel_valid_pixels": 904755,
-    "Fuel_valid_percent": 49.6938,
+    "Fuel_valid_pixels": 1813410,
+    "Fuel_valid_percent": 99.6019,
     "Topo_valid_pixels": 1820636,
     "Topo_valid_percent": 99.9988,
-    "common_valid_pixels": 904753,
-    "common_valid_percent": 49.6937,
-    "common_valid_percent_of_FWI": 49.6937
+    "common_valid_pixels": 1813391,
+    "common_valid_percent": 99.6009,
+    "common_valid_percent_of_FWI": 99.6009
   },
   "statistics": {
     "FWI": {
@@ -317,12 +319,19 @@
       "mean": 0.548205,
       "std": 0.25608
     },
-    "F_Fuel": {
-      "count": 904755,
+    "Fuel": {
+      "count": 1813410,
       "min": 0.0,
-      "max": 0.232112,
-      "mean": 0.099255,
-      "std": 0.062829
+      "max": 1.0,
+      "mean": 0.210366,
+      "std": 0.153134
+    },
+    "F_Fuel": {
+      "count": 1813410,
+      "min": 0.0,
+      "max": 1.0,
+      "mean": 0.210366,
+      "std": 0.153134
     },
     "Slope_degrees": {
       "count": 1820636,
@@ -339,22 +348,17 @@
       "std": 0.184821
     },
     "FLI": {
-      "count": 904753,
+      "count": 1813391,
       "min": 0.0,
-      "max": 63.162334,
-      "mean": 36.58432,
-      "std": 8.567576
+      "max": 85.464043,
+      "mean": 36.069595,
+      "std": 14.968531
     }
-  },
-  "fuel": {
-    "unmapped_code_count": 0,
-    "unmapped_codes": []
   },
   "inputs": {
     "FWI": "data/raw/fwi/fwi_ecmwf_fars_2026-09-15.tif",
     "Fuel": "data/raw/fuel/fars_fuel.tif",
     "DEM": "data/raw/topography/dem_fars.tif",
-    "FuelExcel": "data/raw/fuel/Global_fuelbeds_parameters_v1.2.xlsx",
     "Boundary": "fars.geojson"
   },
   "outputs": {
@@ -369,7 +373,8 @@
     "NoData_policy": "NoData is preserved; missing source coverage is never extrapolated.",
     "coverage_warning": true,
     "grid_policy": "All final rasters use the exact FWI reference profile.",
-    "woody_policy": "Woody Cover is included exactly once.",
-    "canopy_policy": "Canopy Structure is not included because it is absent from Fuelbeds_metric."
+    "fuel_policy": "Fuel is a continuous Sentinel-2-derived 0-1 index and is used directly.",
+    "excel_policy": "No Excel fuel table is used.",
+    "classification_policy": "No external fuel classification lookup is used."
   }
 }
