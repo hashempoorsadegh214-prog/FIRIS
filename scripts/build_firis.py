@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 
 """
@@ -10,9 +9,21 @@ FLI = 100 * (
     + 0.20 * F_Topo
 )
 
+NEW FUEL MODEL
+--------------
+Fuel is a continuous Sentinel-2-derived raster
+with values normalized to the range 0-1.
+
+F_Fuel = direct value from the Fuel raster.
+
+No Excel table is used.
+No JOIN_VALUE is used.
+No Fuelbeds_metric lookup is used.
+
 Spatial rules:
 - FWI is the reference grid.
 - Fuel -> FWI grid using nearest neighbour.
+- Fuel values are expected in the range 0-1.
 - Slope is calculated on the native DEM.
 - DEM NoData values are NEVER artificially filled.
 - Slope is calculated only where the required neighbouring
@@ -20,11 +31,11 @@ Spatial rules:
 - Native slope is then aligned to the FWI grid.
 - All final calculations are restricted to fars.geojson.
 - NoData is preserved.
+- Missing Fuel coverage is never artificially extrapolated.
 - Coverage inside Fars is explicitly reported.
 - All final outputs use the exact FWI reference grid.
 - Main FLI weights remain unchanged.
 """
-
 
 from __future__ import annotations
 
@@ -36,7 +47,6 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import pandas as pd
 import rasterio
 from rasterio.enums import Resampling
 from rasterio.features import geometry_mask
@@ -58,29 +68,6 @@ FWI_MAX = 100.0
 SLOPE_REFERENCE = 45.0
 
 OUTPUT_NODATA = -9999.0
-
-
-# ============================================================
-# FUEL COMPONENT WEIGHTS
-# ============================================================
-
-# Available variables in Fuelbeds_metric:
-#
-# W_1hLoad       -> Fine Fuel
-# W_10hLoad      \
-# W_100hLoad      > Dead Wood
-# W_1000hLoad    /
-# Woody Cover    -> Woody Cover
-# Litter Cover   \
-# L_depth         > Litter
-#
-# Canopy Structure is NOT used because it is
-# not present in the supplied Fuelbeds_metric table.
-
-FINE_FUEL_WEIGHT = 0.35
-DEAD_WOOD_WEIGHT = 0.30
-WOODY_COVER_WEIGHT = 0.15
-LITTER_WEIGHT = 0.20
 
 
 # ============================================================
@@ -109,17 +96,6 @@ def parse_args():
         "--dem-raster",
         required=True,
         type=Path
-    )
-
-    parser.add_argument(
-        "--fuel-excel",
-        required=True,
-        type=Path
-    )
-
-    parser.add_argument(
-        "--fuel-code-column",
-        default="JOIN_VALUE"
     )
 
     parser.add_argument(
@@ -934,6 +910,68 @@ def align_to_fwi(
 
 
 # ============================================================
+# FUEL VALIDATION
+# ============================================================
+
+def validate_fuel_range(
+    fuel: np.ndarray
+):
+
+    valid = np.isfinite(
+        fuel
+    )
+
+    if not np.any(valid):
+
+        raise ValueError(
+            "Fuel raster contains no valid pixels."
+        )
+
+    minimum = float(
+        np.nanmin(fuel)
+    )
+
+    maximum = float(
+        np.nanmax(fuel)
+    )
+
+    print()
+    print(
+        "FUEL VALUE VALIDATION"
+    )
+    print(
+        "---------------------"
+    )
+
+    print(
+        f"Minimum Fuel value : "
+        f"{minimum:.6f}"
+    )
+
+    print(
+        f"Maximum Fuel value : "
+        f"{maximum:.6f}"
+    )
+
+    if minimum < 0.0:
+
+        raise ValueError(
+            "Fuel raster contains values below 0."
+        )
+
+    if maximum > 1.0:
+
+        raise ValueError(
+            "Fuel raster contains values above 1."
+        )
+
+    print(
+        "✓ Fuel values are within the expected "
+        "0-1 range."
+    )
+
+
+# ============================================================
 # METRIC CELL SIZE
 # ============================================================
 
@@ -1013,10 +1051,9 @@ def calculate_native_slope(
     Method:
         Central finite differences.
 
-    Important:
-        NoData pixels are NOT filled.
+    NoData values are never filled.
 
-        A slope value is calculated only where:
+    A slope value is calculated only where:
         - center DEM pixel is valid
         - north pixel is valid
         - south pixel is valid
@@ -1089,10 +1126,6 @@ def calculate_native_slope(
             f"Y={dy:.3f} m"
         )
 
-        # ----------------------------------------------------
-        # OUTPUT SLOPE
-        # ----------------------------------------------------
-
         slope = np.full(
             dem.shape,
             np.nan,
@@ -1132,10 +1165,6 @@ def calculate_native_slope(
                 2:
             ]
 
-            # ------------------------------------------------
-            # VALIDITY MASK
-            # ------------------------------------------------
-
             local_valid = (
 
                 np.isfinite(center)
@@ -1148,10 +1177,6 @@ def calculate_native_slope(
                 &
                 np.isfinite(east)
             )
-
-            # ------------------------------------------------
-            # GRADIENTS
-            # ------------------------------------------------
 
             dzdx = np.full(
                 center.shape,
@@ -1184,10 +1209,6 @@ def calculate_native_slope(
             ) / (
                 2.0 * dy
             )
-
-            # ------------------------------------------------
-            # SLOPE
-            # ------------------------------------------------
 
             gradient = np.sqrt(
 
@@ -1286,16 +1307,17 @@ def align_slope_to_fwi(
 
         src_nodata=np.nan,
 
-        dst_transform=
-            reference["transform"],
+        dst_transform=reference[
+            "transform"
+        ],
 
-        dst_crs=
-            reference["crs"],
+        dst_crs=reference[
+            "crs"
+        ],
 
         dst_nodata=np.nan,
 
-        resampling=
-            Resampling.bilinear
+        resampling=Resampling.bilinear
     )
 
     destination[
@@ -1308,611 +1330,6 @@ def align_slope_to_fwi(
     )
 
     return destination
-
-
-# ============================================================
-# FUEL HELPERS
-# ============================================================
-
-def find_column(
-    dataframe,
-    candidates
-):
-
-    lookup = {
-
-        str(c).strip().lower():
-            c
-
-        for c in dataframe.columns
-    }
-
-    for candidate in candidates:
-
-        key = (
-            candidate.strip().lower()
-        )
-
-        if key in lookup:
-
-            return lookup[key]
-
-    return None
-
-
-def normalize_column(
-    series
-):
-
-    values = (
-        pd.to_numeric(
-            series,
-            errors="coerce"
-        )
-        .fillna(0.0)
-        .clip(lower=0.0)
-    )
-
-    minimum = float(
-        values.min()
-    )
-
-    maximum = float(
-        values.max()
-    )
-
-    if math.isclose(
-        minimum,
-        maximum
-    ):
-
-        return pd.Series(
-            np.zeros(
-                len(values),
-                dtype=np.float64
-            ),
-            index=values.index
-        )
-
-    return (
-        (values - minimum)
-        /
-        (maximum - minimum)
-    )
-
-
-# ============================================================
-# FUEL MAPPING
-# ============================================================
-
-def load_fuel_mapping(
-    excel_path: Path,
-    requested_code_column: str
-):
-
-    print()
-    print(
-        "LOADING FUEL TABLE"
-    )
-    print(
-        "------------------"
-    )
-
-    workbook = pd.ExcelFile(
-        excel_path
-    )
-
-    if (
-        "Fuelbeds_metric"
-        not in workbook.sheet_names
-    ):
-
-        raise ValueError(
-            "Sheet 'Fuelbeds_metric' not found. "
-            f"Available sheets: "
-            f"{workbook.sheet_names}"
-        )
-
-    df = pd.read_excel(
-        excel_path,
-        sheet_name="Fuelbeds_metric"
-    )
-
-    print(
-        "Fuel columns:"
-    )
-
-    for column in df.columns:
-
-        print(
-            f"  - {column}"
-        )
-
-    # --------------------------------------------------------
-    # FUEL CODE
-    # --------------------------------------------------------
-
-    code_col = find_column(
-
-        df,
-
-        [
-            requested_code_column,
-            "JOIN_VALUE",
-            "FUELBED",
-            "FUELBED_ID",
-            "FUEL_CODE"
-        ]
-    )
-
-    if code_col is None:
-
-        raise ValueError(
-            "Could not identify fuel-code column."
-        )
-
-    # --------------------------------------------------------
-    # WOODY COVER
-    # --------------------------------------------------------
-
-    woody_col = find_column(
-
-        df,
-
-        [
-            "Woody Cover (%)",
-            "Woody Cover"
-        ]
-    )
-
-    # --------------------------------------------------------
-    # FINE FUEL
-    # --------------------------------------------------------
-
-    w1_col = find_column(
-
-        df,
-
-        [
-            "W_1hLoad (Mg/ha)",
-            "W_1h Load (Mg/ha)",
-            "W_1hLoad"
-        ]
-    )
-
-    # --------------------------------------------------------
-    # DEAD WOOD
-    # --------------------------------------------------------
-
-    w10_col = find_column(
-
-        df,
-
-        [
-            "W_10hLoad (Mg/ha)",
-            "W_10h Load (Mg/ha)",
-            "W_10hLoad"
-        ]
-    )
-
-    w100_col = find_column(
-
-        df,
-
-        [
-            "W_100hLoad (Mg/ha)",
-            "W_100h Load (Mg/ha)",
-            "W_100hLoad"
-        ]
-    )
-
-    w1000_col = find_column(
-
-        df,
-
-        [
-            "W_1000hLoad (Mg/ha)",
-            "W_1000h Load (Mg/ha)",
-            "W_1000hLoad"
-        ]
-    )
-
-    # --------------------------------------------------------
-    # LITTER
-    # --------------------------------------------------------
-
-    litter_cover_col = find_column(
-
-        df,
-
-        [
-            "Litter Cover (%)",
-            "Litter Cover"
-        ]
-    )
-
-    litter_depth_col = find_column(
-
-        df,
-
-        [
-            "L_depth (cm)",
-            "L_depth"
-        ]
-    )
-
-    if w1_col is None:
-
-        raise ValueError(
-            "W_1hLoad column was not found."
-        )
-
-    df[code_col] = pd.to_numeric(
-        df[code_col],
-        errors="coerce"
-    )
-
-    # ========================================================
-    # FINE FUEL
-    # ========================================================
-
-    fine = normalize_column(
-        df[w1_col]
-    )
-
-    # ========================================================
-    # DEAD WOOD
-    # ========================================================
-
-    dead_parts = []
-
-    if w10_col is not None:
-
-        dead_parts.append(
-            (
-                0.50,
-                normalize_column(
-                    df[w10_col]
-                )
-            )
-        )
-
-    if w100_col is not None:
-
-        dead_parts.append(
-            (
-                0.30,
-                normalize_column(
-                    df[w100_col]
-                )
-            )
-        )
-
-    if w1000_col is not None:
-
-        dead_parts.append(
-            (
-                0.20,
-                normalize_column(
-                    df[w1000_col]
-                )
-            )
-        )
-
-    dead = pd.Series(
-        0.0,
-        index=df.index
-    )
-
-    total_weight = 0.0
-
-    for weight, values in dead_parts:
-
-        dead += (
-            weight *
-            values
-        )
-
-        total_weight += weight
-
-    if total_weight > 0:
-
-        dead /= total_weight
-
-    # ========================================================
-    # WOODY COVER
-    # ========================================================
-    #
-    # IMPORTANT:
-    # Woody Cover is used ONLY ONCE.
-    # ========================================================
-
-    if woody_col is not None:
-
-        woody = normalize_column(
-            df[woody_col]
-        )
-
-    else:
-
-        woody = pd.Series(
-            0.0,
-            index=df.index
-        )
-
-    # ========================================================
-    # LITTER
-    # ========================================================
-
-    litter_parts = []
-
-    if litter_cover_col is not None:
-
-        litter_parts.append(
-            normalize_column(
-                df[litter_cover_col]
-            )
-        )
-
-    if litter_depth_col is not None:
-
-        litter_parts.append(
-            normalize_column(
-                df[litter_depth_col]
-            )
-        )
-
-    if litter_parts:
-
-        litter = (
-            sum(litter_parts)
-            /
-            len(litter_parts)
-        )
-
-    else:
-
-        litter = pd.Series(
-            0.0,
-            index=df.index
-        )
-
-    # ========================================================
-    # CORRECTED FUEL FORMULA
-    # ========================================================
-    #
-    # Fine Fuel     = 35%
-    # Dead Wood     = 30%
-    # Woody Cover   = 15%
-    # Litter        = 20%
-    #
-    # Total         = 100%
-    #
-    # Woody Cover is NOT duplicated.
-    # Canopy Structure is NOT used.
-    # ========================================================
-
-    fuel_score = (
-
-        FINE_FUEL_WEIGHT * fine
-        +
-        DEAD_WOOD_WEIGHT * dead
-        +
-        WOODY_COVER_WEIGHT * woody
-        +
-        LITTER_WEIGHT * litter
-
-    ).clip(
-        0.0,
-        1.0
-    )
-
-    df["_F_Fuel"] = fuel_score
-
-    df = (
-        df
-        .dropna(
-            subset=[code_col]
-        )
-        .drop_duplicates(
-            subset=[code_col],
-            keep="last"
-        )
-    )
-
-    mapping = {}
-
-    for code, score in zip(
-        df[code_col],
-        df["_F_Fuel"]
-    ):
-
-        try:
-
-            code_value = float(
-                code
-            )
-
-            score_value = float(
-                score
-            )
-
-            if (
-                math.isfinite(
-                    code_value
-                )
-                and
-                math.isfinite(
-                    score_value
-                )
-            ):
-
-                mapping[
-                    code_value
-                ] = score_value
-
-        except (
-            TypeError,
-            ValueError
-        ):
-
-            continue
-
-    if not mapping:
-
-        raise ValueError(
-            "Fuel mapping is empty."
-        )
-
-    print()
-    print(
-        f"Fuel-code column: "
-        f"{code_col}"
-    )
-
-    print(
-        f"Fuel mapping entries: "
-        f"{len(mapping)}"
-    )
-
-    print()
-    print(
-        "FUEL COMPONENT WEIGHTS"
-    )
-    print(
-        "----------------------"
-    )
-
-    print(
-        f"Fine Fuel     : "
-        f"{FINE_FUEL_WEIGHT:.2f}"
-    )
-
-    print(
-        f"Dead Wood     : "
-        f"{DEAD_WOOD_WEIGHT:.2f}"
-    )
-
-    print(
-        f"Woody Cover   : "
-        f"{WOODY_COVER_WEIGHT:.2f}"
-    )
-
-    print(
-        f"Litter        : "
-        f"{LITTER_WEIGHT:.2f}"
-    )
-
-    print(
-        "Canopy        : NOT USED"
-    )
-
-    print(
-        "TOTAL         : "
-        f"{FINE_FUEL_WEIGHT + DEAD_WOOD_WEIGHT + WOODY_COVER_WEIGHT + LITTER_WEIGHT:.2f}"
-    )
-
-    return mapping
-
-
-# ============================================================
-# FUEL TO SCORE
-# ============================================================
-
-def fuel_to_score(
-    fuel_codes,
-    mapping
-):
-
-    output = np.full(
-        fuel_codes.shape,
-        np.nan,
-        dtype=np.float32
-    )
-
-    valid = np.isfinite(
-        fuel_codes
-    )
-
-    if not np.any(valid):
-
-        raise ValueError(
-            "Aligned Fuel raster contains "
-            "no valid pixels."
-        )
-
-    unique_codes = np.unique(
-        fuel_codes[valid]
-    )
-
-    unmapped = []
-
-    for code in unique_codes:
-
-        code_float = float(
-            code
-        )
-
-        mask = (
-            fuel_codes == code
-        )
-
-        if code_float in mapping:
-
-            output[mask] = (
-                mapping[code_float]
-            )
-
-        else:
-
-            unmapped.append(
-                code_float
-            )
-
-    print()
-    print(
-        "FUEL MAPPING"
-    )
-    print(
-        "------------"
-    )
-
-    print(
-        f"Unique raster codes : "
-        f"{len(unique_codes)}"
-    )
-
-    print(
-        f"Mapped codes        : "
-        f"{len(unique_codes) - len(unmapped)}"
-    )
-
-    print(
-        f"Unmapped codes      : "
-        f"{len(unmapped)}"
-    )
-
-    if unmapped:
-
-        print(
-            "First unmapped codes:"
-        )
-
-        for code in unmapped[:20]:
-
-            print(
-                f"  - {code}"
-            )
-
-    print(
-        f"F_Fuel statistics   : "
-        f"{stats(output)}"
-    )
-
-    return (
-        output,
-        unmapped
-    )
 
 
 # ============================================================
@@ -2005,11 +1422,6 @@ def main():
     )
 
     require_file(
-        args.fuel_excel,
-        "Fuel Excel"
-    )
-
-    require_file(
         args.boundary,
         "Fars boundary"
     )
@@ -2023,6 +1435,22 @@ def main():
     print("=" * 70)
     print("FIRIS BUILD START")
     print("=" * 70)
+
+    print()
+    print("NEW FUEL MODEL")
+    print("--------------")
+    print(
+        "Fuel source: Sentinel-2-derived continuous raster"
+    )
+    print(
+        "Fuel range : 0-1"
+    )
+    print(
+        "Excel      : NOT USED"
+    )
+    print(
+        "JOIN_VALUE : NOT USED"
+    )
 
     # ========================================================
     # FWI REFERENCE
@@ -2045,13 +1473,21 @@ def main():
     # FUEL ALIGNMENT
     # ========================================================
 
-    fuel_codes = align_to_fwi(
+    f_fuel = align_to_fwi(
 
         args.fuel_raster,
 
         reference,
 
         Resampling.nearest
+    )
+
+    # ========================================================
+    # FUEL VALIDATION
+    # ========================================================
+
+    validate_fuel_range(
+        f_fuel
     )
 
     # ========================================================
@@ -2063,27 +1499,6 @@ def main():
         args.dem_raster,
 
         reference
-    )
-
-    # ========================================================
-    # FUEL MAPPING
-    # ========================================================
-
-    fuel_mapping = load_fuel_mapping(
-
-        args.fuel_excel,
-
-        args.fuel_code_column
-    )
-
-    (
-        f_fuel,
-        unmapped_codes
-    ) = fuel_to_score(
-
-        fuel_codes,
-
-        fuel_mapping
     )
 
     # ========================================================
@@ -2236,6 +1651,13 @@ def main():
 
         print(
             "NoData will remain NoData."
+        )
+
+    else:
+
+        print()
+        print(
+            "✓ Fuel coverage is complete inside Fars."
         )
 
     if common_count == 0:
@@ -2517,36 +1939,34 @@ def main():
                 TOPO_WEIGHT
         },
 
-        "fuel_formula": {
+        "fuel_model": {
 
-            "FineFuel":
-                FINE_FUEL_WEIGHT,
+            "source":
+                "Sentinel-2-derived continuous Fuel raster",
 
-            "DeadWood":
-                DEAD_WOOD_WEIGHT,
+            "input_path":
+                str(args.fuel_raster),
 
-            "WoodyCover":
-                WOODY_COVER_WEIGHT,
+            "input_range":
+                "0-1",
 
-            "Litter":
-                LITTER_WEIGHT,
+            "fuel_definition":
+                "Vegetation Availability x Fuel Dryness",
 
-            "CanopyStructure":
-                None,
+            "normalization":
+                "P5-P95 robust normalization performed upstream in GEE",
 
-            "WoodyCover_used_once":
-                True,
+            "excel_used":
+                False,
 
-            "weights_sum":
-                (
-                    FINE_FUEL_WEIGHT
-                    +
-                    DEAD_WOOD_WEIGHT
-                    +
-                    WOODY_COVER_WEIGHT
-                    +
-                    LITTER_WEIGHT
-                )
+            "JOIN_VALUE_used":
+                False,
+
+            "Fuelbeds_metric_used":
+                False,
+
+            "resampling_to_FWI":
+                "nearest neighbour"
         },
 
         "slope_method": {
@@ -2651,10 +2071,8 @@ def main():
                 "clip(FWI / 100, 0, 1)",
 
             "F_Fuel":
-                "0.35 FineFuel + "
-                "0.30 DeadWood + "
-                "0.15 WoodyCover + "
-                "0.20 Litter",
+                "direct continuous Fuel raster value "
+                "in the range 0-1",
 
             "F_Topo":
                 "clip(slope_degrees / 45, 0, 1)"
@@ -2732,6 +2150,9 @@ def main():
             "F_FWI":
                 stats(f_fwi_out),
 
+            "Fuel":
+                stats(f_fuel_out),
+
             "F_Fuel":
                 stats(f_fuel_out),
 
@@ -2745,15 +2166,6 @@ def main():
                 stats(fli)
         },
 
-        "fuel": {
-
-            "unmapped_code_count":
-                len(unmapped_codes),
-
-            "unmapped_codes":
-                unmapped_codes[:100]
-        },
-
         "inputs": {
 
             "FWI":
@@ -2764,9 +2176,6 @@ def main():
 
             "DEM":
                 str(args.dem_raster),
-
-            "FuelExcel":
-                str(args.fuel_excel),
 
             "Boundary":
                 str(args.boundary)
@@ -2810,13 +2219,15 @@ def main():
                 "All final rasters use the "
                 "exact FWI reference profile.",
 
-            "woody_policy":
-                "Woody Cover is included exactly once.",
+            "fuel_policy":
+                "Fuel is a continuous Sentinel-2-derived "
+                "0-1 index and is used directly.",
 
-            "canopy_policy":
-                "Canopy Structure is not included "
-                "because it is absent from "
-                "Fuelbeds_metric."
+            "excel_policy":
+                "No Excel fuel table is used.",
+
+            "classification_policy":
+                "No external fuel classification lookup is used."
         }
     }
 
@@ -2867,6 +2278,11 @@ def main():
     print(
         f"FLI output    : "
         f"{fli_path}"
+    )
+
+    print(
+        f"Fuel output   : "
+        f"{f_fuel_path}"
     )
 
     print(
