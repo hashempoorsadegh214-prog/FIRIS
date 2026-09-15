@@ -37,11 +37,12 @@ RISK_CLASSES = (
 
 RISK_CODE_TO_INFO = {index + 1: item for index, item in enumerate(RISK_CLASSES)}
 
-MIN_VECTOR_AREA = 0.000002
-CHAIKIN_ITERATIONS = 2
-CHAIKIN_RATIO = 0.25
-SIMPLIFY_TOLERANCE = 0.00025
-MIN_RING_POINTS = 4
+# بهینه‌سازی اندازه فایل (کاهش حجم به زیر ۱۰ مگابایت)
+MIN_VECTOR_AREA = 0.00001
+CHAIKIN_ITERATIONS = 1
+CHAIKIN_RATIO = 0.2
+SIMPLIFY_TOLERANCE = 0.0008
+MIN_RING_POINTS = 3
 
 DATE_PATTERN = re.compile(r"fli_fars_(\d{4}-\d{2}-\d{2})\.tif$", re.I)
 
@@ -103,8 +104,8 @@ def create_excel_report(stats: dict, output_path: Path, forecast_date: str) -> N
         "تاریخ پیش‌بینی": [forecast_date],
         "مساحت متوسط (هکتار)": [stats.get("area_medium", 0)],
         "مساحت زیاد (هکتار)": [stats.get("area_high", 0)],
-        "مساحت خیلی زیاد (هکتار)": [stats.get("area_very_high", 0)],
-        "مساحت بحرانی (هکتار)": [stats.get("area_critical", 0)],
+        "مساحت خیلی زیاد (هکتار)": [stats.get("area_("area_critical", 0)],
+        "حداکثر FLIار)": [stats.get("area_critical", 0)],
         "حداکثر FLI": [stats.get("max_fli", 0)],
     })
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -144,7 +145,7 @@ def main() -> None:
     archive_root = args.archive_dir.resolve() if args.archive_dir is not None else output_dir / "archive"
 
     print("\n" + "=" * 70)
-    print("FIRIS WEB MAP BUILD")
+    print("FIRIS WEB MAP BUILD (Optimized)")
     print("=" * 70)
     print(f"Input FLI        : {args.input}")
     print(f"Forecast date    : {forecast_date}")
@@ -164,8 +165,11 @@ def main() -> None:
 
     update_archive_index(archive_root)
 
-    print("\n" + "=" * 70)
-    print("FIRIS WEB MAP BUILD COMPLETED SUCCESSFULLY")
+ "report.xlsx")
+
+    update_archive_index(archive_root)
+
+    print("\nIS WEB MAP BUILD COMPLETED SUCCESSFULLY (Optimized)")
     print("=" * 70)
 
 
