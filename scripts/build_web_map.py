@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import rasterio
 from rasterio.features import shapes
 from shapely.geometry import Polygon, MultiPolygon, GeometryCollection, shape, mapping
@@ -97,6 +98,20 @@ def atomic_write_json(path: Path, payload: Any) -> None:
             os.unlink(temp_name)
 
 
+def create_excel_report(stats: dict, output_path: Path, forecast_date: str) -> None:
+    df = pd.DataFrame({
+        "تاریخ پیش‌بینی": [forecast_date],
+        "مساحت متوسط (هکتار)": [stats.get("area_medium", 0)],
+        "مساحت زیاد (هکتار)": [stats.get("area_high", 0)],
+        "مساحت خیلی زیاد (هکتار)": [stats.get("area_very_high", 0)],
+        "مساحت بحرانی (هکتار)": [stats.get("area_critical", 0)],
+        "حداکثر FLI": [stats.get("max_fli", 0)],
+    })
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    df.to_excel(output_path, index=False, sheet_name="گزارش آتش")
+    print(f"Excel report created: {output_path}")
+
+
 def update_archive_index(archive_root: Path) -> None:
     index_path = archive_root / "index.json"
     entries = []
@@ -104,9 +119,12 @@ def update_archive_index(archive_root: Path) -> None:
         for date_dir in sorted(archive_root.iterdir()):
             if date_dir.is_dir() and re.match(r"\d{4}-\d{2}-\d{2}", date_dir.name):
                 if (date_dir / "fli.json").exists():
+                    excel_file = date_dir / "report.xlsx"
+                    excel_exists = excel_file.exists()
                     entries.append({
                         "date": date_dir.name,
                         "url": f"archive/{date_dir.name}/fli.json",
+                        "excel_url": f"archive/{date_dir.name}/report.xlsx" if excel_exists else None,
                         "generated_at": datetime.now(timezone.utc).isoformat()
                     })
     payload = {
@@ -135,6 +153,14 @@ def main() -> None:
 
     # TODO: Insert full raster reading, classification, polygonization,
     # smoothing and writing logic here (same as previous version)
+    stats = {"area_medium": 0, "area_high": 0, "area_very_high": 0, "area_critical": 0, "max_fli": 0}
+
+    excel_path = output_dir / "report.xlsx"
+    create_excel_report(stats, excel_path, forecast_date)
+
+    archive_date_dir = archive_root / forecast_date
+    archive_date_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy(excel_path, archive_date_dir / "report.xlsx")
 
     update_archive_index(archive_root)
 
