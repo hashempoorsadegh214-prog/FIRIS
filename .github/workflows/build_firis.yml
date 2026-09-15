@@ -17,19 +17,19 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt pandas openpyxl
 
-      - name: Build web map and update archive index
+      - name: Build web map, Excel report and update archive
         run: |
           python scripts/build_web_map.py \
             --input data/outputs/fli_fars_$(date +%Y-%m-%d).tif \
             --output-dir data/web \
             --archive-dir data/web/archive
 
-      - name: Commit updated index
+      - name: Commit updated files
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add data/web/archive/index.json
-          git commit -m "chore: update archive index" || echo "No changes"
+          git add data/web/archive/index.json data/web/report.xlsx
+          git commit -m "chore: update archive index and Excel report" || echo "No changes"
           git push
