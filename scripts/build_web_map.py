@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """
 FIRIS - Build Web GIS products from a dated FLI GeoTIFF.
@@ -20,8 +21,12 @@ the same run.
 
 The grid JSON preserves the raster row/column arrangement and is used by the
 front-end for point queries and regional statistics.
-The polygon GeoJSON is classified into the four FIRIS risk classes and
-dissolved into contiguous polygons so the web map remains practical.
+
+The polygon GeoJSON is classified into the FIRIS risk classes and dissolved
+into contiguous polygons.
+
+Chaikin smoothing is applied ONLY to the web GeoJSON polygon geometry.
+The original FLI raster and all numerical calculations remain unchanged.
 """
 
 from __future__ import annotations
@@ -40,7 +45,13 @@ from typing import Any
 import numpy as np
 import rasterio
 from rasterio.features import shapes
-from shapely.geometry import shape, mapping
+from shapely.geometry import (
+    Polygon,
+    MultiPolygon,
+    LinearRing,
+    shape,
+    mapping,
+)
 from shapely.ops import unary_union
 
 
@@ -62,85 +73,161 @@ RISK_CODE_TO_INFO = {
 
 
 # ============================================================
-# WEB POLYGON SMOOTHING
+# CHAIKIN SMOOTHING
 # ============================================================
 
-# این پارامترها فقط روی هندسه GeoJSON خروجی اثر دارند.
-# رستر اصلی FLI و مقادیر آن به هیچ وجه تغییر نمی‌کنند.
+# تعداد تکرار Chaikin
+CHAIKIN_ITERATIONS = 2
 
-SMOOTH_BUFFER_DISTANCE = 0.005
-SMOOTH_SIMPLIFY_TOLERANCE = 0.002
+# نسبت گوشه‌برداری Chaikin
+CHAIKIN_RATIO = 0.25
 
 
-def smooth_polygon_geometry(geometry):
+def chaikin_ring(
+    coordinates,
+    iterations: int = CHAIKIN_ITERATIONS,
+    ratio: float = CHAIKIN_RATIO,
+):
     """
-    Smooth pixel-like polygon boundaries for web visualization.
+    Smooth a closed polygon ring using the Chaikin corner-cutting algorithm.
 
-    The operation is applied ONLY to the dissolved vector geometry.
-    It does NOT modify the source FLI raster or risk classification.
+    This operates only on the vector geometry used by the web map.
+    """
 
-    Method:
-        1. Small positive buffer
-        2. Small negative buffer
-        3. Topology-preserving simplify
+    if len(coordinates) < 4:
+        return list(coordinates)
 
-    If smoothing produces an empty or invalid geometry, the original
-    dissolved geometry is returned.
+    points = [
+        (float(x), float(y))
+        for x, y, *rest in coordinates
+    ]
+
+    # حذف نقطه انتهایی تکراری
+    if points[0] == points[-1]:
+        points = points[:-1]
+
+    if len(points) < 3:
+        return list(coordinates)
+
+    for _ in range(iterations):
+        new_points = []
+
+        count = len(points)
+
+        for i in range(count):
+            p0 = points[i]
+            p1 = points[(i + 1) % count]
+
+            q = (
+                (1.0 - ratio) * p0[0] + ratio * p1[0],
+                (1.0 - ratio) * p0[1] + ratio * p1[1],
+            )
+
+            r = (
+                ratio * p0[0] + (1.0 - ratio) * p1[0],
+                ratio * p0[1] + (1.0 - ratio) * p1[1],
+            )
+
+            new_points.append(q)
+            new_points.append(r)
+
+        points = new_points
+
+    points.append(points[0])
+
+    return points
+
+
+def smooth_polygon(
+    geometry,
+    iterations: int = CHAIKIN_ITERATIONS,
+    ratio: float = CHAIKIN_RATIO,
+):
+    """
+    Apply Chaikin smoothing to Polygon / MultiPolygon geometries.
+
+    Holes are preserved.
     """
 
     if geometry.is_empty:
         return geometry
 
-    original = geometry
+    if isinstance(geometry, Polygon):
 
-    try:
-        # ----------------------------------------------------
-        # 1. Buffer outward and inward.
-        #
-        # join_style=1 -> rounded joins
-        # This removes many sharp 90-degree pixel corners.
-        # ----------------------------------------------------
-        smoothed = geometry.buffer(
-            SMOOTH_BUFFER_DISTANCE,
-            join_style=1,
+        exterior_coords = chaikin_ring(
+            list(geometry.exterior.coords),
+            iterations=iterations,
+            ratio=ratio,
         )
 
-        smoothed = smoothed.buffer(
-            -SMOOTH_BUFFER_DISTANCE,
-            join_style=1,
-        )
+        interior_coords = []
 
-        if smoothed.is_empty:
-            return original
+        for interior in geometry.interiors:
+            smoothed_hole = chaikin_ring(
+                list(interior.coords),
+                iterations=iterations,
+                ratio=ratio,
+            )
 
-        # ----------------------------------------------------
-        # 2. Topology-preserving simplification.
-        # ----------------------------------------------------
-        smoothed = smoothed.simplify(
-            SMOOTH_SIMPLIFY_TOLERANCE,
-            preserve_topology=True,
-        )
+            if len(smoothed_hole) >= 4:
+                interior_coords.append(smoothed_hole)
 
-        if smoothed.is_empty:
-            return original
+        try:
+            result = Polygon(
+                exterior_coords,
+                interior_coords,
+            )
 
-        # ----------------------------------------------------
-        # 3. Final geometry validity check.
-        # ----------------------------------------------------
-        if not smoothed.is_valid:
-            repaired = smoothed.buffer(0)
+        except Exception:
+            return geometry
 
-            if not repaired.is_empty and repaired.is_valid:
-                smoothed = repaired
-            else:
-                return original
+        if result.is_empty:
+            return geometry
 
-        return smoothed
+        if not result.is_valid:
+            repaired = result.buffer(0)
 
-    except Exception:
-        # Smoothing is only a visualization enhancement.
-        # Never allow it to break the FIRIS build.
-        return original
+            if not repaired.is_empty:
+                result = repaired
+
+        return result
+
+    if isinstance(geometry, MultiPolygon):
+
+        polygons = []
+
+        for polygon in geometry.geoms:
+            smoothed = smooth_polygon(
+                polygon,
+                iterations=iterations,
+                ratio=ratio,
+            )
+
+            if smoothed.is_empty:
+                continue
+
+            if isinstance(smoothed, Polygon):
+                polygons.append(smoothed)
+
+            elif isinstance(smoothed, MultiPolygon):
+                polygons.extend(
+                    list(smoothed.geoms)
+                )
+
+        if not polygons:
+            return geometry
+
+        result = MultiPolygon(polygons)
+
+        if not result.is_valid:
+            repaired = result.buffer(0)
+
+            if not repaired.is_empty:
+                result = repaired
+
+        return result
+
+    return geometry
 
 
 # ============================================================
@@ -186,20 +273,28 @@ DATE_PATTERN = re.compile(
 )
 
 
-def require_file(path: Path, label: str) -> None:
+def require_file(
+    path: Path,
+    label: str,
+) -> None:
+
     if not path.is_file():
         raise FileNotFoundError(
             f"{label} not found: {path}"
         )
 
 
-def extract_forecast_date(path: Path) -> str:
-    match = DATE_PATTERN.search(path.name)
+def extract_forecast_date(
+    path: Path,
+) -> str:
+
+    match = DATE_PATTERN.search(
+        path.name
+    )
 
     if match:
         return match.group(1)
 
-    # Fallback: accept any ISO date embedded in the filename.
     match = re.search(
         r"(\d{4}-\d{2}-\d{2})",
         path.name,
@@ -214,18 +309,30 @@ def extract_forecast_date(path: Path) -> str:
     )
 
 
-def risk_code(value: float) -> int:
-    for code, (_, minimum, maximum, _) in enumerate(
+def risk_code(
+    value: float,
+) -> int:
+
+    for code, (
+        _,
+        minimum,
+        maximum,
+        _,
+    ) in enumerate(
         RISK_CLASSES,
         start=1,
     ):
+
         if minimum <= value < maximum:
             return code
 
     return 0
 
 
-def risk_info(value: float) -> tuple[str, float, float, str]:
+def risk_info(
+    value: float,
+) -> tuple[str, float, float, str]:
+
     if not math.isfinite(value):
         return (
             "بدون داده",
@@ -234,7 +341,13 @@ def risk_info(value: float) -> tuple[str, float, float, str]:
             "#777",
         )
 
-    for label, minimum, maximum, color in RISK_CLASSES:
+    for (
+        label,
+        minimum,
+        maximum,
+        color,
+    ) in RISK_CLASSES:
+
         if minimum <= value < maximum:
             return (
                 label,
@@ -277,24 +390,20 @@ def json_safe_number(
 def array_to_json_values(
     array: np.ndarray,
 ) -> list[list[float | None]]:
-    """
-    Convert the raster to a JSON-safe row-major grid.
-
-    Values are rounded to 4 decimal places. This keeps the click/grid
-    representation compact while retaining more precision than the UI
-    displays.
-    """
 
     result: list[list[float | None]] = []
 
     for row in array:
+
         out_row: list[float | None] = []
 
         for value in row:
+
             number = float(value)
 
             if not math.isfinite(number):
                 out_row.append(None)
+
             else:
                 out_row.append(
                     round(number, 4)
@@ -323,6 +432,7 @@ def atomic_write_json(
     )
 
     try:
+
         with os.fdopen(
             fd,
             "w",
@@ -345,6 +455,7 @@ def atomic_write_json(
         )
 
     finally:
+
         if os.path.exists(temp_name):
             os.unlink(temp_name)
 
@@ -355,7 +466,11 @@ def atomic_write_json(
 
 def read_fli(
     path: Path,
-) -> tuple[np.ndarray, dict[str, Any], dict[str, Any]]:
+) -> tuple[
+    np.ndarray,
+    dict[str, Any],
+    dict[str, Any],
+]:
 
     with rasterio.open(path) as src:
 
@@ -386,12 +501,15 @@ def read_fli(
         if nodata is not None:
 
             try:
+
                 nodata_float = float(nodata)
 
                 if math.isnan(nodata_float):
+
                     valid &= ~np.isnan(data)
 
                 else:
+
                     valid &= ~np.isclose(
                         data,
                         nodata_float,
@@ -399,10 +517,12 @@ def read_fli(
                         atol=1e-8,
                     )
 
-            except (TypeError, ValueError):
+            except (
+                TypeError,
+                ValueError,
+            ):
                 pass
 
-        # FIRIS valid range.
         valid &= data >= 0.0
         valid &= data <= 100.0
 
@@ -435,23 +555,35 @@ def read_fli(
                 "north": float(bounds.top),
             },
             "resolution": {
-                "x": float(abs(src.res[0])),
-                "y": float(abs(src.res[1])),
+                "x": float(
+                    abs(src.res[0])
+                ),
+                "y": float(
+                    abs(src.res[1])
+                ),
             },
             "nodata": (
                 None
                 if src.nodata is None
-                else json_safe_number(src.nodata)
+                else json_safe_number(
+                    src.nodata
+                )
             ),
         }
 
         stats = {
-            "count": int(np.sum(valid)),
+            "count": int(
+                np.sum(valid)
+            ),
             "min": (
                 None
                 if not np.any(valid)
                 else round(
-                    float(np.min(clean[valid])),
+                    float(
+                        np.min(
+                            clean[valid]
+                        )
+                    ),
                     6,
                 )
             ),
@@ -459,7 +591,11 @@ def read_fli(
                 None
                 if not np.any(valid)
                 else round(
-                    float(np.max(clean[valid])),
+                    float(
+                        np.max(
+                            clean[valid]
+                        )
+                    ),
                     6,
                 )
             ),
@@ -467,7 +603,11 @@ def read_fli(
                 None
                 if not np.any(valid)
                 else round(
-                    float(np.mean(clean[valid])),
+                    float(
+                        np.mean(
+                            clean[valid]
+                        )
+                    ),
                     6,
                 )
             ),
@@ -503,7 +643,9 @@ def build_grid_json(
         "cols": reference["width"],
         "bounds": reference["bounds"],
         "resolution": reference["resolution"],
-        "values": array_to_json_values(array),
+        "values": array_to_json_values(
+            array
+        ),
     }
 
 
@@ -519,24 +661,47 @@ def build_metadata_json(
 ) -> dict[str, Any]:
 
     return {
-        "project": (
-            "FIRIS - Fars Integrated Fire "
-            "Information System"
-        ),
-        "forecast_date": forecast_date,
-        "target_date": forecast_date,
-        "generated_at_utc": datetime.now(
-            timezone.utc
-        ).isoformat(),
-        "source_file": input_path.name,
-        "source_path": str(input_path),
-        "crs": reference["crs"],
-        "width": reference["width"],
-        "height": reference["height"],
-        "bounds": reference["bounds"],
-        "resolution": reference["resolution"],
-        "nodata": reference["nodata"],
-        "statistics": stats,
+        "project":
+            "FIRIS - Fars Integrated Fire Information System",
+
+        "forecast_date":
+            forecast_date,
+
+        "target_date":
+            forecast_date,
+
+        "generated_at_utc":
+            datetime.now(
+                timezone.utc
+            ).isoformat(),
+
+        "source_file":
+            input_path.name,
+
+        "source_path":
+            str(input_path),
+
+        "crs":
+            reference["crs"],
+
+        "width":
+            reference["width"],
+
+        "height":
+            reference["height"],
+
+        "bounds":
+            reference["bounds"],
+
+        "resolution":
+            reference["resolution"],
+
+        "nodata":
+            reference["nodata"],
+
+        "statistics":
+            stats,
+
         "risk_classes": [
             {
                 "label": label,
@@ -547,21 +712,54 @@ def build_metadata_json(
                 ),
                 "color": color,
             }
-            for label, minimum, maximum, color
-            in RISK_CLASSES
+            for (
+                label,
+                minimum,
+                maximum,
+                color,
+            ) in RISK_CLASSES
         ],
+
         "grid": {
-            "row_order": "north_to_south",
-            "column_order": "west_to_east",
-            "coordinate_reference": "EPSG:4326",
+            "row_order":
+                "north_to_south",
+
+            "column_order":
+                "west_to_east",
+
+            "coordinate_reference":
+                "EPSG:4326",
         },
+
         "web_products": {
-            "latest_metadata": "fli_latest.json",
-            "latest_grid": "fli_latest_grid.json",
-            "latest_polygons": "fli_polygons.geojson",
-            "archive_directory": (
-                f"archive/{forecast_date}"
-            ),
+            "latest_metadata":
+                "fli_latest.json",
+
+            "latest_grid":
+                "fli_latest_grid.json",
+
+            "latest_polygons":
+                "fli_polygons.geojson",
+
+            "archive_directory":
+                f"archive/{forecast_date}",
+        },
+
+        "polygon_smoothing": {
+            "method":
+                "Chaikin corner-cutting",
+
+            "iterations":
+                CHAIKIN_ITERATIONS,
+
+            "ratio":
+                CHAIKIN_RATIO,
+
+            "applied_to":
+                "web GeoJSON only",
+
+            "source_raster_unchanged":
+                True,
         },
     }
 
@@ -581,7 +779,12 @@ def build_classified_raster(
 
     finite = np.isfinite(array)
 
-    for code, (_, minimum, maximum, _) in enumerate(
+    for code, (
+        _,
+        minimum,
+        maximum,
+        _,
+    ) in enumerate(
         RISK_CLASSES,
         start=1,
     ):
@@ -601,10 +804,6 @@ def polygonize_classes(
     classified: np.ndarray,
     transform,
 ) -> dict[int, list[Any]]:
-    """
-    Polygonize risk classes and dissolve contiguous polygons belonging to the
-    same class. Class 0 (NoData) is omitted.
-    """
 
     groups: dict[int, list[Any]] = {
         code: []
@@ -625,7 +824,9 @@ def polygonize_classes(
         if code <= 0:
             continue
 
-        geom = shape(geometry)
+        geom = shape(
+            geometry
+        )
 
         if geom.is_empty:
             continue
@@ -638,7 +839,7 @@ def polygonize_classes(
 
         groups.setdefault(
             code,
-            [],
+            []
         ).append(geom)
 
     return groups
@@ -655,16 +856,15 @@ def make_feature_collection(
         transform,
     )
 
-    features: list[dict[str, Any]] = []
+    features: list[
+        dict[str, Any]
+    ] = []
 
     for code, geometries in grouped.items():
 
         if not geometries:
             continue
 
-        # ----------------------------------------------------
-        # Merge all polygons belonging to the same risk class.
-        # ----------------------------------------------------
         dissolved = unary_union(
             geometries
         )
@@ -678,21 +878,24 @@ def make_feature_collection(
         if dissolved.is_empty:
             continue
 
-        # ----------------------------------------------------
-        # SMOOTH WEB POLYGON BOUNDARY
-        #
-        # IMPORTANT:
-        # This happens AFTER raster polygonization and dissolve.
-        # Therefore the original FLI raster and its values remain
-        # completely unchanged.
-        # ----------------------------------------------------
-        smooth_geom = smooth_polygon_geometry(
-            dissolved
+        # ====================================================
+        # CHAIKIN SMOOTHING
+        # ====================================================
+
+        smoothed = smooth_polygon(
+            dissolved,
+            iterations=CHAIKIN_ITERATIONS,
+            ratio=CHAIKIN_RATIO,
         )
 
-        # Safety fallback.
-        if smooth_geom.is_empty:
-            smooth_geom = dissolved
+        if smoothed.is_empty:
+            continue
+
+        if not smoothed.is_valid:
+            repaired = smoothed.buffer(0)
+
+            if not repaired.is_empty:
+                smoothed = repaired
 
         label, minimum, maximum, color = (
             RISK_CODE_TO_INFO[code]
@@ -700,69 +903,107 @@ def make_feature_collection(
 
         features.append(
             {
-                "type": "Feature",
+                "type":
+                    "Feature",
+
                 "properties": {
-                    "risk_code": code,
-                    "risk": label,
-                    "label": label,
-                    "color": color,
-                    "minimum": minimum,
-                    "maximum": min(
-                        maximum,
-                        100.0,
-                    ),
-                    "forecast_date": (
-                        metadata["forecast_date"]
-                    ),
+                    "risk_code":
+                        code,
+
+                    "risk":
+                        label,
+
+                    "label":
+                        label,
+
+                    "color":
+                        color,
+
+                    "minimum":
+                        minimum,
+
+                    "maximum":
+                        min(
+                            maximum,
+                            100.0,
+                        ),
+
+                    "forecast_date":
+                        metadata[
+                            "forecast_date"
+                        ],
+
+                    "geometry_smoothing":
+                        "Chaikin",
+
+                    "chaikin_iterations":
+                        CHAIKIN_ITERATIONS,
+
+                    "chaikin_ratio":
+                        CHAIKIN_RATIO,
                 },
-                "geometry": mapping(
-                    smooth_geom
-                ),
+
+                "geometry":
+                    mapping(smoothed),
             }
         )
 
     features.sort(
         key=lambda item: int(
-            item["properties"]["risk_code"]
+            item["properties"][
+                "risk_code"
+            ]
         )
     )
 
     return {
-        "type": "FeatureCollection",
-        "name": "FIRIS_FLI_Risk_Zones",
+        "type":
+            "FeatureCollection",
+
+        "name":
+            "FIRIS_FLI_Risk_Zones",
+
         "crs": {
-            "type": "name",
+            "type":
+                "name",
+
             "properties": {
-                "name": "EPSG:4326",
+                "name":
+                    "EPSG:4326",
             },
         },
+
         "properties": {
-            "forecast_date": (
-                metadata["forecast_date"]
-            ),
-            "source_file": (
-                metadata["source_file"]
-            ),
-            "generated_at_utc": (
-                metadata["generated_at_utc"]
-            ),
-            "classification": (
-                "FLI risk classes"
-            ),
-            "geometry_smoothing": {
-                "method": (
-                    "buffer-in-buffer + "
-                    "topology-preserving simplify"
-                ),
-                "buffer_distance": (
-                    SMOOTH_BUFFER_DISTANCE
-                ),
-                "simplify_tolerance": (
-                    SMOOTH_SIMPLIFY_TOLERANCE
-                ),
-            },
+            "forecast_date":
+                metadata[
+                    "forecast_date"
+                ],
+
+            "source_file":
+                metadata[
+                    "source_file"
+                ],
+
+            "generated_at_utc":
+                metadata[
+                    "generated_at_utc"
+                ],
+
+            "classification":
+                "FLI risk classes",
+
+            "geometry_smoothing":
+                "Chaikin corner-cutting",
+
+            "chaikin_iterations":
+                CHAIKIN_ITERATIONS,
+
+            "chaikin_ratio":
+                CHAIKIN_RATIO,
         },
-        "features": features,
+
+        "features":
+            features,
     }
 
 
@@ -781,11 +1022,17 @@ def validate_metadata(
         encoding="utf-8",
     ) as handle:
 
-        metadata = json.load(handle)
+        metadata = json.load(
+            handle
+        )
 
     actual_date = (
-        metadata.get("forecast_date")
-        or metadata.get("target_date")
+        metadata.get(
+            "forecast_date"
+        )
+        or metadata.get(
+            "target_date"
+        )
     )
 
     actual_source = metadata.get(
@@ -794,12 +1041,14 @@ def validate_metadata(
     )
 
     if str(actual_date) != expected_date:
+
         raise RuntimeError(
             "Generated latest metadata has the wrong forecast date: "
             f"expected {expected_date}, got {actual_date}"
         )
 
     if str(actual_source) != expected_source:
+
         raise RuntimeError(
             "Generated latest metadata has the wrong source file: "
             f"expected {expected_source}, got {actual_source}"
@@ -818,21 +1067,31 @@ def validate_grid(
         encoding="utf-8",
     ) as handle:
 
-        grid = json.load(handle)
+        grid = json.load(
+            handle
+        )
 
     actual_date = (
-        grid.get("forecast_date")
-        or grid.get("target_date")
+        grid.get(
+            "forecast_date"
+        )
+        or grid.get(
+            "target_date"
+        )
     )
 
     if str(actual_date) != expected_date:
+
         raise RuntimeError(
             "Generated latest grid has the wrong forecast date: "
             f"expected {expected_date}, got {actual_date}"
         )
 
     if int(
-        grid.get("rows", -1)
+        grid.get(
+            "rows",
+            -1,
+        )
     ) != expected_rows:
 
         raise RuntimeError(
@@ -840,30 +1099,40 @@ def validate_grid(
         )
 
     if int(
-        grid.get("cols", -1)
+        grid.get(
+            "cols",
+            -1,
+        )
     ) != expected_cols:
 
         raise RuntimeError(
             "Generated grid column count is incorrect."
         )
 
-    values = grid.get("values")
+    values = grid.get(
+        "values"
+    )
 
     if not isinstance(
         values,
         list,
     ):
+
         raise RuntimeError(
             "Generated grid values are not a list."
         )
 
     if len(values) != expected_rows:
+
         raise RuntimeError(
             "Generated grid row count does not match values length."
         )
 
     sample_rows = values[
-        : min(10, len(values))
+        : min(
+            10,
+            len(values),
+        )
     ]
 
     for row in sample_rows:
@@ -872,11 +1141,13 @@ def validate_grid(
             row,
             list,
         ):
+
             raise RuntimeError(
                 "Generated grid contains an invalid row."
             )
 
         if len(row) != expected_cols:
+
             raise RuntimeError(
                 "Generated grid column count does not match values width."
             )
@@ -892,16 +1163,21 @@ def validate_polygons(
         encoding="utf-8",
     ) as handle:
 
-        geojson = json.load(handle)
+        geojson = json.load(
+            handle
+        )
 
-    if geojson.get("type") != "FeatureCollection":
+    if geojson.get(
+        "type"
+    ) != "FeatureCollection":
+
         raise RuntimeError(
             "Generated FLI polygons are not a FeatureCollection."
         )
 
     properties = geojson.get(
         "properties",
-        {},
+        {}
     )
 
     actual_date = properties.get(
@@ -909,6 +1185,7 @@ def validate_polygons(
     )
 
     if str(actual_date) != expected_date:
+
         raise RuntimeError(
             "Generated polygon forecast date is incorrect: "
             f"expected {expected_date}, got {actual_date}"
@@ -922,6 +1199,7 @@ def validate_polygons(
         features,
         list,
     ):
+
         raise RuntimeError(
             "Generated polygon features are invalid."
         )
@@ -938,7 +1216,11 @@ def write_product_set(
     reference: dict[str, Any],
     stats: dict[str, Any],
     forecast_date: str,
-) -> tuple[Path, Path, Path]:
+) -> tuple[
+    Path,
+    Path,
+    Path,
+]:
 
     destination.mkdir(
         parents=True,
@@ -971,15 +1253,18 @@ def write_product_set(
     )
 
     metadata_path = (
-        destination / "fli_latest.json"
+        destination
+        / "fli_latest.json"
     )
 
     grid_path = (
-        destination / "fli_latest_grid.json"
+        destination
+        / "fli_latest_grid.json"
     )
 
     polygon_path = (
-        destination / "fli_polygons.geojson"
+        destination
+        / "fli_polygons.geojson"
     )
 
     atomic_write_json(
@@ -1010,7 +1295,9 @@ def _transform_from_reference(
 
     from affine import Affine
 
-    values = reference["transform"]
+    values = reference[
+        "transform"
+    ]
 
     return Affine(
         values[0],
@@ -1033,7 +1320,8 @@ def archive_product_set(
 ) -> Path:
 
     archive_dir = (
-        archive_root / forecast_date
+        archive_root
+        / forecast_date
     )
 
     archive_dir.mkdir(
@@ -1042,18 +1330,24 @@ def archive_product_set(
     )
 
     shutil.copy2(
-        latest_dir / "fli_latest.json",
-        archive_dir / "fli.json",
+        latest_dir
+        / "fli_latest.json",
+        archive_dir
+        / "fli.json",
     )
 
     shutil.copy2(
-        latest_dir / "fli_latest_grid.json",
-        archive_dir / "fli_grid.json",
+        latest_dir
+        / "fli_latest_grid.json",
+        archive_dir
+        / "fli_grid.json",
     )
 
     shutil.copy2(
-        latest_dir / "fli_polygons.geojson",
-        archive_dir / "fli_polygons.geojson",
+        latest_dir
+        / "fli_polygons.geojson",
+        archive_dir
+        / "fli_polygons.geojson",
     )
 
     return archive_dir
@@ -1074,31 +1368,41 @@ def validate_archive(
         name
         for name in required
         if not (
-            archive_dir / name
+            archive_dir
+            / name
         ).is_file()
     ]
 
     if missing:
+
         raise RuntimeError(
             "Archive is incomplete. Missing: "
             + ", ".join(missing)
         )
 
     with (
-        archive_dir / "fli.json"
+        archive_dir
+        / "fli.json"
     ).open(
         "r",
         encoding="utf-8",
     ) as handle:
 
-        metadata = json.load(handle)
+        metadata = json.load(
+            handle
+        )
 
     actual_date = (
-        metadata.get("forecast_date")
-        or metadata.get("target_date")
+        metadata.get(
+            "forecast_date"
+        )
+        or metadata.get(
+            "target_date"
+        )
     )
 
     if str(actual_date) != expected_date:
+
         raise RuntimeError(
             "Archive metadata date is incorrect: "
             f"expected {expected_date}, got {actual_date}"
@@ -1137,17 +1441,40 @@ def main() -> None:
     print("FIRIS WEB MAP BUILD")
     print("=" * 70)
     print()
+
     print(
         f"Input FLI        : {args.input}"
     )
+
     print(
         f"Forecast date    : {forecast_date}"
     )
+
     print(
         f"Web output       : {output_dir}"
     )
+
     print(
         f"Archive root     : {archive_root}"
+    )
+
+    print()
+    print("POLYGON SMOOTHING")
+    print("-----------------")
+    print(
+        "Method           : Chaikin corner-cutting"
+    )
+    print(
+        f"Iterations       : {CHAIKIN_ITERATIONS}"
+    )
+    print(
+        f"Ratio            : {CHAIKIN_RATIO}"
+    )
+    print(
+        "Applied to       : Web GeoJSON only"
+    )
+    print(
+        "Source FLI       : UNCHANGED"
     )
 
     # --------------------------------------------------------
@@ -1161,47 +1488,38 @@ def main() -> None:
     print()
     print("INPUT FLI")
     print("---------")
+
     print(
-        f"CRS              : "
-        f"{reference['crs']}"
+        f"CRS              : {reference['crs']}"
     )
+
     print(
         f"Size             : "
         f"{reference['width']} x "
         f"{reference['height']}"
     )
+
     print(
         f"Resolution       : "
         f"{reference['resolution']['x']} x "
         f"{reference['resolution']['y']}"
     )
+
     print(
         f"Valid pixels     : "
         f"{stats['count']:,}"
     )
+
     print(
-        f"Minimum          : "
-        f"{stats['min']}"
-    )
-    print(
-        f"Maximum          : "
-        f"{stats['max']}"
-    )
-    print(
-        f"Mean             : "
-        f"{stats['mean']}"
+        f"Minimum          : {stats['min']}"
     )
 
-    print()
-    print("WEB GEOMETRY SMOOTHING")
-    print("----------------------")
     print(
-        f"Buffer distance  : "
-        f"{SMOOTH_BUFFER_DISTANCE}"
+        f"Maximum          : {stats['max']}"
     )
+
     print(
-        f"Simplify tolerance: "
-        f"{SMOOTH_SIMPLIFY_TOLERANCE}"
+        f"Mean             : {stats['mean']}"
     )
 
     # --------------------------------------------------------
@@ -1230,7 +1548,8 @@ def main() -> None:
         )
 
         temp_latest = (
-            temp_root / "latest"
+            temp_root
+            / "latest"
         )
 
         temp_archive = (
@@ -1250,7 +1569,7 @@ def main() -> None:
         )
 
         # ----------------------------------------------------
-        # Build latest set
+        # BUILD LATEST SET
         # ----------------------------------------------------
 
         (
@@ -1267,26 +1586,29 @@ def main() -> None:
         )
 
         # ----------------------------------------------------
-        # Archive same exact product set
+        # ARCHIVE SAME EXACT PRODUCT SET
         # ----------------------------------------------------
 
         shutil.copy2(
             metadata_path,
-            temp_archive / "fli.json",
+            temp_archive
+            / "fli.json",
         )
 
         shutil.copy2(
             grid_path,
-            temp_archive / "fli_grid.json",
+            temp_archive
+            / "fli_grid.json",
         )
 
         shutil.copy2(
             polygon_path,
-            temp_archive / "fli_polygons.geojson",
+            temp_archive
+            / "fli_polygons.geojson",
         )
 
         # ----------------------------------------------------
-        # Validation BEFORE touching live outputs
+        # VALIDATION BEFORE TOUCHING LIVE OUTPUTS
         # ----------------------------------------------------
 
         validate_metadata(
@@ -1316,22 +1638,25 @@ def main() -> None:
         print(
             "✓ Staged Web GIS products validated."
         )
+
         print(
             "✓ Latest date validated."
         )
+
         print(
             "✓ Grid dimensions validated."
         )
+
         print(
             "✓ Polygon metadata validated."
         )
+
         print(
             "✓ Archive validated."
         )
 
         # ----------------------------------------------------
-        # Publish latest atomically, file by file, after all
-        # products have already been successfully generated.
+        # PUBLISH LATEST ATOMICALLY
         # ----------------------------------------------------
 
         output_dir.mkdir(
@@ -1351,11 +1676,12 @@ def main() -> None:
             )
 
         # ----------------------------------------------------
-        # Publish archive for this exact forecast date.
+        # PUBLISH ARCHIVE
         # ----------------------------------------------------
 
         live_archive = (
-            archive_root / forecast_date
+            archive_root
+            / forecast_date
         )
 
         live_archive.mkdir(
@@ -1375,19 +1701,22 @@ def main() -> None:
             )
 
     # --------------------------------------------------------
-    # Final live validation
+    # FINAL LIVE VALIDATION
     # --------------------------------------------------------
 
     live_metadata = (
-        output_dir / "fli_latest.json"
+        output_dir
+        / "fli_latest.json"
     )
 
     live_grid = (
-        output_dir / "fli_latest_grid.json"
+        output_dir
+        / "fli_latest_grid.json"
     )
 
     live_polygons = (
-        output_dir / "fli_polygons.geojson"
+        output_dir
+        / "fli_polygons.geojson"
     )
 
     validate_metadata(
@@ -1416,47 +1745,51 @@ def main() -> None:
     print()
     print("=" * 70)
     print(
-        "FIRIS WEB MAP BUILD "
-        "COMPLETED SUCCESSFULLY"
+        "FIRIS WEB MAP BUILD COMPLETED SUCCESSFULLY"
     )
     print("=" * 70)
     print()
+
     print(
-        f"Forecast date    : "
-        f"{forecast_date}"
+        f"Forecast date    : {forecast_date}"
     )
+
     print(
-        f"Latest metadata  : "
-        f"{live_metadata}"
+        f"Latest metadata  : {live_metadata}"
     )
+
     print(
-        f"Latest grid      : "
-        f"{live_grid}"
+        f"Latest grid      : {live_grid}"
     )
+
     print(
-        f"Latest polygons  : "
-        f"{live_polygons}"
+        f"Latest polygons  : {live_polygons}"
     )
+
     print(
         f"Archive          : "
         f"{archive_root / forecast_date}"
     )
+
     print()
     print(
-        "✓ latest products belong to "
-        "the same dated FLI input."
+        "✓ latest products belong to the same dated FLI input."
     )
+
     print(
-        "✓ archive products belong to "
-        "the same forecast date."
+        "✓ archive products belong to the same forecast date."
     )
+
     print(
-        "✓ no older forecast can silently "
-        "become latest."
+        "✓ no older forecast can silently become latest."
     )
+
     print(
-        "✓ web polygon boundaries were "
-        "smoothed without changing the FLI raster."
+        "✓ Chaikin smoothing applied to web polygons."
+    )
+
+    print(
+        "✓ Original FLI raster remains unchanged."
     )
 
 
