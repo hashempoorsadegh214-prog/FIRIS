@@ -15,18 +15,29 @@ Outputs:
     data/web/archive/YYYY-MM-DD/fli_grid.json
     data/web/archive/YYYY-MM-DD/fli_polygons.geojson
 
-The generated "latest" files always represent the exact dated input raster.
-The archive for the same forecast date is generated from the same source in
-the same run.
+IMPORTANT
+---------
+The FLI raster and its numerical values are NOT modified.
 
-The grid JSON preserves the raster row/column arrangement and is used by the
-front-end for point queries and regional statistics.
+Only the polygon geometry used by the web map is visually generalized
+and smoothed after classification and dissolve.
 
-The polygon GeoJSON is classified into the FIRIS risk classes and dissolved
-into contiguous polygons.
-
-Chaikin smoothing is applied ONLY to the web GeoJSON polygon geometry.
-The original FLI raster and all numerical calculations remain unchanged.
+Web geometry processing:
+    Raster classification
+        ↓
+    Polygonize
+        ↓
+    Dissolve same-risk polygons
+        ↓
+    Remove very small vector fragments
+        ↓
+    Chaikin smoothing
+        ↓
+    Controlled simplification
+        ↓
+    Geometry repair
+        ↓
+    GeoJSON
 """
 
 from __future__ import annotations
@@ -48,7 +59,7 @@ from rasterio.features import shapes
 from shapely.geometry import (
     Polygon,
     MultiPolygon,
-    LinearRing,
+    GeometryCollection,
     shape,
     mapping,
 )
@@ -73,161 +84,47 @@ RISK_CODE_TO_INFO = {
 
 
 # ============================================================
-# CHAIKIN SMOOTHING
+# WEB GEOMETRY SETTINGS
 # ============================================================
 
-# تعداد تکرار Chaikin
-CHAIKIN_ITERATIONS = 2
+# ------------------------------------------------------------
+# 1. حذف قطعات بسیار کوچک
+#
+# این مقدار فقط روی GeoJSON وب اثر دارد.
+# واحد در EPSG:4326 است.
+#
+# قطعاتی که مساحتشان کمتر از این مقدار باشد حذف می‌شوند.
+# ------------------------------------------------------------
 
-# نسبت گوشه‌برداری Chaikin
+MIN_VECTOR_AREA = 0.000002
+
+
+# ------------------------------------------------------------
+# 2. Chaikin smoothing
+#
+# دو تکرار برای نرم شدن واضح مرزها، بدون تغییر شدید شکل.
+# ------------------------------------------------------------
+
+CHAIKIN_ITERATIONS = 2
 CHAIKIN_RATIO = 0.25
 
 
-def chaikin_ring(
-    coordinates,
-    iterations: int = CHAIKIN_ITERATIONS,
-    ratio: float = CHAIKIN_RATIO,
-):
-    """
-    Smooth a closed polygon ring using the Chaikin corner-cutting algorithm.
+# ------------------------------------------------------------
+# 3. Simplify
+#
+# بعد از Chaikin تعداد نقاط اضافی کم می‌شود.
+#
+# preserve_topology=True باعث می‌شود هندسه تا حد ممکن سالم بماند.
+# ------------------------------------------------------------
 
-    This operates only on the vector geometry used by the web map.
-    """
-
-    if len(coordinates) < 4:
-        return list(coordinates)
-
-    points = [
-        (float(x), float(y))
-        for x, y, *rest in coordinates
-    ]
-
-    # حذف نقطه انتهایی تکراری
-    if points[0] == points[-1]:
-        points = points[:-1]
-
-    if len(points) < 3:
-        return list(coordinates)
-
-    for _ in range(iterations):
-        new_points = []
-
-        count = len(points)
-
-        for i in range(count):
-            p0 = points[i]
-            p1 = points[(i + 1) % count]
-
-            q = (
-                (1.0 - ratio) * p0[0] + ratio * p1[0],
-                (1.0 - ratio) * p0[1] + ratio * p1[1],
-            )
-
-            r = (
-                ratio * p0[0] + (1.0 - ratio) * p1[0],
-                ratio * p0[1] + (1.0 - ratio) * p1[1],
-            )
-
-            new_points.append(q)
-            new_points.append(r)
-
-        points = new_points
-
-    points.append(points[0])
-
-    return points
+SIMPLIFY_TOLERANCE = 0.00025
 
 
-def smooth_polygon(
-    geometry,
-    iterations: int = CHAIKIN_ITERATIONS,
-    ratio: float = CHAIKIN_RATIO,
-):
-    """
-    Apply Chaikin smoothing to Polygon / MultiPolygon geometries.
+# ------------------------------------------------------------
+# 4. حداقل تعداد نقاط حلقه
+# ------------------------------------------------------------
 
-    Holes are preserved.
-    """
-
-    if geometry.is_empty:
-        return geometry
-
-    if isinstance(geometry, Polygon):
-
-        exterior_coords = chaikin_ring(
-            list(geometry.exterior.coords),
-            iterations=iterations,
-            ratio=ratio,
-        )
-
-        interior_coords = []
-
-        for interior in geometry.interiors:
-            smoothed_hole = chaikin_ring(
-                list(interior.coords),
-                iterations=iterations,
-                ratio=ratio,
-            )
-
-            if len(smoothed_hole) >= 4:
-                interior_coords.append(smoothed_hole)
-
-        try:
-            result = Polygon(
-                exterior_coords,
-                interior_coords,
-            )
-
-        except Exception:
-            return geometry
-
-        if result.is_empty:
-            return geometry
-
-        if not result.is_valid:
-            repaired = result.buffer(0)
-
-            if not repaired.is_empty:
-                result = repaired
-
-        return result
-
-    if isinstance(geometry, MultiPolygon):
-
-        polygons = []
-
-        for polygon in geometry.geoms:
-            smoothed = smooth_polygon(
-                polygon,
-                iterations=iterations,
-                ratio=ratio,
-            )
-
-            if smoothed.is_empty:
-                continue
-
-            if isinstance(smoothed, Polygon):
-                polygons.append(smoothed)
-
-            elif isinstance(smoothed, MultiPolygon):
-                polygons.extend(
-                    list(smoothed.geoms)
-                )
-
-        if not polygons:
-            return geometry
-
-        result = MultiPolygon(polygons)
-
-        if not result.is_valid:
-            repaired = result.buffer(0)
-
-            if not repaired.is_empty:
-                result = repaired
-
-        return result
-
-    return geometry
+MIN_RING_POINTS = 4
 
 
 # ============================================================
@@ -235,36 +132,46 @@ def smooth_polygon(
 # ============================================================
 
 def parse_args() -> argparse.Namespace:
+
     parser = argparse.ArgumentParser(
-        description="Build FIRIS Web GIS products from a dated FLI GeoTIFF."
+        description=(
+            "Build FIRIS Web GIS products "
+            "from a dated FLI GeoTIFF."
+        )
     )
 
     parser.add_argument(
         "--input",
         required=True,
         type=Path,
-        help="Input dated FLI GeoTIFF."
+        help="Input dated FLI GeoTIFF.",
     )
 
     parser.add_argument(
         "--output-dir",
         required=True,
         type=Path,
-        help="Web output directory, normally data/web."
+        help=(
+            "Web output directory, "
+            "normally data/web."
+        ),
     )
 
     parser.add_argument(
         "--archive-dir",
         default=None,
         type=Path,
-        help="Optional archive root. Defaults to <output-dir>/archive."
+        help=(
+            "Optional archive root. "
+            "Defaults to <output-dir>/archive."
+        ),
     )
 
     return parser.parse_args()
 
 
 # ============================================================
-# HELPERS
+# BASIC HELPERS
 # ============================================================
 
 DATE_PATTERN = re.compile(
@@ -304,8 +211,10 @@ def extract_forecast_date(
         return match.group(1)
 
     raise ValueError(
-        "Could not determine forecast date from input filename. "
-        f"Expected a name like fli_fars_YYYY-MM-DD.tif: {path.name}"
+        "Could not determine forecast date "
+        "from input filename. "
+        f"Expected fli_fars_YYYY-MM-DD.tif: "
+        f"{path.name}"
     )
 
 
@@ -334,6 +243,7 @@ def risk_info(
 ) -> tuple[str, float, float, str]:
 
     if not math.isfinite(value):
+
         return (
             "بدون داده",
             0.0,
@@ -349,6 +259,7 @@ def risk_info(
     ) in RISK_CLASSES:
 
         if minimum <= value < maximum:
+
             return (
                 label,
                 minimum,
@@ -357,6 +268,7 @@ def risk_info(
             )
 
     if value < 0:
+
         return (
             "بدون داده",
             0.0,
@@ -402,11 +314,16 @@ def array_to_json_values(
             number = float(value)
 
             if not math.isfinite(number):
+
                 out_row.append(None)
 
             else:
+
                 out_row.append(
-                    round(number, 4)
+                    round(
+                        number,
+                        4,
+                    )
                 )
 
         result.append(out_row)
@@ -475,38 +392,52 @@ def read_fli(
     with rasterio.open(path) as src:
 
         if src.count < 1:
+
             raise ValueError(
                 "FLI raster has no bands."
             )
 
         if src.crs is None:
+
             raise ValueError(
                 "FLI raster has no CRS."
             )
 
         if src.crs.to_epsg() != 4326:
+
             raise ValueError(
-                f"FLI raster must use EPSG:4326. Found: {src.crs}"
+                "FLI raster must use EPSG:4326. "
+                f"Found: {src.crs}"
             )
 
-        data = src.read(1).astype(
+        data = src.read(
+            1
+        ).astype(
             np.float32,
             copy=False,
         )
 
         nodata = src.nodata
 
-        valid = np.isfinite(data)
+        valid = np.isfinite(
+            data
+        )
 
         if nodata is not None:
 
             try:
 
-                nodata_float = float(nodata)
+                nodata_float = float(
+                    nodata
+                )
 
-                if math.isnan(nodata_float):
+                if math.isnan(
+                    nodata_float
+                ):
 
-                    valid &= ~np.isnan(data)
+                    valid &= ~np.isnan(
+                        data
+                    )
 
                 else:
 
@@ -521,6 +452,7 @@ def read_fli(
                 TypeError,
                 ValueError,
             ):
+
                 pass
 
         valid &= data >= 0.0
@@ -538,8 +470,15 @@ def read_fli(
 
         reference = {
             "crs": str(src.crs),
-            "width": int(src.width),
-            "height": int(src.height),
+
+            "width": int(
+                src.width
+            ),
+
+            "height": int(
+                src.height
+            ),
+
             "transform": [
                 float(src.transform.a),
                 float(src.transform.b),
@@ -548,12 +487,22 @@ def read_fli(
                 float(src.transform.e),
                 float(src.transform.f),
             ],
+
             "bounds": {
-                "west": float(bounds.left),
-                "south": float(bounds.bottom),
-                "east": float(bounds.right),
-                "north": float(bounds.top),
+                "west": float(
+                    bounds.left
+                ),
+                "south": float(
+                    bounds.bottom
+                ),
+                "east": float(
+                    bounds.right
+                ),
+                "north": float(
+                    bounds.top
+                ),
             },
+
             "resolution": {
                 "x": float(
                     abs(src.res[0])
@@ -562,6 +511,7 @@ def read_fli(
                     abs(src.res[1])
                 ),
             },
+
             "nodata": (
                 None
                 if src.nodata is None
@@ -575,6 +525,7 @@ def read_fli(
             "count": int(
                 np.sum(valid)
             ),
+
             "min": (
                 None
                 if not np.any(valid)
@@ -587,6 +538,7 @@ def read_fli(
                     6,
                 )
             ),
+
             "max": (
                 None
                 if not np.any(valid)
@@ -599,6 +551,7 @@ def read_fli(
                     6,
                 )
             ),
+
             "mean": (
                 None
                 if not np.any(valid)
@@ -614,8 +567,10 @@ def read_fli(
         }
 
     if stats["count"] == 0:
+
         raise ValueError(
-            "FLI raster contains no valid 0-100 pixels."
+            "FLI raster contains no valid "
+            "0-100 pixels."
         )
 
     return (
@@ -636,21 +591,36 @@ def build_grid_json(
 ) -> dict[str, Any]:
 
     return {
-        "forecast_date": forecast_date,
-        "target_date": forecast_date,
-        "crs": reference["crs"],
-        "rows": reference["height"],
-        "cols": reference["width"],
-        "bounds": reference["bounds"],
-        "resolution": reference["resolution"],
-        "values": array_to_json_values(
-            array
-        ),
+        "forecast_date":
+            forecast_date,
+
+        "target_date":
+            forecast_date,
+
+        "crs":
+            reference["crs"],
+
+        "rows":
+            reference["height"],
+
+        "cols":
+            reference["width"],
+
+        "bounds":
+            reference["bounds"],
+
+        "resolution":
+            reference["resolution"],
+
+        "values":
+            array_to_json_values(
+                array
+            ),
     }
 
 
 # ============================================================
-# METADATA JSON
+# METADATA
 # ============================================================
 
 def build_metadata_json(
@@ -661,6 +631,7 @@ def build_metadata_json(
 ) -> dict[str, Any]:
 
     return {
+
         "project":
             "FIRIS - Fars Integrated Fire Information System",
 
@@ -703,15 +674,24 @@ def build_metadata_json(
             stats,
 
         "risk_classes": [
+
             {
-                "label": label,
-                "minimum": minimum,
-                "maximum": min(
-                    maximum,
-                    100.0,
-                ),
-                "color": color,
+                "label":
+                    label,
+
+                "minimum":
+                    minimum,
+
+                "maximum":
+                    min(
+                        maximum,
+                        100.0,
+                    ),
+
+                "color":
+                    color,
             }
+
             for (
                 label,
                 minimum,
@@ -721,6 +701,7 @@ def build_metadata_json(
         ],
 
         "grid": {
+
             "row_order":
                 "north_to_south",
 
@@ -732,6 +713,7 @@ def build_metadata_json(
         },
 
         "web_products": {
+
             "latest_metadata":
                 "fli_latest.json",
 
@@ -745,27 +727,32 @@ def build_metadata_json(
                 f"archive/{forecast_date}",
         },
 
-        "polygon_smoothing": {
-            "method":
-                "Chaikin corner-cutting",
+        "polygon_processing": {
 
-            "iterations":
+            "method":
+                "Dissolve + fragment removal + "
+                "Chaikin smoothing + topology-preserving simplify",
+
+            "minimum_vector_area":
+                MIN_VECTOR_AREA,
+
+            "chaikin_iterations":
                 CHAIKIN_ITERATIONS,
 
-            "ratio":
+            "chaikin_ratio":
                 CHAIKIN_RATIO,
 
-            "applied_to":
-                "web GeoJSON only",
+            "simplify_tolerance":
+                SIMPLIFY_TOLERANCE,
 
-            "source_raster_unchanged":
+            "source_fli_unchanged":
                 True,
         },
     }
 
 
 # ============================================================
-# CLASSIFIED POLYGONS
+# CLASSIFIED RASTER
 # ============================================================
 
 def build_classified_raster(
@@ -777,7 +764,9 @@ def build_classified_raster(
         dtype=np.uint8,
     )
 
-    finite = np.isfinite(array)
+    finite = np.isfinite(
+        array
+    )
 
     for code, (
         _,
@@ -800,12 +789,416 @@ def build_classified_raster(
     return classified
 
 
+# ============================================================
+# VECTOR CLEANING
+# ============================================================
+
+def extract_polygon_parts(
+    geometry,
+) -> list[Polygon]:
+
+    if geometry.is_empty:
+        return []
+
+    if isinstance(
+        geometry,
+        Polygon,
+    ):
+
+        return [geometry]
+
+    if isinstance(
+        geometry,
+        MultiPolygon,
+    ):
+
+        return list(
+            geometry.geoms
+        )
+
+    if isinstance(
+        geometry,
+        GeometryCollection,
+    ):
+
+        polygons = []
+
+        for item in geometry.geoms:
+
+            if isinstance(
+                item,
+                Polygon,
+            ):
+
+                polygons.append(
+                    item
+                )
+
+            elif isinstance(
+                item,
+                MultiPolygon,
+            ):
+
+                polygons.extend(
+                    list(
+                        item.geoms
+                    )
+                )
+
+        return polygons
+
+    return []
+
+
+def remove_small_fragments(
+    geometry,
+    minimum_area: float = MIN_VECTOR_AREA,
+):
+
+    parts = extract_polygon_parts(
+        geometry
+    )
+
+    if not parts:
+        return geometry
+
+    kept = [
+        polygon
+        for polygon in parts
+        if polygon.area >= minimum_area
+    ]
+
+    if not kept:
+
+        # اگر کل هندسه کوچک بود، همان را نگه می‌داریم
+        # تا یک کلاس کاملاً حذف نشود.
+        largest = max(
+            parts,
+            key=lambda item: item.area,
+        )
+
+        return largest
+
+    if len(kept) == 1:
+        return kept[0]
+
+    return MultiPolygon(
+        kept
+    )
+
+
+# ============================================================
+# CHAIKIN
+# ============================================================
+
+def chaikin_ring(
+    coordinates,
+    iterations: int = CHAIKIN_ITERATIONS,
+    ratio: float = CHAIKIN_RATIO,
+):
+
+    if len(coordinates) < MIN_RING_POINTS:
+        return list(
+            coordinates
+        )
+
+    points = [
+        (
+            float(x),
+            float(y),
+        )
+        for x, y, *rest
+        in coordinates
+    ]
+
+    # حذف نقطه انتهایی تکراری
+    if points[0] == points[-1]:
+
+        points = points[:-1]
+
+    if len(points) < 3:
+
+        return list(
+            coordinates
+        )
+
+    for _ in range(
+        iterations
+    ):
+
+        new_points = []
+
+        count = len(
+            points
+        )
+
+        for i in range(
+            count
+        ):
+
+            p0 = points[i]
+
+            p1 = points[
+                (i + 1) % count
+            ]
+
+            q = (
+                (1.0 - ratio) * p0[0]
+                + ratio * p1[0],
+
+                (1.0 - ratio) * p0[1]
+                + ratio * p1[1],
+            )
+
+            r = (
+                ratio * p0[0]
+                + (1.0 - ratio) * p1[0],
+
+                ratio * p0[1]
+                + (1.0 - ratio) * p1[1],
+            )
+
+            new_points.append(
+                q
+            )
+
+            new_points.append(
+                r
+            )
+
+        points = new_points
+
+    points.append(
+        points[0]
+    )
+
+    return points
+
+
+def smooth_polygon(
+    geometry,
+    iterations: int = CHAIKIN_ITERATIONS,
+    ratio: float = CHAIKIN_RATIO,
+):
+
+    if geometry.is_empty:
+        return geometry
+
+    if isinstance(
+        geometry,
+        Polygon,
+    ):
+
+        exterior = chaikin_ring(
+            list(
+                geometry.exterior.coords
+            ),
+            iterations=iterations,
+            ratio=ratio,
+        )
+
+        holes = []
+
+        for interior in geometry.interiors:
+
+            hole = chaikin_ring(
+                list(
+                    interior.coords
+                ),
+                iterations=iterations,
+                ratio=ratio,
+            )
+
+            if len(hole) >= MIN_RING_POINTS:
+
+                holes.append(
+                    hole
+                )
+
+        try:
+
+            result = Polygon(
+                exterior,
+                holes,
+            )
+
+        except Exception:
+
+            return geometry
+
+        if result.is_empty:
+
+            return geometry
+
+        if not result.is_valid:
+
+            repaired = result.buffer(
+                0
+            )
+
+            if not repaired.is_empty:
+
+                result = repaired
+
+        return result
+
+    if isinstance(
+        geometry,
+        MultiPolygon,
+    ):
+
+        polygons = []
+
+        for polygon in geometry.geoms:
+
+            smoothed = smooth_polygon(
+                polygon,
+                iterations=iterations,
+                ratio=ratio,
+            )
+
+            if smoothed.is_empty:
+                continue
+
+            if isinstance(
+                smoothed,
+                Polygon,
+            ):
+
+                polygons.append(
+                    smoothed
+                )
+
+            elif isinstance(
+                smoothed,
+                MultiPolygon,
+            ):
+
+                polygons.extend(
+                    list(
+                        smoothed.geoms
+                    )
+                )
+
+        if not polygons:
+
+            return geometry
+
+        result = MultiPolygon(
+            polygons
+        )
+
+        if not result.is_valid:
+
+            repaired = result.buffer(
+                0
+            )
+
+            if not repaired.is_empty:
+
+                result = repaired
+
+        return result
+
+    return geometry
+
+
+# ============================================================
+# FINAL VECTOR GENERALIZATION
+# ============================================================
+
+def professionalize_geometry(
+    geometry,
+):
+
+    if geometry.is_empty:
+
+        return geometry
+
+    # --------------------------------------------------------
+    # Step 1: repair
+    # --------------------------------------------------------
+
+    if not geometry.is_valid:
+
+        geometry = geometry.buffer(
+            0
+        )
+
+    if geometry.is_empty:
+
+        return geometry
+
+    # --------------------------------------------------------
+    # Step 2: remove tiny fragments
+    # --------------------------------------------------------
+
+    geometry = remove_small_fragments(
+        geometry,
+        MIN_VECTOR_AREA,
+    )
+
+    if geometry.is_empty:
+
+        return geometry
+
+    # --------------------------------------------------------
+    # Step 3: Chaikin
+    # --------------------------------------------------------
+
+    geometry = smooth_polygon(
+        geometry,
+        iterations=CHAIKIN_ITERATIONS,
+        ratio=CHAIKIN_RATIO,
+    )
+
+    if geometry.is_empty:
+
+        return geometry
+
+    # --------------------------------------------------------
+    # Step 4: topology-preserving simplify
+    # --------------------------------------------------------
+
+    geometry = geometry.simplify(
+        SIMPLIFY_TOLERANCE,
+        preserve_topology=True,
+    )
+
+    if geometry.is_empty:
+
+        return geometry
+
+    # --------------------------------------------------------
+    # Step 5: final repair
+    # --------------------------------------------------------
+
+    if not geometry.is_valid:
+
+        repaired = geometry.buffer(
+            0
+        )
+
+        if not repaired.is_empty:
+
+            geometry = repaired
+
+    return geometry
+
+
+# ============================================================
+# POLYGONIZE
+# ============================================================
+
 def polygonize_classes(
     classified: np.ndarray,
     transform,
 ) -> dict[int, list[Any]]:
 
-    groups: dict[int, list[Any]] = {
+    groups: dict[
+        int,
+        list[Any],
+    ] = {
         code: []
         for code in RISK_CODE_TO_INFO
     }
@@ -819,7 +1212,9 @@ def polygonize_classes(
         connectivity=4,
     ):
 
-        code = int(value)
+        code = int(
+            value
+        )
 
         if code <= 0:
             continue
@@ -832,18 +1227,27 @@ def polygonize_classes(
             continue
 
         if not geom.is_valid:
-            geom = geom.buffer(0)
+
+            geom = geom.buffer(
+                0
+            )
 
         if geom.is_empty:
             continue
 
         groups.setdefault(
             code,
-            []
-        ).append(geom)
+            [],
+        ).append(
+            geom
+        )
 
     return groups
 
+
+# ============================================================
+# FEATURE COLLECTION
+# ============================================================
 
 def make_feature_collection(
     classified: np.ndarray,
@@ -865,6 +1269,10 @@ def make_feature_collection(
         if not geometries:
             continue
 
+        # ----------------------------------------------------
+        # DISSOLVE
+        # ----------------------------------------------------
+
         dissolved = unary_union(
             geometries
         )
@@ -873,29 +1281,32 @@ def make_feature_collection(
             continue
 
         if not dissolved.is_valid:
-            dissolved = dissolved.buffer(0)
+
+            dissolved = dissolved.buffer(
+                0
+            )
 
         if dissolved.is_empty:
             continue
 
-        # ====================================================
-        # CHAIKIN SMOOTHING
-        # ====================================================
+        original_area = float(
+            dissolved.area
+        )
 
-        smoothed = smooth_polygon(
-            dissolved,
-            iterations=CHAIKIN_ITERATIONS,
-            ratio=CHAIKIN_RATIO,
+        # ----------------------------------------------------
+        # PROFESSIONAL WEB GENERALIZATION
+        # ----------------------------------------------------
+
+        smoothed = professionalize_geometry(
+            dissolved
         )
 
         if smoothed.is_empty:
             continue
 
-        if not smoothed.is_valid:
-            repaired = smoothed.buffer(0)
-
-            if not repaired.is_empty:
-                smoothed = repaired
+        final_area = float(
+            smoothed.area
+        )
 
         label, minimum, maximum, color = (
             RISK_CODE_TO_INFO[code]
@@ -907,6 +1318,7 @@ def make_feature_collection(
                     "Feature",
 
                 "properties": {
+
                     "risk_code":
                         code,
 
@@ -933,18 +1345,23 @@ def make_feature_collection(
                             "forecast_date"
                         ],
 
-                    "geometry_smoothing":
-                        "Chaikin",
+                    "geometry_processing":
+                        "Dissolve + "
+                        "fragment removal + "
+                        "Chaikin + "
+                        "topology-preserving simplify",
 
-                    "chaikin_iterations":
-                        CHAIKIN_ITERATIONS,
+                    "original_vector_area":
+                        original_area,
 
-                    "chaikin_ratio":
-                        CHAIKIN_RATIO,
+                    "final_vector_area":
+                        final_area,
                 },
 
                 "geometry":
-                    mapping(smoothed),
+                    mapping(
+                        smoothed
+                    ),
             }
         )
 
@@ -957,6 +1374,7 @@ def make_feature_collection(
     )
 
     return {
+
         "type":
             "FeatureCollection",
 
@@ -964,16 +1382,19 @@ def make_feature_collection(
             "FIRIS_FLI_Risk_Zones",
 
         "crs": {
+
             "type":
                 "name",
 
             "properties": {
+
                 "name":
                     "EPSG:4326",
             },
         },
 
         "properties": {
+
             "forecast_date":
                 metadata[
                     "forecast_date"
@@ -992,14 +1413,27 @@ def make_feature_collection(
             "classification":
                 "FLI risk classes",
 
-            "geometry_smoothing":
-                "Chaikin corner-cutting",
+            "geometry_processing":
+                "Professional web "
+                "polygon generalization",
+
+            "smoothing":
+                "Chaikin",
 
             "chaikin_iterations":
                 CHAIKIN_ITERATIONS,
 
             "chaikin_ratio":
                 CHAIKIN_RATIO,
+
+            "simplify_tolerance":
+                SIMPLIFY_TOLERANCE,
+
+            "minimum_vector_area":
+                MIN_VECTOR_AREA,
+
+            "source_raster_unchanged":
+                True,
         },
 
         "features":
@@ -1043,15 +1477,19 @@ def validate_metadata(
     if str(actual_date) != expected_date:
 
         raise RuntimeError(
-            "Generated latest metadata has the wrong forecast date: "
-            f"expected {expected_date}, got {actual_date}"
+            "Generated latest metadata "
+            "has the wrong forecast date: "
+            f"expected {expected_date}, "
+            f"got {actual_date}"
         )
 
     if str(actual_source) != expected_source:
 
         raise RuntimeError(
-            "Generated latest metadata has the wrong source file: "
-            f"expected {expected_source}, got {actual_source}"
+            "Generated latest metadata "
+            "has the wrong source file: "
+            f"expected {expected_source}, "
+            f"got {actual_source}"
         )
 
 
@@ -1083,8 +1521,10 @@ def validate_grid(
     if str(actual_date) != expected_date:
 
         raise RuntimeError(
-            "Generated latest grid has the wrong forecast date: "
-            f"expected {expected_date}, got {actual_date}"
+            "Generated latest grid "
+            "has the wrong forecast date: "
+            f"expected {expected_date}, "
+            f"got {actual_date}"
         )
 
     if int(
@@ -1125,7 +1565,8 @@ def validate_grid(
     if len(values) != expected_rows:
 
         raise RuntimeError(
-            "Generated grid row count does not match values length."
+            "Generated grid row count "
+            "does not match values length."
         )
 
     sample_rows = values[
@@ -1149,7 +1590,8 @@ def validate_grid(
         if len(row) != expected_cols:
 
             raise RuntimeError(
-                "Generated grid column count does not match values width."
+                "Generated grid column count "
+                "does not match values width."
             )
 
 
@@ -1172,7 +1614,8 @@ def validate_polygons(
     ) != "FeatureCollection":
 
         raise RuntimeError(
-            "Generated FLI polygons are not a FeatureCollection."
+            "Generated FLI polygons "
+            "are not a FeatureCollection."
         )
 
     properties = geojson.get(
@@ -1187,8 +1630,10 @@ def validate_polygons(
     if str(actual_date) != expected_date:
 
         raise RuntimeError(
-            "Generated polygon forecast date is incorrect: "
-            f"expected {expected_date}, got {actual_date}"
+            "Generated polygon forecast "
+            "date is incorrect: "
+            f"expected {expected_date}, "
+            f"got {actual_date}"
         )
 
     features = geojson.get(
@@ -1405,7 +1850,8 @@ def validate_archive(
 
         raise RuntimeError(
             "Archive metadata date is incorrect: "
-            f"expected {expected_date}, got {actual_date}"
+            f"expected {expected_date}, "
+            f"got {actual_date}"
         )
 
 
@@ -1459,20 +1905,37 @@ def main() -> None:
     )
 
     print()
-    print("POLYGON SMOOTHING")
-    print("-----------------")
+    print("WEB POLYGON GENERALIZATION")
+    print("---------------------------")
+
     print(
-        "Method           : Chaikin corner-cutting"
+        "Dissolve         : ENABLED"
     )
+
     print(
-        f"Iterations       : {CHAIKIN_ITERATIONS}"
+        "Small fragments  : REMOVED"
     )
+
     print(
-        f"Ratio            : {CHAIKIN_RATIO}"
+        "Chaikin          : ENABLED"
     )
+
     print(
-        "Applied to       : Web GeoJSON only"
+        f"Chaikin passes   : {CHAIKIN_ITERATIONS}"
     )
+
+    print(
+        f"Chaikin ratio    : {CHAIKIN_RATIO}"
+    )
+
+    print(
+        f"Simplify         : {SIMPLIFY_TOLERANCE}"
+    )
+
+    print(
+        f"Min area         : {MIN_VECTOR_AREA}"
+    )
+
     print(
         "Source FLI       : UNCHANGED"
     )
@@ -1608,7 +2071,7 @@ def main() -> None:
         )
 
         # ----------------------------------------------------
-        # VALIDATION BEFORE TOUCHING LIVE OUTPUTS
+        # VALIDATION BEFORE LIVE OUTPUT
         # ----------------------------------------------------
 
         validate_metadata(
@@ -1656,7 +2119,7 @@ def main() -> None:
         )
 
         # ----------------------------------------------------
-        # PUBLISH LATEST ATOMICALLY
+        # PUBLISH LATEST
         # ----------------------------------------------------
 
         output_dir.mkdir(
@@ -1785,11 +2248,11 @@ def main() -> None:
     )
 
     print(
-        "✓ Chaikin smoothing applied to web polygons."
+        "✓ web polygon geometry professionally generalized."
     )
 
     print(
-        "✓ Original FLI raster remains unchanged."
+        "✓ original FLI raster remains unchanged."
     )
 
 
