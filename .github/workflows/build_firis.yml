@@ -1,46 +1,257 @@
-
-name: Build FIRIS Web Map
+name: Build FIRIS FLI and Web Map
 
 on:
-  push:
-    branches: [main]
-
-  schedule:
-    - cron: "0 6 * * *"
-
   workflow_dispatch:
+
+  workflow_run:
+    workflows:
+      - Update FIRIS FWI
+    types:
+      - completed
+
+permissions:
+  contents: write
 
 jobs:
   build:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
     runs-on: ubuntu-latest
 
     steps:
+      # ============================================================
+      # 1. Checkout
+      # ============================================================
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: main
 
+      # ============================================================
+      # 2. Setup Python
+      # ============================================================
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
+      # ============================================================
+      # 3. Install dependencies
+      # ============================================================
       - name: Install dependencies
-        run: pip install -r scripts/requirements.txt
-
-      - name: Build web map
         run: |
+          python -m pip install --upgrade pip
+          pip install -r scripts/requirements.txt
+
+      # ============================================================
+      # 4. Detect exact FWI date
+      #
+      #    The newest dated FWI raster in data/raw/fwi is used.
+      #    This avoids relying on GitHub runner UTC time.
+      # ============================================================
+      - name: Detect FWI date
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "DETECTING AVAILABLE FWI"
+          echo "============================================================"
+
+          FWI_FILE=$(find data/raw/fwi \
+            -maxdepth 1 \
+            -type f \
+            -name 'fwi_ecmwf_fars_????-??-??.tif' \
+            -printf '%f\n' \
+            | sort \
+            | tail -n 1)
+
+          if [ -z "$FWI_FILE" ]; then
+            echo "ERROR: No dated FWI GeoTIFF found."
+            echo "Expected pattern:"
+            echo "data/raw/fwi/fwi_ecmwf_fars_YYYY-MM-DD.tif"
+            exit 1
+          fi
+
+          RUN_DATE="${FWI_FILE#fwi_ecmwf_fars_}"
+          RUN_DATE="${RUN_DATE%.tif}"
+
+          echo "FWI file  : $FWI_FILE"
+          echo "Run date  : $RUN_DATE"
+
+          if ! [[ "$RUN_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "ERROR: Invalid FWI date: $RUN_DATE"
+            exit 1
+          fi
+
+          echo "RUN_DATE=$RUN_DATE" >> "$GITHUB_ENV"
+          echo "FWI_FILE=data/raw/fwi/$FWI_FILE" >> "$GITHUB_ENV"
+
+      # ============================================================
+      # 5. Verify exact input files
+      # ============================================================
+      - name: Verify FIRIS inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "VERIFYING FIRIS INPUTS"
+          echo "============================================================"
+
+          test -f "$FWI_FILE" || {
+            echo "ERROR: FWI file not found:"
+            echo "$FWI_FILE"
+            exit 1
+          }
+
+          test -f "data/raw/fuel/fars_fuel.tif" || {
+            echo "ERROR: Fuel raster not found:"
+            echo "data/raw/fuel/fars_fuel.tif"
+            exit 1
+          }
+
+          test -f "data/raw/topography/dem_fars.tif" || {
+            echo "ERROR: DEM raster not found:"
+            echo "data/raw/topography/dem_fars.tif"
+            exit 1
+          }
+
+          test -f "fars.geojson" || {
+            echo "ERROR: Fars boundary not found:"
+            echo "fars.geojson"
+            exit 1
+          }
+
+          echo ""
+          echo "FWI   : $FWI_FILE"
+          echo "Fuel  : data/raw/fuel/fars_fuel.tif"
+          echo "DEM   : data/raw/topography/dem_fars.tif"
+          echo "BOUND : fars.geojson"
+
+      # ============================================================
+      # 6. Build FLI
+      # ============================================================
+      - name: Build FLI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "BUILDING FIRIS FLI"
+          echo "============================================================"
+
+          python scripts/build_firis.py \
+            --fwi-raster "$FWI_FILE" \
+            --fuel-raster "data/raw/fuel/fars_fuel.tif" \
+            --dem-raster "data/raw/topography/dem_fars.tif" \
+            --boundary "fars.geojson" \
+            --output-dir "data/outputs" \
+            --run-date "$RUN_DATE"
+
+      # ============================================================
+      # 7. Verify FLI output
+      # ============================================================
+      - name: Verify FLI output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "VERIFYING FLI OUTPUT"
+          echo "============================================================"
+
+          FLI_FILE="data/outputs/fli_fars_${RUN_DATE}.tif"
+
+          if [ ! -f "$FLI_FILE" ]; then
+            echo "ERROR: FLI raster was not created:"
+            echo "$FLI_FILE"
+            exit 1
+          fi
+
+          echo "FLI created successfully:"
+          echo "$FLI_FILE"
+
+      # ============================================================
+      # 8. Build Web GIS products
+      # ============================================================
+      - name: Build Web Map
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "BUILDING FIRIS WEB MAP"
+          echo "============================================================"
+
           python scripts/build_web_map.py \
-            --input data/outputs/fli_fars_$(date +%Y-%m-%d).tif \
-            --output-dir data/web \
-            --archive-dir data/web/archive
+            --input "data/outputs/fli_fars_${RUN_DATE}.tif" \
+            --output-dir "data/web" \
+            --archive-dir "data/web/archive"
 
-      - name: Commit updated web products
+      # ============================================================
+      # 9. Verify web outputs
+      # ============================================================
+      - name: Verify Web outputs
+        shell: bash
         run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "VERIFYING WEB OUTPUTS"
+          echo "============================================================"
+
+          test -f "data/web/fli_latest.json" || {
+            echo "ERROR: Missing data/web/fli_latest.json"
+            exit 1
+          }
+
+          test -f "data/web/fli_latest_grid.json" || {
+            echo "ERROR: Missing data/web/fli_latest_grid.json"
+            exit 1
+          }
+
+          test -f "data/web/fli_polygons.geojson" || {
+            echo "ERROR: Missing data/web/fli_polygons.geojson"
+            exit 1
+          }
+
+          test -d "data/web/archive" || {
+            echo "ERROR: Missing data/web/archive"
+            exit 1
+          }
+
+          echo "All web products verified."
+
+      # ============================================================
+      # 10. Commit and push
+      # ============================================================
+      - name: Commit and push FIRIS products
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "============================================================"
+          echo "COMMITTING FIRIS PRODUCTS"
+          echo "============================================================"
+
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
-          git add data/web
+          git add data/outputs data/web
 
-          git commit -m "chore: update FIRIS web products" || echo "No changes"
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit \
+            -m "chore: build FIRIS FLI and web products ${RUN_DATE}"
 
           git push
 
+          echo ""
+          echo "FIRIS build completed successfully."
+          echo "Date: ${RUN_DATE}"
