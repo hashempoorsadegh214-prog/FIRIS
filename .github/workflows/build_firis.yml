@@ -1,35 +1,46 @@
+
 name: Build FIRIS Web Map
 
 on:
   push:
     branches: [main]
+
   schedule:
     - cron: "0 6 * * *"
+
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt pandas openpyxl
+        run: pip install -r scripts/requirements.txt
 
-      - name: Build web map, Excel report and update archive (Optimized)
+      - name: Build web map
         run: |
           python scripts/build_web_map.py \
             --input data/outputs/fli_fars_$(date +%Y-%m-%d).tif \
             --output-dir data/web \
             --archive-dir data/web/archive
 
-      - name: Commit updated files
+      - name: Commit updated web products
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add data/web/archive/index.json data/web/report.xlsx
-          git commit -m "chore: update archive index, Excel and optimized data" || echo "No changes"
+
+          git add data/web
+
+          git commit -m "chore: update FIRIS web products" || echo "No changes"
+
           git push
+
