@@ -4,36 +4,16 @@
 FIRIS - Detailed Excel Fire Risk Report
 =======================================
 
-این فایل شاخص FLI را محاسبه نمی‌کند.
+Reads the final FLI raster and creates the Excel report.
 
-فقط Raster نهایی FLI را می‌خواند و گزارش Excel می‌سازد.
-
-خروجی:
+Outputs:
 
 1. خلاصه
 2. مناطق_چهارگانه
 3. مناطق_شکار_ممنوع
 4. طبقات_خطر
 5. اطلاعات_فنی
-
-نگاشت قطعی منابع:
-
-protected_areas.geojson
--> مناطق_چهارگانه
-
-hunting_banned.geojson
--> مناطق_شکار_ممنوع
-
-طبقه‌بندی خطر:
-
-متوسط       0–25
-زیاد        25–50
-خیلی زیاد   50–75
-بحرانی      75–100
-
-توجه:
-این فایل هیچ تغییری در مقادیر Raster FLI ایجاد نمی‌کند.
-"""
+   """
 
 from **future** import annotations
 
@@ -84,28 +64,6 @@ RISK_COLORS = {
 
 # ============================================================
 
-#
-
-# این دو نگاشت عمداً ثابت و صریح هستند.
-
-#
-
-# protected_areas.geojson
-
-# -> مناطق چهارگانه
-
-#
-
-# hunting_banned.geojson
-
-# -> مناطق شکار ممنوع
-
-#
-
-# هیچ جابه‌جایی یا تشخیص خودکاری بین این دو انجام نمی‌شود.
-
-# ============================================================
-
 PROTECTED_SHEET = "مناطق_چهارگانه"
 PROTECTED_LABEL = "مناطق چهارگانه"
 
@@ -118,21 +76,18 @@ HUNTING_LABEL = "مناطق شکار ممنوع"
 
 # ============================================================
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
 
 ```
 parser = argparse.ArgumentParser(
-    description=(
-        "Build detailed FIRIS Excel "
-        "fire-risk report."
-    )
+    description="Build FIRIS Excel fire-risk report."
 )
 
 parser.add_argument(
     "--input",
     required=True,
     type=Path,
-    help="Existing FLI raster."
+    help="Input FLI raster."
 )
 
 parser.add_argument(
@@ -153,9 +108,7 @@ parser.add_argument(
     "--protected",
     required=False,
     type=Path,
-    default=Path(
-        "protected_areas.geojson"
-    ),
+    default=Path("protected_areas.geojson"),
     help="Protected areas GeoJSON."
 )
 
@@ -163,9 +116,7 @@ parser.add_argument(
     "--hunting",
     required=False,
     type=Path,
-    default=Path(
-        "hunting_banned.geojson"
-    ),
+    default=Path("hunting_banned.geojson"),
     help="Hunting banned GeoJSON."
 )
 
@@ -181,7 +132,7 @@ return parser.parse_args()
 def require_file(
 path: Path,
 label: str
-):
+) -> None:
 
 ```
 if not path.is_file():
@@ -193,7 +144,7 @@ if not path.is_file():
 
 # ============================================================
 
-# DATE CHECK
+# DATE
 
 # ============================================================
 
@@ -211,10 +162,8 @@ match = re.search(
 if not match:
 
     raise ValueError(
-        "Could not determine forecast date "
-        "from FLI filename. Expected: "
-        f"fli_fars_YYYY-MM-DD.tif ; "
-        f"received: {path.name}"
+        "Invalid FLI filename. Expected: "
+        "fli_fars_YYYY-MM-DD.tif"
     )
 
 return match.group(1)
@@ -223,7 +172,7 @@ return match.group(1)
 def validate_run_date(
 input_path: Path,
 run_date: str
-):
+) -> None:
 
 ```
 filename_date = (
@@ -236,9 +185,8 @@ if filename_date != run_date:
 
     raise ValueError(
         "Forecast date mismatch.\n"
-        f"FLI filename date : {filename_date}\n"
-        f"--run-date        : {run_date}\n"
-        "The Excel report was NOT created."
+        f"FLI filename date: {filename_date}\n"
+        f"Run date: {run_date}"
     )
 ```
 
@@ -263,15 +211,15 @@ if not np.isfinite(value):
 
     return "بدون داده"
 
-if value < 25:
+if value < 25.0:
 
     return "متوسط"
 
-if value < 50:
+if value < 50.0:
 
     return "زیاد"
 
-if value < 75:
+if value < 75.0:
 
     return "خیلی زیاد"
 
@@ -319,18 +267,12 @@ with path.open(
     encoding="utf-8"
 ) as file:
 
-    data = json.load(
-        file
-    )
+    data = json.load(file)
 
-if (
-    data.get("type")
-    != "FeatureCollection"
-):
+if data.get("type") != "FeatureCollection":
 
     raise ValueError(
-        f"Invalid GeoJSON FeatureCollection: "
-        f"{path}"
+        f"Invalid GeoJSON FeatureCollection: {path}"
     )
 
 features = data.get(
@@ -382,25 +324,18 @@ candidates = [
 
 for key in candidates:
 
-    value = properties.get(
-        key
-    )
+    value = properties.get(key)
 
     if (
         value is not None
         and str(value).strip()
     ):
 
-        return str(
-            value
-        ).strip()
+        return str(value).strip()
 
 for key, value in properties.items():
 
-    if not isinstance(
-        value,
-        str
-    ):
+    if not isinstance(value, str):
 
         continue
 
@@ -427,7 +362,7 @@ return fallback
 
 # ============================================================
 
-# READ FLI
+# LOAD FLI
 
 # ============================================================
 
@@ -436,9 +371,7 @@ path: Path
 ):
 
 ```
-with rasterio.open(
-    path
-) as src:
+with rasterio.open(path) as src:
 
     if src.crs is None:
 
@@ -471,9 +404,7 @@ with rasterio.open(
         (data > 100)
     ] = np.nan
 
-    valid = np.isfinite(
-        data
-    )
+    valid = np.isfinite(data)
 
     if not np.any(valid):
 
@@ -481,25 +412,17 @@ with rasterio.open(
             "FLI raster contains no valid pixels."
         )
 
-    valid_values = data[
-        valid
-    ]
+    valid_values = data[valid]
 
     statistics = {
         "min": float(
-            np.min(
-                valid_values
-            )
+            np.min(valid_values)
         ),
         "max": float(
-            np.max(
-                valid_values
-            )
+            np.max(valid_values)
         ),
         "mean": float(
-            np.mean(
-                valid_values
-            )
+            np.mean(valid_values)
         ),
         "count": int(
             valid_values.size
@@ -507,21 +430,20 @@ with rasterio.open(
     }
 
     metadata = {
-        "crs": str(
-            src.crs
-        ),
-        "width": int(
-            src.width
-        ),
-        "height": int(
-            src.height
-        ),
+        "crs": str(src.crs),
+
+        "width": int(src.width),
+
+        "height": int(src.height),
+
         "resolution_x": float(
             src.res[0]
         ),
+
         "resolution_y": float(
             abs(src.res[1])
         ),
+
         "bounds": {
             "left": float(
                 src.bounds.left
@@ -536,25 +458,14 @@ with rasterio.open(
                 src.bounds.top
             ),
         },
+
         "transform": [
-            float(
-                src.transform.a
-            ),
-            float(
-                src.transform.b
-            ),
-            float(
-                src.transform.c
-            ),
-            float(
-                src.transform.d
-            ),
-            float(
-                src.transform.e
-            ),
-            float(
-                src.transform.f
-            ),
+            float(src.transform.a),
+            float(src.transform.b),
+            float(src.transform.c),
+            float(src.transform.d),
+            float(src.transform.e),
+            float(src.transform.f),
         ],
     }
 
@@ -603,16 +514,12 @@ try:
 
     band = masked_data[0]
 
-    if np.ma.isMaskedArray(
-        band
-    ):
+    if np.ma.isMaskedArray(band):
 
         values = (
             band
             .compressed()
-            .astype(
-                np.float32
-            )
+            .astype(np.float32)
         )
 
     else:
@@ -647,19 +554,11 @@ try:
     )
 
     return {
-        "count": int(
-            values.size
-        ),
-        "min": float(
-            np.min(values)
-        ),
-        "max": float(
-            np.max(values)
-        ),
+        "count": int(values.size),
+        "min": float(np.min(values)),
+        "max": float(np.max(values)),
         "mean": mean_value,
-        "risk": risk_class(
-            mean_value
-        ),
+        "risk": risk_class(mean_value),
     }
 
 except Exception as error:
@@ -668,9 +567,7 @@ except Exception as error:
         "WARNING: Region statistics failed:"
     )
 
-    print(
-        f"  {error}"
-    )
+    print(error)
 
     return {
         "count": 0,
@@ -683,7 +580,7 @@ except Exception as error:
 
 # ============================================================
 
-# WHOLE-PROVINCE RISK CLASSES
+# CLASS STATISTICS
 
 # ============================================================
 
@@ -721,15 +618,11 @@ for (
     )
 
     count = int(
-        np.count_nonzero(
-            class_mask
-        )
+        np.count_nonzero(class_mask)
     )
 
     percent = (
-        100.0
-        * count
-        / total
+        100.0 * count / total
         if total > 0
         else 0.0
     )
@@ -752,7 +645,7 @@ return rows
 
 # ============================================================
 
-# EXCEL STYLE
+# STYLES
 
 # ============================================================
 
@@ -765,6 +658,7 @@ thin = Side(
 )
 
 return {
+
     "border": Border(
         left=thin,
         right=thin,
@@ -832,9 +726,7 @@ for row in worksheet.iter_rows():
 
             continue
 
-        cell.border = styles[
-            "border"
-        ]
+        cell.border = styles["border"]
 
         cell.alignment = Alignment(
             horizontal="right",
@@ -842,9 +734,7 @@ for row in worksheet.iter_rows():
             wrap_text=True,
         )
 
-        cell.font = styles[
-            "normal_font"
-        ]
+        cell.font = styles["normal_font"]
 ```
 
 # ============================================================
@@ -860,9 +750,7 @@ styles
 ):
 
 ```
-for cell in worksheet[
-    row_number
-]:
+for cell in worksheet[row_number]:
 
     if isinstance(
         cell,
@@ -875,17 +763,11 @@ for cell in worksheet[
 
         continue
 
-    cell.fill = styles[
-        "header_fill"
-    ]
+    cell.fill = styles["header_fill"]
 
-    cell.font = styles[
-        "header_font"
-    ]
+    cell.font = styles["header_font"]
 
-    cell.border = styles[
-        "border"
-    ]
+    cell.border = styles["border"]
 
     cell.alignment = Alignment(
         horizontal="center",
@@ -907,7 +789,7 @@ maximum=42
 ):
 
 ```
-column_widths = {}
+widths = {}
 
 for row in worksheet.iter_rows():
 
@@ -926,52 +808,37 @@ for row in worksheet.iter_rows():
 
         try:
 
-            column_letter = (
-                get_column_letter(
-                    cell.column
-                )
+            column_letter = get_column_letter(
+                cell.column
             )
 
         except Exception:
 
             continue
 
-        text = str(
-            cell.value
-        )
+        text = str(cell.value)
 
-        current_width = (
-            column_widths.get(
+        widths[column_letter] = max(
+            widths.get(
                 column_letter,
                 0
-            )
-        )
-
-        column_widths[
-            column_letter
-        ] = max(
-            current_width,
+            ),
             len(text) + 2
         )
 
-for column_letter, width in (
-    column_widths.items()
-):
+for column_letter, width in widths.items():
 
     worksheet.column_dimensions[
         column_letter
     ].width = min(
-        max(
-            width,
-            minimum
-        ),
+        max(width, minimum),
         maximum
     )
 ```
 
 # ============================================================
 
-# SUMMARY SHEET
+# SUMMARY
 
 # ============================================================
 
@@ -993,44 +860,43 @@ worksheet.merge_cells(
     "A1:C1"
 )
 
-title_cell = worksheet[
-    "A1"
-]
+title_cell = worksheet["A1"]
 
 title_cell.value = (
     "گزارش خطر حریق استان فارس"
 )
 
-title_cell.font = styles[
-    "title_font"
-]
+title_cell.font = styles["title_font"]
 
 title_cell.alignment = Alignment(
     horizontal="center",
     vertical="center",
 )
 
-worksheet.row_dimensions[
-    1
-].height = 30
+worksheet.row_dimensions[1].height = 30
 
 rows = [
+
     (
         "تاریخ پیش‌بینی",
         run_date,
     ),
+
     (
         "فایل FLI",
         input_path.name,
     ),
+
     (
         "سیستم مختصات",
         metadata["crs"],
     ),
+
     (
         "تعداد سلول معتبر",
         statistics["count"],
     ),
+
     (
         "حداقل FLI",
         round(
@@ -1038,6 +904,7 @@ rows = [
             2
         ),
     ),
+
     (
         "حداکثر FLI",
         round(
@@ -1045,6 +912,7 @@ rows = [
             2
         ),
     ),
+
     (
         "میانگین FLI",
         round(
@@ -1052,16 +920,19 @@ rows = [
             2
         ),
     ),
+
     (
         "طبقه خطر استان",
         risk_class(
             statistics["mean"]
         ),
     ),
+
     (
         "رزولوشن X",
         metadata["resolution_x"],
     ),
+
     (
         "رزولوشن Y",
         metadata["resolution_y"],
@@ -1093,14 +964,12 @@ apply_sheet_format(
     styles
 )
 
-risk_row = 10
-
 risk_label = risk_class(
     statistics["mean"]
 )
 
 risk_cell = worksheet.cell(
-    risk_row,
+    10,
     2
 )
 
@@ -1112,9 +981,7 @@ risk_cell.font = Font(
     name="B Nazanin",
     size=11,
     bold=True,
-    color=(
-        "FFFFFF"
-    ),
+    color="FFFFFF",
 )
 
 auto_fit_columns(
@@ -1173,16 +1040,10 @@ style_header_row(
     styles
 )
 
-row_number = 2
-
 features = geojson.get(
     "features",
     []
 )
-
-# --------------------------------------------------------
-# ثبت تعداد واقعی رکوردها
-# --------------------------------------------------------
 
 print("")
 print(
@@ -1197,6 +1058,8 @@ print(
     f"Feature count: {len(features)}"
 )
 
+row_number = 2
+
 for index, feature in enumerate(
     features,
     start=1
@@ -1207,15 +1070,21 @@ for index, feature in enumerate(
         f"{region_label} {index}"
     )
 
-    statistics = calculate_region_statistics(
-        src,
-        feature
+    statistics = (
+        calculate_region_statistics(
+            src,
+            feature
+        )
     )
 
     values = [
+
         index,
+
         name,
+
         region_label,
+
         (
             round(
                 statistics["mean"],
@@ -1224,6 +1093,7 @@ for index, feature in enumerate(
             if statistics["mean"] is not None
             else None
         ),
+
         (
             round(
                 statistics["min"],
@@ -1232,6 +1102,7 @@ for index, feature in enumerate(
             if statistics["min"] is not None
             else None
         ),
+
         (
             round(
                 statistics["max"],
@@ -1240,7 +1111,9 @@ for index, feature in enumerate(
             if statistics["max"] is not None
             else None
         ),
+
         statistics["count"],
+
         statistics["risk"],
     ]
 
@@ -1255,14 +1128,12 @@ for index, feature in enumerate(
             value
         )
 
+    risk_label = statistics["risk"]
+
     risk_cell = worksheet.cell(
         row_number,
         8
     )
-
-    risk_label = statistics[
-        "risk"
-    ]
 
     risk_cell.fill = risk_fill(
         risk_label
@@ -1390,12 +1261,8 @@ for row_number, item in enumerate(
         1
     )
 
-    risk_label = item[
-        "label"
-    ]
-
     risk_cell.fill = risk_fill(
-        risk_label
+        item["label"]
     )
 
     risk_cell.font = Font(
@@ -1445,62 +1312,77 @@ worksheet = workbook.create_sheet(
 )
 
 rows = [
+
     (
         "CRS",
         metadata["crs"]
     ),
+
     (
         "Width",
         metadata["width"]
     ),
+
     (
         "Height",
         metadata["height"]
     ),
+
     (
         "Resolution X",
         metadata["resolution_x"]
     ),
+
     (
         "Resolution Y",
         metadata["resolution_y"]
     ),
+
     (
         "Left",
         metadata["bounds"]["left"]
     ),
+
     (
         "Bottom",
         metadata["bounds"]["bottom"]
     ),
+
     (
         "Right",
         metadata["bounds"]["right"]
     ),
+
     (
         "Top",
         metadata["bounds"]["top"]
     ),
+
     (
         "Transform a",
         metadata["transform"][0]
     ),
+
     (
         "Transform b",
         metadata["transform"][1]
     ),
+
     (
         "Transform c",
         metadata["transform"][2]
     ),
+
     (
         "Transform d",
         metadata["transform"][3]
     ),
+
     (
         "Transform e",
         metadata["transform"][4]
     ),
+
     (
         "Transform f",
         metadata["transform"][5]
@@ -1551,10 +1433,6 @@ args = parse_args()
 input_path = args.input
 output_path = args.output
 
-# --------------------------------------------------------
-# منابع را به‌صورت صریح دریافت می‌کنیم
-# --------------------------------------------------------
-
 protected_path = args.protected
 hunting_path = args.hunting
 
@@ -1573,23 +1451,17 @@ require_file(
     "Hunting banned GeoJSON"
 )
 
-# --------------------------------------------------------
-# DATE
-# --------------------------------------------------------
-
 filename_date = (
     extract_date_from_fli_filename(
         input_path
     )
 )
 
-if args.run_date:
-
-    run_date = args.run_date
-
-else:
-
-    run_date = filename_date
+run_date = (
+    args.run_date
+    if args.run_date
+    else filename_date
+)
 
 validate_run_date(
     input_path,
@@ -1618,9 +1490,7 @@ print(
 )
 
 print("")
-print(
-    "Reading FLI raster..."
-)
+print("Reading FLI raster...")
 
 data, statistics, metadata = load_fli(
     input_path
@@ -1652,49 +1522,39 @@ print(
 )
 
 print("")
-print(
-    "Loading regional boundaries..."
-)
-
-# --------------------------------------------------------
-# SOURCE 1
-# protected_areas.geojson
-#     -> مناطق چهارگانه
-# --------------------------------------------------------
+print("Loading regional boundaries...")
 
 protected_geojson = load_geojson(
     protected_path
 )
 
-# --------------------------------------------------------
-# SOURCE 2
-# hunting_banned.geojson
-#     -> مناطق شکار ممنوع
-# --------------------------------------------------------
-
 hunting_geojson = load_geojson(
     hunting_path
 )
 
-print(
-    f"Protected features "
-    f"(مناطق چهارگانه): "
-    f"{len(protected_geojson['features'])}"
+protected_count = len(
+    protected_geojson["features"]
+)
+
+hunting_count = len(
+    hunting_geojson["features"]
 )
 
 print(
-    f"Hunting features "
+    "Protected features "
+    f"(مناطق چهارگانه): "
+    f"{protected_count}"
+)
+
+print(
+    "Hunting features "
     f"(مناطق شکار ممنوع): "
-    f"{len(hunting_geojson['features'])}"
+    f"{hunting_count}"
 )
 
 styles = create_styles()
 
 workbook = Workbook()
-
-# --------------------------------------------------------
-# FLI raster
-# --------------------------------------------------------
 
 with rasterio.open(
     input_path
@@ -1706,10 +1566,6 @@ with rasterio.open(
             "FLI raster has no CRS."
         )
 
-    # ----------------------------------------------------
-    # 1. SUMMARY
-    # ----------------------------------------------------
-
     build_summary_sheet(
         workbook,
         run_date,
@@ -1718,12 +1574,6 @@ with rasterio.open(
         metadata,
         styles
     )
-
-    # ----------------------------------------------------
-    # 2. مناطق چهارگانه
-    #
-    # ONLY protected_areas.geojson
-    # ----------------------------------------------------
 
     build_region_sheet(
         workbook,
@@ -1735,12 +1585,6 @@ with rasterio.open(
         styles
     )
 
-    # ----------------------------------------------------
-    # 3. مناطق شکار ممنوع
-    #
-    # ONLY hunting_banned.geojson
-    # ----------------------------------------------------
-
     build_region_sheet(
         workbook,
         HUNTING_SHEET,
@@ -1751,29 +1595,17 @@ with rasterio.open(
         styles
     )
 
-# --------------------------------------------------------
-# 4. RISK CLASSES
-# --------------------------------------------------------
-
 build_class_sheet(
     workbook,
     data,
     styles
 )
 
-# --------------------------------------------------------
-# 5. TECHNICAL INFORMATION
-# --------------------------------------------------------
-
 build_technical_sheet(
     workbook,
     metadata,
     styles
 )
-
-# --------------------------------------------------------
-# FINAL GENERAL FORMATTING
-# --------------------------------------------------------
 
 for worksheet in workbook.worksheets:
 
@@ -1807,8 +1639,7 @@ for worksheet in workbook.worksheets:
             if (
                 cell.font.color
                 and
-                cell.font.color.type
-                == "rgb"
+                cell.font.color.type == "rgb"
             ):
 
                 color_value = (
@@ -1830,10 +1661,6 @@ for worksheet in workbook.worksheets:
         worksheet
     )
 
-# --------------------------------------------------------
-# SAVE
-# --------------------------------------------------------
-
 output_path.parent.mkdir(
     parents=True,
     exist_ok=True
@@ -1842,10 +1669,6 @@ output_path.parent.mkdir(
 workbook.save(
     output_path
 )
-
-# --------------------------------------------------------
-# FINAL LOG
-# --------------------------------------------------------
 
 print("")
 print("=" * 70)
@@ -1857,25 +1680,21 @@ print(
 )
 
 print("")
+print("SOURCE MAPPING")
 
 print(
-    "SOURCE MAPPING"
+    f"{protected_path.name} "
+    f"-> {PROTECTED_SHEET} "
+    f"({protected_count} records)"
 )
 
 print(
-    f"  {protected_path.name}"
-    f" -> {PROTECTED_SHEET}"
-    f" | {len(protected_geojson['features'])} records"
-)
-
-print(
-    f"  {hunting_path.name}"
-    f" -> {HUNTING_SHEET}"
-    f" | {len(hunting_geojson['features'])} records"
+    f"{hunting_path.name} "
+    f"-> {HUNTING_SHEET} "
+    f"({hunting_count} records)"
 )
 
 print("")
-
 print("Sheets:")
 
 for number, name in enumerate(
@@ -1888,7 +1707,6 @@ for number, name in enumerate(
     )
 
 print("")
-
 print(
     f"Province mean FLI : "
     f"{statistics['mean']:.2f}"
@@ -1900,10 +1718,7 @@ print(
 )
 
 print("")
-
-print(
-    "✓ Excel report completed."
-)
+print("✓ Excel report completed.")
 ```
 
 if **name** == "**main**":
