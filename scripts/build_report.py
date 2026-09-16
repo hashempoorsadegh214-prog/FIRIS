@@ -2,20 +2,7 @@
 
 """
 FIRIS - Detailed Excel Fire Risk Report
-=======================================
-
-Reads the final FLI raster and creates the Excel report.
-
-Outputs:
-
-1. خلاصه
-2. مناطق_چهارگانه
-3. مناطق_شکار_ممنوع
-4. طبقات_خطر
-5. اطلاعات_فنی
-   """
-
-from **future** import annotations
+"""
 
 import argparse
 import json
@@ -37,12 +24,6 @@ from openpyxl.utils import get_column_letter
 
 from rasterio.mask import mask
 
-# ============================================================
-
-# RISK CLASSES
-
-# ============================================================
-
 RISK_CLASSES = [
 ("متوسط", 0.0, 25.0),
 ("زیاد", 25.0, 50.0),
@@ -58,23 +39,11 @@ RISK_COLORS = {
 "بدون داده": "777777",
 }
 
-# ============================================================
-
-# SOURCE MAPPING
-
-# ============================================================
-
 PROTECTED_SHEET = "مناطق_چهارگانه"
 PROTECTED_LABEL = "مناطق چهارگانه"
 
 HUNTING_SHEET = "مناطق_شکار_ممنوع"
 HUNTING_LABEL = "مناطق شکار ممنوع"
-
-# ============================================================
-
-# ARGUMENTS
-
-# ============================================================
 
 def parse_args() -> argparse.Namespace:
 
@@ -123,12 +92,6 @@ parser.add_argument(
 return parser.parse_args()
 ```
 
-# ============================================================
-
-# FILE CHECK
-
-# ============================================================
-
 def require_file(
 path: Path,
 label: str
@@ -136,17 +99,10 @@ label: str
 
 ```
 if not path.is_file():
-
     raise FileNotFoundError(
         f"{label} not found: {path}"
     )
 ```
-
-# ============================================================
-
-# DATE
-
-# ============================================================
 
 def extract_date_from_fli_filename(
 path: Path
@@ -160,9 +116,8 @@ match = re.search(
 )
 
 if not match:
-
     raise ValueError(
-        "Invalid FLI filename. Expected: "
+        "Invalid FLI filename. Expected "
         "fli_fars_YYYY-MM-DD.tif"
     )
 
@@ -176,13 +131,10 @@ run_date: str
 
 ```
 filename_date = (
-    extract_date_from_fli_filename(
-        input_path
-    )
+    extract_date_from_fli_filename(input_path)
 )
 
 if filename_date != run_date:
-
     raise ValueError(
         "Forecast date mismatch.\n"
         f"FLI filename date: {filename_date}\n"
@@ -190,47 +142,30 @@ if filename_date != run_date:
     )
 ```
 
-# ============================================================
-
-# RISK CLASS
-
-# ============================================================
-
 def risk_class(
 value: float | None
 ) -> str:
 
 ```
 if value is None:
-
     return "بدون داده"
 
 value = float(value)
 
 if not np.isfinite(value):
-
     return "بدون داده"
 
 if value < 25.0:
-
     return "متوسط"
 
 if value < 50.0:
-
     return "زیاد"
 
 if value < 75.0:
-
     return "خیلی زیاد"
 
 return "بحرانی"
 ```
-
-# ============================================================
-
-# RISK FILL
-
-# ============================================================
 
 def risk_fill(
 label: str
@@ -246,12 +181,6 @@ return PatternFill(
 )
 ```
 
-# ============================================================
-
-# LOAD GEOJSON
-
-# ============================================================
-
 def load_geojson(
 path: Path
 ) -> dict[str, Any]:
@@ -266,34 +195,22 @@ with path.open(
     "r",
     encoding="utf-8"
 ) as file:
-
     data = json.load(file)
 
 if data.get("type") != "FeatureCollection":
-
     raise ValueError(
         f"Invalid GeoJSON FeatureCollection: {path}"
     )
 
-features = data.get(
-    "features",
-    []
-)
+features = data.get("features", [])
 
 if not features:
-
     raise ValueError(
         f"No features found in: {path}"
     )
 
 return data
 ```
-
-# ============================================================
-
-# FEATURE NAME
-
-# ============================================================
 
 def get_feature_name(
 feature: dict[str, Any],
@@ -330,17 +247,14 @@ for key in candidates:
         value is not None
         and str(value).strip()
     ):
-
         return str(value).strip()
 
 for key, value in properties.items():
 
     if not isinstance(value, str):
-
         continue
 
     if not value.strip():
-
         continue
 
     key_lower = (
@@ -354,17 +268,10 @@ for key, value in properties.items():
         or "title" in key_lower
         or "نام" in key_lower
     ):
-
         return value.strip()
 
 return fallback
 ```
-
-# ============================================================
-
-# LOAD FLI
-
-# ============================================================
 
 def load_fli(
 path: Path
@@ -374,14 +281,11 @@ path: Path
 with rasterio.open(path) as src:
 
     if src.crs is None:
-
         raise ValueError(
             "FLI raster has no CRS."
         )
 
-    data = src.read(
-        1
-    ).astype(
+    data = src.read(1).astype(
         np.float32
     )
 
@@ -407,7 +311,6 @@ with rasterio.open(path) as src:
     valid = np.isfinite(data)
 
     if not np.any(valid):
-
         raise RuntimeError(
             "FLI raster contains no valid pixels."
         )
@@ -475,12 +378,6 @@ return (
     metadata
 )
 ```
-
-# ============================================================
-
-# REGION STATISTICS
-
-# ============================================================
 
 def calculate_region_statistics(
 src,
@@ -578,12 +475,6 @@ except Exception as error:
     }
 ```
 
-# ============================================================
-
-# CLASS STATISTICS
-
-# ============================================================
-
 def calculate_class_statistics(
 values: np.ndarray
 ):
@@ -643,12 +534,6 @@ for (
 return rows
 ```
 
-# ============================================================
-
-# STYLES
-
-# ============================================================
-
 def create_styles():
 
 ```
@@ -658,7 +543,6 @@ thin = Side(
 )
 
 return {
-
     "border": Border(
         left=thin,
         right=thin,
@@ -691,12 +575,6 @@ return {
 }
 ```
 
-# ============================================================
-
-# FORMAT SHEET
-
-# ============================================================
-
 def apply_sheet_format(
 worksheet,
 styles
@@ -719,11 +597,9 @@ for row in worksheet.iter_rows():
             cell,
             MergedCell
         ):
-
             continue
 
         if cell.value is None:
-
             continue
 
         cell.border = styles["border"]
@@ -736,12 +612,6 @@ for row in worksheet.iter_rows():
 
         cell.font = styles["normal_font"]
 ```
-
-# ============================================================
-
-# HEADER STYLE
-
-# ============================================================
 
 def style_header_row(
 worksheet,
@@ -756,11 +626,9 @@ for cell in worksheet[row_number]:
         cell,
         MergedCell
     ):
-
         continue
 
     if cell.value is None:
-
         continue
 
     cell.fill = styles["header_fill"]
@@ -775,12 +643,6 @@ for cell in worksheet[row_number]:
         wrap_text=True,
     )
 ```
-
-# ============================================================
-
-# AUTO FIT
-
-# ============================================================
 
 def auto_fit_columns(
 worksheet,
@@ -799,11 +661,9 @@ for row in worksheet.iter_rows():
             cell,
             MergedCell
         ):
-
             continue
 
         if cell.value is None:
-
             continue
 
         try:
@@ -835,12 +695,6 @@ for column_letter, width in widths.items():
         maximum
     )
 ```
-
-# ============================================================
-
-# SUMMARY
-
-# ============================================================
 
 def build_summary_sheet(
 workbook,
@@ -991,12 +845,6 @@ auto_fit_columns(
 worksheet.freeze_panes = "A3"
 ```
 
-# ============================================================
-
-# REGIONAL SHEET
-
-# ============================================================
-
 def build_region_sheet(
 workbook,
 sheet_title,
@@ -1070,11 +918,9 @@ for index, feature in enumerate(
         f"{region_label} {index}"
     )
 
-    statistics = (
-        calculate_region_statistics(
-            src,
-            feature
-        )
+    statistics = calculate_region_statistics(
+        src,
+        feature
     )
 
     values = [
@@ -1171,12 +1017,6 @@ auto_fit_columns(
     worksheet
 )
 ```
-
-# ============================================================
-
-# RISK CLASS SHEET
-
-# ============================================================
 
 def build_class_sheet(
 workbook,
@@ -1293,12 +1133,6 @@ auto_fit_columns(
     worksheet
 )
 ```
-
-# ============================================================
-
-# TECHNICAL SHEET
-
-# ============================================================
 
 def build_technical_sheet(
 workbook,
@@ -1418,12 +1252,6 @@ auto_fit_columns(
     worksheet
 )
 ```
-
-# ============================================================
-
-# MAIN
-
-# ============================================================
 
 def main():
 
@@ -1561,7 +1389,6 @@ with rasterio.open(
 ) as src:
 
     if src.crs is None:
-
         raise ValueError(
             "FLI raster has no CRS."
         )
@@ -1619,11 +1446,9 @@ for worksheet in workbook.worksheets:
                 cell,
                 MergedCell
             ):
-
                 continue
 
             if cell.value is None:
-
                 continue
 
             bold_value = bool(
@@ -1641,7 +1466,6 @@ for worksheet in workbook.worksheets:
                 and
                 cell.font.color.type == "rgb"
             ):
-
                 color_value = (
                     cell.font.color.rgb
                 )
@@ -1718,7 +1542,7 @@ print(
 )
 
 print("")
-print("✓ Excel report completed.")
+print("Excel report completed.")
 ```
 
 if **name** == "**main**":
