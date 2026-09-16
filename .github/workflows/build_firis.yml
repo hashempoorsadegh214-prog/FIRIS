@@ -1,416 +1,321 @@
 name: Build FIRIS FLI and Web Map
 
 on:
-workflow_dispatch:
+  workflow_dispatch:
 
-workflow_run:
-workflows:
-- Update FIRIS FWI
-types:
-- completed
+  workflow_run:
+    workflows:
+      - Update FIRIS FWI
+    types:
+      - completed
 
 permissions:
-contents: write
+  contents: write
 
 concurrency:
-group: firis-daily-build
-cancel-in-progress: false
+  group: firis-daily-build
+  cancel-in-progress: false
 
 jobs:
-
-build:
-
-
-if: >
-  github.event_name == 'workflow_dispatch' ||
-  github.event.workflow_run.conclusion == 'success'
-
-runs-on: ubuntu-latest
-
-timeout-minutes: 40
-
-steps:
-
-  - name: Checkout repository
-    uses: actions/checkout@v4
-    with:
-      ref: main
-      fetch-depth: 0
-
-  - name: Setup Python
-    uses: actions/setup-python@v5
-    with:
-      python-version: "3.11"
-
-  - name: Install dependencies
-    shell: bash
-    run: |
-      set -euo pipefail
-      python -m pip install --upgrade pip
-      python -m pip install -r scripts/requirements.txt
-
-  - name: Calculate exact forecast date
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      python - <<'PY'
-      from datetime import datetime, timedelta
-      from zoneinfo import ZoneInfo
-
-      timezone = ZoneInfo("Asia/Tehran")
-
-      now_iran = datetime.now(timezone)
-      forecast_date = now_iran.date() + timedelta(days=1)
-
-      print(
-          "Iran current date : "
-          f"{now_iran.strftime('%Y-%m-%d')}"
-      )
-
-      print(
-          "Iran current time : "
-          f"{now_iran.strftime('%H:%M:%S')}"
-      )
-
-      print(
-          "Forecast date     : "
-          f"{forecast_date.isoformat()}"
-      )
-
-      with open(
-          "forecast_date.txt",
-          "w",
-          encoding="utf-8"
-      ) as file:
-          file.write(forecast_date.isoformat())
-      PY
-
-      RUN_DATE=$(cat forecast_date.txt)
-
-      echo "RUN_DATE=${RUN_DATE}" >> "${GITHUB_ENV}"
-
-      echo ""
-      echo "FINAL FORECAST DATE: ${RUN_DATE}"
-
-  - name: Verify exact tomorrow FWI
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
-
-      if [ ! -f "${FWI_FILE}" ]; then
-        echo ""
-        echo "ERROR: Required tomorrow FWI does not exist."
-        echo ""
-        echo "Forecast date:"
-        echo "${RUN_DATE}"
-        echo ""
-        echo "Expected file:"
-        echo "${FWI_FILE}"
-        exit 1
-      fi
-
-      echo ""
-      echo "FWI:"
-      echo "${FWI_FILE}"
-
-      ls -lh "${FWI_FILE}"
-
-      echo "FWI_FILE=${FWI_FILE}" >> "${GITHUB_ENV}"
-
-  - name: Verify FIRIS inputs
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      REQUIRED_FILES=(
-        "${FWI_FILE}"
-        "data/raw/fuel/fars_fuel.tif"
-        "data/raw/topography/dem_fars.tif"
-        "fars.geojson"
-        "protected_areas.geojson"
-        "hunting_banned.geojson"
-        "scripts/build_firis.py"
-        "scripts/build_web_map.py"
-        "scripts/build_report.py"
-      )
-
-      for FILE in "${REQUIRED_FILES[@]}"; do
-        if [ ! -f "${FILE}" ]; then
-          echo ""
-          echo "ERROR: Required file not found:"
-          echo "${FILE}"
-          exit 1
-        fi
-
-        echo "✓ ${FILE}"
-      done
-
-  - name: Build FLI
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      python scripts/build_firis.py \
-        --fwi-raster "${FWI_FILE}" \
-        --fuel-raster "data/raw/fuel/fars_fuel.tif" \
-        --dem-raster "data/raw/topography/dem_fars.tif" \
-        --boundary "fars.geojson" \
-        --output-dir "data/outputs" \
-        --run-date "${RUN_DATE}"
-
-  - name: Verify FLI output
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      FLI_FILE="data/outputs/fli_fars_${RUN_DATE}.tif"
-
-      if [ ! -f "${FLI_FILE}" ]; then
-        echo ""
-        echo "ERROR: FLI raster was not created:"
-        echo "${FLI_FILE}"
-        exit 1
-      fi
-
-      echo ""
-      echo "FLI:"
-      echo "${FLI_FILE}"
-
-      ls -lh "${FLI_FILE}"
-
-      echo "FLI_FILE=${FLI_FILE}" >> "${GITHUB_ENV}"
-
-  - name: Build Web GIS
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      python scripts/build_web_map.py \
-        --input "${FLI_FILE}" \
-        --output-dir "data/web" \
-        --archive-dir "data/web/archive"
-
-  - name: Build current Excel report
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      mkdir -p data/report
-
-      python scripts/build_report.py \
-        --input "${FLI_FILE}" \
-        --output "data/report/firis_report.xlsx" \
-        --run-date "${RUN_DATE}" \
-        --protected "protected_areas.geojson" \
-        --hunting "hunting_banned.geojson"
-
-      if [ ! -f "data/report/firis_report.xlsx" ]; then
-        echo ""
-        echo "ERROR: Current Excel report was not created."
-        exit 1
-      fi
-
-      echo ""
-      echo "Current Excel:"
-      echo "data/report/firis_report.xlsx"
-
-      ls -lh data/report/firis_report.xlsx
-
-  - name: Add Excel to daily archive
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      ARCHIVE_DIR="data/web/archive/${RUN_DATE}"
-
-      if [ ! -d "${ARCHIVE_DIR}" ]; then
-        echo ""
-        echo "ERROR: Daily archive directory does not exist:"
-        echo "${ARCHIVE_DIR}"
-        exit 1
-      fi
-
-      cp -f \
-        "data/report/firis_report.xlsx" \
-        "${ARCHIVE_DIR}/firis_report.xlsx"
-
-      if [ ! -f "${ARCHIVE_DIR}/firis_report.xlsx" ]; then
-        echo ""
-        echo "ERROR: Archived Excel was not created."
-        exit 1
-      fi
-
-      echo ""
-      echo "Archived Excel:"
-      echo "${ARCHIVE_DIR}/firis_report.xlsx"
-
-      ls -lh "${ARCHIVE_DIR}/firis_report.xlsx"
-
-  - name: Update archive index
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      python - <<'PY'
-      from pathlib import Path
-      import json
-      import re
-
-      root = Path("data/web/archive")
-
-      root.mkdir(
-          parents=True,
-          exist_ok=True
-      )
-
-      pattern = re.compile(
-          r"^\d{4}-\d{2}-\d{2}$"
-      )
-
-      dates = sorted(
-          directory.name
-          for directory in root.iterdir()
-          if directory.is_dir()
-          and pattern.match(directory.name)
-      )
-
-      output = root / "index.json"
-
-      output.write_text(
-          json.dumps(
-              dates,
-              ensure_ascii=False,
-              indent=2
-          ) + "\n",
-          encoding="utf-8"
-      )
-
-      print("Archive dates:")
-      for date in dates:
-          print(date)
-
-      print(
-          f"Total archive dates: {len(dates)}"
-      )
-
-      PY
-
-  - name: Verify daily archive
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      ARCHIVE_DIR="data/web/archive/${RUN_DATE}"
-
-      REQUIRED_ARCHIVE_FILES=(
-        "${ARCHIVE_DIR}/fli.json"
-        "${ARCHIVE_DIR}/fli_grid.json"
-        "${ARCHIVE_DIR}/fli_polygons.geojson"
-        "${ARCHIVE_DIR}/firis_report.xlsx"
-      )
-
-      for FILE in "${REQUIRED_ARCHIVE_FILES[@]}"; do
-        if [ ! -f "${FILE}" ]; then
-          echo ""
-          echo "ERROR: Missing archive file:"
-          echo "${FILE}"
-          exit 1
-        fi
-
-        if [ ! -s "${FILE}" ]; then
-          echo ""
-          echo "ERROR: Empty archive file:"
-          echo "${FILE}"
-          exit 1
-        fi
-
-        echo "✓ ${FILE}"
-      done
-
-  - name: Verify archive index
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      if [ ! -f "data/web/archive/index.json" ]; then
-        echo ""
-        echo "ERROR: Archive index not found."
-        exit 1
-      fi
-
-      grep -q "\"${RUN_DATE}\"" \
-        "data/web/archive/index.json" || {
-          echo ""
-          echo "ERROR: Current forecast date missing from archive index:"
-          echo "${RUN_DATE}"
-          exit 1
-        }
-
-      echo ""
-      echo "Archive index verified."
-
-  - name: Final validation
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      test -f "${FLI_FILE}"
-      test -f "data/report/firis_report.xlsx"
-      test -f "data/web/fli_latest.json"
-      test -f "data/web/fli_latest_grid.json"
-      test -f "data/web/fli_polygons.geojson"
-
-      echo ""
-      echo "======================================================================"
-      echo "FIRIS BUILD VALIDATION SUCCESSFUL"
-      echo "======================================================================"
-
-      echo ""
-      echo "Forecast date:"
-      echo "${RUN_DATE}"
-
-      echo ""
-      echo "FLI:"
-      echo "${FLI_FILE}"
-
-      echo ""
-      echo "Excel:"
-      echo "data/report/firis_report.xlsx"
-
-      echo ""
-      echo "Archive:"
-      echo "data/web/archive/${RUN_DATE}/"
-
-  - name: Commit and push FIRIS products
-    shell: bash
-    run: |
-      set -euo pipefail
-
-      git config user.name \
-        "github-actions[bot]"
-
-      git config user.email \
-        "41898282+github-actions[bot]@users.noreply.github.com"
-
-      git add \
-        data/outputs \
-        data/web \
-        data/report/firis_report.xlsx
-
-      if git diff --cached --quiet; then
-        echo "No changes to commit."
-        exit 0
-      fi
-
-      git commit \
-        -m "chore: build FIRIS forecast ${RUN_DATE}"
-
-      git push
-
-      echo ""
-      echo "======================================================================"
-      echo "FIRIS BUILD COMPLETED SUCCESSFULLY"
-      echo "======================================================================"
+  build:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r scripts/requirements.txt
+
+      - name: Calculate exact forecast date
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+
+          now_iran = datetime.now(ZoneInfo("Asia/Tehran"))
+          forecast_date = now_iran.date() + timedelta(days=1)
+
+          print(f"Iran current date : {now_iran.strftime('%Y-%m-%d')}")
+          print(f"Iran current time : {now_iran.strftime('%H:%M:%S')}")
+          print(f"Forecast date     : {forecast_date.isoformat()}")
+
+          with open("forecast_date.txt", "w", encoding="utf-8") as file:
+              file.write(forecast_date.isoformat())
+          PY
+
+          RUN_DATE=$(cat forecast_date.txt)
+
+          echo "RUN_DATE=${RUN_DATE}" >> "${GITHUB_ENV}"
+
+      - name: Verify exact tomorrow FWI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${RUN_DATE}.tif"
+
+          if [ ! -f "${FWI_FILE}" ]; then
+            echo "ERROR: Required tomorrow FWI does not exist."
+            echo "Expected: ${FWI_FILE}"
+            exit 1
+          fi
+
+          echo "FWI_FILE=${FWI_FILE}" >> "${GITHUB_ENV}"
+
+          echo "FWI: ${FWI_FILE}"
+          ls -lh "${FWI_FILE}"
+
+      - name: Verify FIRIS inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          REQUIRED_FILES=(
+            "${FWI_FILE}"
+            "data/raw/fuel/fars_fuel.tif"
+            "data/raw/topography/dem_fars.tif"
+            "fars.geojson"
+            "protected_areas.geojson"
+            "hunting_banned.geojson"
+            "scripts/build_firis.py"
+            "scripts/build_web_map.py"
+            "scripts/build_report.py"
+          )
+
+          for FILE in "${REQUIRED_FILES[@]}"; do
+            if [ ! -f "${FILE}" ]; then
+              echo "ERROR: Required file not found: ${FILE}"
+              exit 1
+            fi
+
+            echo "OK: ${FILE}"
+          done
+
+      - name: Build FLI
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python scripts/build_firis.py \
+            --fwi-raster "${FWI_FILE}" \
+            --fuel-raster "data/raw/fuel/fars_fuel.tif" \
+            --dem-raster "data/raw/topography/dem_fars.tif" \
+            --boundary "fars.geojson" \
+            --output-dir "data/outputs" \
+            --run-date "${RUN_DATE}"
+
+      - name: Verify FLI output
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          FLI_FILE="data/outputs/fli_fars_${RUN_DATE}.tif"
+
+          if [ ! -f "${FLI_FILE}" ]; then
+            echo "ERROR: FLI raster was not created: ${FLI_FILE}"
+            exit 1
+          fi
+
+          echo "FLI_FILE=${FLI_FILE}" >> "${GITHUB_ENV}"
+
+          echo "FLI: ${FLI_FILE}"
+          ls -lh "${FLI_FILE}"
+
+      - name: Build Web GIS
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python scripts/build_web_map.py \
+            --input "${FLI_FILE}" \
+            --output-dir "data/web" \
+            --archive-dir "data/web/archive"
+
+      - name: Build current Excel report
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p data/report
+
+          python scripts/build_report.py \
+            --input "${FLI_FILE}" \
+            --output "data/report/firis_report.xlsx" \
+            --run-date "${RUN_DATE}" \
+            --protected "protected_areas.geojson" \
+            --hunting "hunting_banned.geojson"
+
+          if [ ! -f "data/report/firis_report.xlsx" ]; then
+            echo "ERROR: Current Excel report was not created."
+            exit 1
+          fi
+
+          ls -lh "data/report/firis_report.xlsx"
+
+      - name: Add Excel to daily archive
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ARCHIVE_DIR="data/web/archive/${RUN_DATE}"
+
+          if [ ! -d "${ARCHIVE_DIR}" ]; then
+            echo "ERROR: Archive directory does not exist: ${ARCHIVE_DIR}"
+            exit 1
+          fi
+
+          cp -f \
+            "data/report/firis_report.xlsx" \
+            "${ARCHIVE_DIR}/firis_report.xlsx"
+
+          if [ ! -f "${ARCHIVE_DIR}/firis_report.xlsx" ]; then
+            echo "ERROR: Archived Excel was not created."
+            exit 1
+          fi
+
+          ls -lh "${ARCHIVE_DIR}/firis_report.xlsx"
+
+      - name: Update archive index
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import re
+
+          root = Path("data/web/archive")
+          root.mkdir(parents=True, exist_ok=True)
+
+          pattern = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+          dates = sorted(
+              p.name
+              for p in root.iterdir()
+              if p.is_dir() and pattern.fullmatch(p.name)
+          )
+
+          output = root / "index.json"
+
+          output.write_text(
+              json.dumps(
+                  dates,
+                  ensure_ascii=False,
+                  indent=2
+              ) + "\n",
+              encoding="utf-8"
+          )
+
+          print("Archive dates:")
+          for date in dates:
+              print(date)
+          PY
+
+      - name: Verify daily archive
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ARCHIVE_DIR="data/web/archive/${RUN_DATE}"
+
+          REQUIRED_ARCHIVE_FILES=(
+            "${ARCHIVE_DIR}/fli.json"
+            "${ARCHIVE_DIR}/fli_grid.json"
+            "${ARCHIVE_DIR}/fli_polygons.geojson"
+            "${ARCHIVE_DIR}/firis_report.xlsx"
+          )
+
+          for FILE in "${REQUIRED_ARCHIVE_FILES[@]}"; do
+            if [ ! -f "${FILE}" ]; then
+              echo "ERROR: Missing archive file: ${FILE}"
+              exit 1
+            fi
+
+            if [ ! -s "${FILE}" ]; then
+              echo "ERROR: Empty archive file: ${FILE}"
+              exit 1
+            fi
+
+            echo "OK: ${FILE}"
+          done
+
+      - name: Verify archive index
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          INDEX_FILE="data/web/archive/index.json"
+
+          if [ ! -f "${INDEX_FILE}" ]; then
+            echo "ERROR: Archive index not found."
+            exit 1
+          fi
+
+          grep -q "\"${RUN_DATE}\"" "${INDEX_FILE}" || {
+            echo "ERROR: ${RUN_DATE} is missing from archive index."
+            exit 1
+          }
+
+          echo "Archive index verified."
+
+      - name: Final validation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -f "${FLI_FILE}"
+          test -f "data/report/firis_report.xlsx"
+          test -f "data/web/fli_latest.json"
+          test -f "data/web/fli_latest_grid.json"
+          test -f "data/web/fli_polygons.geojson"
+
+          echo "FIRIS validation successful."
+          echo "Forecast date: ${RUN_DATE}"
+          echo "FLI: ${FLI_FILE}"
+          echo "Excel: data/report/firis_report.xlsx"
+          echo "Archive: data/web/archive/${RUN_DATE}/"
+
+      - name: Commit and push FIRIS products
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            data/outputs \
+            data/web \
+            data/report/firis_report.xlsx
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit \
+            -m "chore: build FIRIS forecast ${RUN_DATE}"
+
+          git push
