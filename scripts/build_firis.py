@@ -1,603 +1,2328 @@
-name: Update FIRIS FWI
+#!/usr/bin/env python3
+
+"""
+FIRIS - Fars Integrated Fire Information System
+
+FLI = 100 * (
+    0.45 * F_FWI
+    + 0.35 * F_Fuel
+    + 0.20 * F_Topo
+)
+
+FUEL MODEL
+----------
+Fuel is a continuous Sentinel-2-derived raster
+with values normalized to the range 0-1.
+
+F_Fuel = direct value from the Fuel raster.
+
+No Excel table is used.
+No JOIN_VALUE is used.
+No Fuelbeds_metric lookup is used.
+
+Spatial rules:
+- FWI is the reference grid.
+- Fuel -> FWI grid using nearest neighbour.
+- Fuel values are expected in the range 0-1.
+- Slope is calculated on the native DEM.
+- DEM NoData values are NEVER artificially filled.
+- Slope is calculated only where the required neighbouring
+  DEM cells are valid.
+- Native slope is then aligned to the FWI grid.
+- All final calculations are restricted to fars.geojson.
+- NoData is preserved.
+- Missing Fuel coverage is never artificially extrapolated.
+- Coverage inside Fars is explicitly reported.
+- All final outputs use the exact FWI reference grid.
+- Main FLI weights remain unchanged.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import rasterio
+from rasterio.enums import Resampling
+from rasterio.features import geometry_mask
+from rasterio.warp import reproject, transform_geom
+
+
+# ============================================================
+# FLI PARAMETERS
+# ============================================================
+
+FWI_WEIGHT = 0.45
+FUEL_WEIGHT = 0.35
+TOPO_WEIGHT = 0.20
+
+FWI_MAX = 100.0
+
+# 45 degrees is the reference point at which
+# the topographic component reaches 1.0.
+SLOPE_REFERENCE = 45.0
+
+OUTPUT_NODATA = -9999.0
+
+
+# ============================================================
+# ARGUMENTS
+# ============================================================
+
+def parse_args():
+
+    parser = argparse.ArgumentParser(
+        description="Build FIRIS Fire Likelihood Index"
+    )
+
+    parser.add_argument(
+        "--fwi-raster",
+        required=True,
+        type=Path
+    )
+
+    parser.add_argument(
+        "--fuel-raster",
+        required=True,
+        type=Path
+    )
+
+    parser.add_argument(
+        "--dem-raster",
+        required=True,
+        type=Path
+    )
+
+    parser.add_argument(
+        "--fuel-excel",
+        required=False,
+        type=Path,
+        default=None,
+        help=(
+            "Legacy compatibility argument. "
+            "The Excel fuel table is NOT used."
+        )
+    )
 
-on:
+    parser.add_argument(
+        "--boundary",
+        type=Path,
+        default=Path("fars.geojson")
+    )
 
-  workflow_dispatch:
+    parser.add_argument(
+        "--output-dir",
+        required=True,
+        type=Path
+    )
 
-  schedule:
+    parser.add_argument(
+        "--run-date",
+        required=True
+    )
 
-    # ----------------------------------------------------------
-    # RUN 1
-    #
-    # 18:00 UTC
-    # = 21:30 Iran
-    #
-    # Prepare tomorrow's forecast in advance.
-    # ----------------------------------------------------------
-    - cron: "0 18 * * *"
+    return parser.parse_args()
 
-    # ----------------------------------------------------------
-    # RUN 2
-    #
-    # 20:35 UTC
-    # = 00:05 Iran
-    #
-    # After midnight in Iran, tomorrow changes to the new date.
-    # ----------------------------------------------------------
-    - cron: "35 20 * * *"
 
-  push:
+# ============================================================
+# FILE CHECK
+# ============================================================
 
-    paths:
+def require_file(
+    path: Path,
+    label: str
+):
 
-      - "scripts/update_fwi.py"
-      - "fars.geojson"
-      - ".github/workflows/update_fwi.yml"
+    if not path.is_file():
+
+        raise FileNotFoundError(
+            f"{label} not found: {path}"
+        )
+
+
+# ============================================================
+# CLEAN ARRAY
+# ============================================================
+
+def clean_array(
+    array: np.ndarray,
+    nodata: Any = None
+) -> np.ndarray:
 
+    result = np.asarray(
+        array,
+        dtype=np.float32
+    ).copy()
 
-permissions:
-  contents: write
+    if nodata is not None:
 
+        try:
 
-concurrency:
+            if np.isnan(nodata):
 
-  group: firis-fwi-update
+                result[
+                    np.isnan(result)
+                ] = np.nan
 
-  cancel-in-progress: false
+            else:
 
+                result[
+                    np.isclose(
+                        result,
+                        float(nodata)
+                    )
+                ] = np.nan
 
-jobs:
+        except (
+            TypeError,
+            ValueError
+        ):
 
-  update-fwi:
+            pass
 
-    runs-on: ubuntu-latest
+    result[
+        ~np.isfinite(result)
+    ] = np.nan
 
-    steps:
+    return result
 
-      # ========================================================
-      # CHECKOUT
-      # ========================================================
 
-      - name: Checkout repository
+# ============================================================
+# STATISTICS
+# ============================================================
 
-        uses: actions/checkout@v4
+def stats(
+    array: np.ndarray
+):
 
-        with:
+    valid = array[
+        np.isfinite(array)
+    ]
 
-          fetch-depth: 0
-          persist-credentials: true
+    if valid.size == 0:
 
+        return {
+            "count": 0,
+            "min": None,
+            "max": None,
+            "mean": None,
+            "std": None
+        }
 
-      # ========================================================
-      # SETUP PYTHON
-      # ========================================================
+    return {
 
-      - name: Setup Python
+        "count":
+            int(valid.size),
 
-        uses: actions/setup-python@v5
+        "min":
+            round(
+                float(np.min(valid)),
+                6
+            ),
 
-        with:
+        "max":
+            round(
+                float(np.max(valid)),
+                6
+            ),
 
-          python-version: "3.11"
+        "mean":
+            round(
+                float(np.mean(valid)),
+                6
+            ),
 
+        "std":
+            round(
+                float(np.std(valid)),
+                6
+            )
+    }
 
-      # ========================================================
-      # INSTALL DEPENDENCIES
-      # ========================================================
 
-      - name: Install dependencies
+# ============================================================
+# BOUNDS
+# ============================================================
 
-        shell: bash
+def bounds_dict(bounds):
 
-        run: |
+    return {
 
-          set -euo pipefail
+        "left":
+            float(bounds.left),
 
-          python -m pip install --upgrade pip
+        "bottom":
+            float(bounds.bottom),
 
-          pip install \
-            numpy \
-            rasterio \
-            requests \
-            shapely \
-            pyproj
+        "right":
+            float(bounds.right),
 
+        "top":
+            float(bounds.top)
+    }
 
-      # ========================================================
-      # CALCULATE IRAN DATE
-      # ========================================================
 
-      - name: Calculate Iran dates
+# ============================================================
+# RASTER METADATA
+# ============================================================
 
-        shell: bash
+def raster_metadata(
+    path: Path
+):
 
-        run: |
+    with rasterio.open(path) as src:
 
-          set -euo pipefail
+        return {
 
-          python - <<'PY'
+            "crs":
+                str(src.crs)
+                if src.crs
+                else None,
 
-          import os
+            "width":
+                int(src.width),
 
-          from datetime import (
-              datetime,
-              timedelta
-          )
+            "height":
+                int(src.height),
 
-          from zoneinfo import ZoneInfo
+            "cell_size_x":
+                float(src.res[0]),
 
+            "cell_size_y":
+                float(src.res[1]),
 
-          IRAN = ZoneInfo(
-              "Asia/Tehran"
-          )
+            "bounds":
+                bounds_dict(src.bounds),
 
+            "nodata":
+                (
+                    None
+                    if src.nodata is None
+                    else float(src.nodata)
+                ),
 
-          now_iran = datetime.now(
-              IRAN
-          )
+            "transform": [
 
+                float(src.transform.a),
 
-          today = now_iran.date()
+                float(src.transform.b),
 
-          tomorrow = (
-              today
-              +
-              timedelta(days=1)
-          )
+                float(src.transform.c),
 
+                float(src.transform.d),
 
-          today_str = today.isoformat()
+                float(src.transform.e),
 
-          tomorrow_str = tomorrow.isoformat()
+                float(src.transform.f)
+            ]
+        }
 
 
-          print("")
-          print("=" * 70)
-          print("FIRIS IRAN DATE CALCULATION")
-          print("=" * 70)
+# ============================================================
+# GRID VALIDATION
+# ============================================================
 
-          print("")
-          print("Current Iran datetime:")
-          print(now_iran.isoformat())
+def transform_values(
+    transform
+):
 
-          print("")
-          print("Today in Iran:")
-          print(today_str)
+    return np.array(
+        [
 
-          print("")
-          print("Forecast target:")
-          print(tomorrow_str)
+            transform.a,
+            transform.b,
+            transform.c,
+            transform.d,
+            transform.e,
+            transform.f
 
+        ],
+        dtype=np.float64
+    )
 
-          with open(
-              os.environ["GITHUB_ENV"],
-              "a",
-              encoding="utf-8"
-          ) as env:
 
-              env.write(
-                  f"TODAY_IRAN={today_str}\n"
-              )
+def grid_matches(
+    reference: dict,
+    metadata: dict,
+    tolerance: float = 1e-9
+):
 
-              env.write(
-                  f"EXPECTED_DATE={tomorrow_str}\n"
-              )
+    reasons = []
 
-          PY
+    if metadata["crs"] != str(
+        reference["crs"]
+    ):
 
+        reasons.append(
+            "CRS mismatch"
+        )
 
-      # ========================================================
-      # DOWNLOAD TOMORROW FWI
-      # ========================================================
+    if metadata["width"] != int(
+        reference["width"]
+    ):
 
-      - name: Download FWI for tomorrow
+        reasons.append(
+            "Width mismatch"
+        )
 
-        shell: bash
+    if metadata["height"] != int(
+        reference["height"]
+    ):
 
-        run: |
+        reasons.append(
+            "Height mismatch"
+        )
 
-          set -euo pipefail
+    reference_transform = (
+        transform_values(
+            reference["transform"]
+        )
+    )
 
-          echo ""
-          echo "=" * 70
-          echo "DOWNLOADING FIRIS FWI"
-          echo "=" * 70
+    output_transform = np.array(
+        metadata["transform"],
+        dtype=np.float64
+    )
 
-          echo ""
-          echo "Today in Iran:"
-          echo "${TODAY_IRAN}"
+    if not np.allclose(
+        reference_transform,
+        output_transform,
+        rtol=0.0,
+        atol=tolerance
+    ):
 
-          echo ""
-          echo "Target forecast:"
-          echo "${EXPECTED_DATE}"
+        reasons.append(
+            "Transform mismatch"
+        )
 
+    reference_bounds = np.array(
+        [
 
-          python scripts/update_fwi.py \
-            --boundary "fars.geojson" \
-            --overwrite
+            reference["bounds"].left,
+            reference["bounds"].bottom,
+            reference["bounds"].right,
+            reference["bounds"].top
 
+        ],
+        dtype=np.float64
+    )
 
-      # ========================================================
-      # VERIFY TOMORROW FWI
-      # ========================================================
+    output_bounds = np.array(
+        [
 
-      - name: Verify tomorrow FWI
+            metadata["bounds"]["left"],
+            metadata["bounds"]["bottom"],
+            metadata["bounds"]["right"],
+            metadata["bounds"]["top"]
 
-        shell: bash
+        ],
+        dtype=np.float64
+    )
 
-        run: |
+    if not np.allclose(
+        reference_bounds,
+        output_bounds,
+        rtol=0.0,
+        atol=tolerance
+    ):
 
-          set -euo pipefail
+        reasons.append(
+            "Bounds mismatch"
+        )
 
-          FWI_FILE="data/raw/fwi/fwi_ecmwf_fars_${EXPECTED_DATE}.tif"
+    return (
+        len(reasons) == 0,
+        reasons
+    )
 
-          FWI_METADATA="data/raw/fwi/fwi_ecmwf_fars_${EXPECTED_DATE}.json"
 
+def validate_output_grids(
+    output_paths: dict,
+    reference: dict
+):
 
-          if [ ! -f "${FWI_FILE}" ]; then
+    print()
+    print("=" * 70)
+    print("FINAL GRID VALIDATION")
+    print("=" * 70)
 
-            echo ""
-            echo "ERROR: Tomorrow FWI raster was not created:"
-            echo "${FWI_FILE}"
+    print()
+    print("REFERENCE = FWI")
 
-            exit 1
+    print(
+        f"CRS       : {reference['crs']}"
+    )
 
-          fi
+    print(
+        f"SIZE      : "
+        f"{reference['width']} x "
+        f"{reference['height']}"
+    )
 
+    print(
+        f"RES       : {reference['res']}"
+    )
 
-          if [ ! -f "${FWI_METADATA}" ]; then
+    print(
+        f"BOUNDS    : {reference['bounds']}"
+    )
 
-            echo ""
-            echo "ERROR: Tomorrow FWI metadata was not created:"
-            echo "${FWI_METADATA}"
+    failures = []
 
-            exit 1
+    validation = {}
 
-          fi
+    for name, path in output_paths.items():
 
+        metadata = raster_metadata(
+            path
+        )
 
-          echo ""
-          echo "✓ Tomorrow FWI raster exists."
+        ok, reasons = grid_matches(
+            reference,
+            metadata,
+            tolerance=1e-9
+        )
 
-          echo "✓ Tomorrow FWI metadata exists."
+        validation[name] = {
 
+            "path":
+                str(path),
 
-      # ========================================================
-      # VERIFY METADATA DATE
-      # ========================================================
+            "matches_fwi_grid":
+                bool(ok),
 
-      - name: Verify FWI metadata date
+            "reasons":
+                reasons,
 
-        shell: bash
+            "metadata":
+                metadata
+        }
 
-        run: |
+        if ok:
 
-          set -euo pipefail
+            print(
+                f"✓ {name:<16} GRID MATCH"
+            )
 
-          python - <<'PY'
+        else:
 
-          import json
-          import os
-          import sys
+            print(
+                f"✗ {name:<16} GRID MISMATCH"
+            )
 
+            for reason in reasons:
 
-          expected = os.environ["EXPECTED_DATE"]
+                print(
+                    f"    - {reason}"
+                )
 
+            failures.append(
+                name
+            )
 
-          path = (
-              "data/raw/fwi/"
-              f"fwi_ecmwf_fars_{expected}.json"
-          )
+    print()
 
+    if failures:
 
-          with open(
-              path,
-              "r",
-              encoding="utf-8"
-          ) as file:
+        print(
+            "FINAL GRID VALIDATION FAILED"
+        )
 
-              metadata = json.load(file)
+        for name in failures:
 
+            print(
+                f"  - {name}"
+            )
 
-          actual = (
-              metadata.get("target_date")
-              or
-              metadata.get("forecast_date")
-          )
+        raise RuntimeError(
+            "One or more output rasters do not "
+            "match the FWI reference grid."
+        )
 
+    print(
+        "✓ ALL OUTPUT RASTERS MATCH THE FWI GRID"
+    )
 
-          print("")
-          print("=" * 70)
-          print("FWI DATE VALIDATION")
-          print("=" * 70)
+    return validation
 
-          print("")
-          print("Expected:")
-          print(expected)
 
-          print("")
-          print("Metadata:")
-          print(actual)
+# ============================================================
+# FARS BOUNDARY
+# ============================================================
 
+def load_boundary_mask(
+    boundary_path: Path,
+    reference: dict
+):
 
-          if actual != expected:
+    with boundary_path.open(
+        "r",
+        encoding="utf-8"
+    ) as file:
 
-              print("")
-              print(
-                  "ERROR: FWI target date does not "
-                  "match EXPECTED_DATE."
-              )
+        geojson = json.load(
+            file
+        )
 
-              sys.exit(1)
+    features = geojson.get(
+        "features",
+        []
+    )
 
+    if not features:
 
-          print("")
-          print("✓ FWI target date is correct.")
+        raise ValueError(
+            f"Boundary contains no features: "
+            f"{boundary_path}"
+        )
 
-          PY
+    geometries = []
 
+    for feature in features:
 
-      # ========================================================
-      # VALIDATE GEOTIFF
-      # ========================================================
+        geometry = feature.get(
+            "geometry"
+        )
 
-      - name: Validate FWI GeoTIFF
+        if geometry:
 
-        shell: bash
+            geometries.append(
+                geometry
+            )
 
-        run: |
+    if not geometries:
 
-          set -euo pipefail
+        raise ValueError(
+            f"Boundary contains no geometries: "
+            f"{boundary_path}"
+        )
 
-          python - <<'PY'
+    source_crs = "EPSG:4326"
 
-          import os
-          import rasterio
+    crs_obj = geojson.get(
+        "crs"
+    )
 
+    if isinstance(
+        crs_obj,
+        dict
+    ):
 
-          expected = os.environ["EXPECTED_DATE"]
+        props = crs_obj.get(
+            "properties",
+            {}
+        )
 
+        name = (
+            props.get("name")
+            or props.get("href")
+        )
 
-          path = (
-              "data/raw/fwi/"
-              f"fwi_ecmwf_fars_{expected}.tif"
-          )
+        if (
+            isinstance(name, str)
+            and name.strip()
+        ):
 
+            source_crs = name.strip()
 
-          with rasterio.open(path) as src:
+    target_crs = reference[
+        "crs"
+    ]
 
-              print("")
-              print("=" * 70)
-              print("FWI GEOTIFF VALIDATION")
-              print("=" * 70)
+    if str(target_crs) != source_crs:
 
-              print("")
-              print("CRS:")
-              print(src.crs)
+        geometries = [
 
-              print("")
-              print("Size:")
-              print(
-                  src.width,
-                  "x",
-                  src.height
-              )
+            transform_geom(
+                source_crs,
+                target_crs,
+                geometry,
+                precision=12
+            )
 
-              print("")
-              print("Resolution:")
-              print(src.res)
+            for geometry in geometries
+        ]
 
-              print("")
-              print("Bounds:")
-              print(src.bounds)
+    mask = geometry_mask(
 
+        geometries,
 
-              if src.crs is None:
+        out_shape=(
+            reference["height"],
+            reference["width"]
+        ),
 
-                  raise SystemExit(
-                      "ERROR: FWI has no CRS."
-                  )
+        transform=reference[
+            "transform"
+        ],
 
+        invert=True,
 
-              if src.crs.to_epsg() != 4326:
+        all_touched=False
+    )
 
-                  raise SystemExit(
-                      "ERROR: FWI CRS is not EPSG:4326."
-                  )
+    count = int(
+        np.sum(mask)
+    )
 
+    if count == 0:
 
-              data = src.read(
-                  1,
-                  masked=True
-              )
+        raise ValueError(
+            "Fars boundary does not overlap "
+            "the FWI grid."
+        )
 
+    print()
+    print("FARS BOUNDARY")
+    print("-------------")
 
-              if data.count() == 0:
+    print(
+        f"Boundary file       : "
+        f"{boundary_path}"
+    )
 
-                  raise SystemExit(
-                      "ERROR: FWI contains no valid pixels."
-                  )
+    print(
+        f"Boundary CRS        : "
+        f"{source_crs}"
+    )
 
+    print(
+        f"Target CRS          : "
+        f"{reference['crs']}"
+    )
 
-              print("")
-              print("Valid pixels:")
-              print(int(data.count()))
+    print(
+        f"Pixels inside Fars  : "
+        f"{count:,}"
+    )
 
-              print("")
-              print("Minimum:")
-              print(float(data.min()))
+    return mask
 
-              print("")
-              print("Maximum:")
-              print(float(data.max()))
 
-              print("")
-              print("Mean:")
-              print(float(data.mean()))
+# ============================================================
+# FWI
+# ============================================================
 
+def read_fwi(
+    path: Path
+):
 
-          print("")
-          print("✓ FWI GeoTIFF is valid.")
+    with rasterio.open(
+        path
+    ) as src:
 
-          PY
+        if src.crs is None:
 
+            raise ValueError(
+                "FWI raster has no CRS."
+            )
 
-      # ========================================================
-      # FINAL FORECAST VALIDATION
-      # ========================================================
+        data = clean_array(
+            src.read(1),
+            src.nodata
+        )
 
-      - name: Final forecast validation
+        reference = {
 
-        shell: bash
+            "crs":
+                src.crs,
 
-        run: |
+            "transform":
+                src.transform,
 
-          set -euo pipefail
+            "width":
+                src.width,
 
-          python - <<'PY'
+            "height":
+                src.height,
 
-          import json
-          import os
-          import sys
+            "profile":
+                src.profile.copy(),
 
+            "bounds":
+                src.bounds,
 
-          expected = os.environ["EXPECTED_DATE"]
+            "res":
+                src.res
+        }
 
+    print()
+    print("FWI REFERENCE GRID")
+    print("------------------")
 
-          path = (
-              "data/raw/fwi/"
-              f"fwi_ecmwf_fars_{expected}.json"
-          )
+    print(
+        f"CRS        : "
+        f"{reference['crs']}"
+    )
 
+    print(
+        f"Width      : "
+        f"{reference['width']}"
+    )
 
-          with open(
-              path,
-              "r",
-              encoding="utf-8"
-          ) as file:
+    print(
+        f"Height     : "
+        f"{reference['height']}"
+    )
 
-              metadata = json.load(file)
+    print(
+        f"Cell size  : "
+        f"{reference['res']}"
+    )
 
+    print(
+        f"Bounds     : "
+        f"{reference['bounds']}"
+    )
 
-          target = (
-              metadata.get("target_date")
-              or
-              metadata.get("forecast_date")
-          )
+    print(
+        f"Transform  : "
+        f"{reference['transform']}"
+    )
 
+    print(
+        f"Statistics : "
+        f"{stats(data)}"
+    )
 
-          print("")
-          print("=" * 70)
-          print("FINAL FIRIS FWI FORECAST")
-          print("=" * 70)
+    return (
+        data,
+        reference
+    )
 
-          print("")
-          print("Iran datetime:")
-          print(
-              metadata.get(
-                  "current_iran_datetime"
-              )
-          )
 
-          print("")
-          print("Today in Iran:")
-          print(
-              os.environ["TODAY_IRAN"]
-          )
+# ============================================================
+# ALIGN RASTER TO FWI
+# ============================================================
 
-          print("")
-          print("Target forecast:")
-          print(target)
+def align_to_fwi(
+    path: Path,
+    reference: dict,
+    resampling: Resampling
+):
 
+    destination = np.full(
 
-          if target != expected:
+        (
+            reference["height"],
+            reference["width"]
+        ),
 
-              print("")
-              print(
-                  "ERROR: Final target date "
-                  "is not tomorrow."
-              )
+        np.nan,
 
-              sys.exit(1)
+        dtype=np.float32
+    )
 
+    with rasterio.open(
+        path
+    ) as src:
 
-          print("")
-          print("✓ Forecast target is correct.")
-          print("✓ Tomorrow FWI validated.")
+        if src.crs is None:
 
-          PY
+            raise ValueError(
+                f"Raster has no CRS: {path}"
+            )
 
+        source = clean_array(
+            src.read(1),
+            src.nodata
+        )
 
-      # ========================================================
-      # COMMIT
-      # ========================================================
+        print()
+        print(
+            f"Aligning: {path}"
+        )
 
-      - name: Commit FWI
+        print(
+            f"Source CRS      : {src.crs}"
+        )
 
-        shell: bash
+        print(
+            f"Source size     : "
+            f"{src.width} x {src.height}"
+        )
 
-        run: |
+        print(
+            f"Source cell     : "
+            f"{src.res}"
+        )
 
-          set -euo pipefail
+        print(
+            f"Source bounds   : "
+            f"{src.bounds}"
+        )
 
-          git config \
-            user.name \
-            "github-actions[bot]"
+        print(
+            f"Target CRS      : "
+            f"{reference['crs']}"
+        )
 
-          git config \
-            user.email \
-            "41898282+github-actions[bot]@users.noreply.github.com"
+        print(
+            f"Target size     : "
+            f"{reference['width']} x "
+            f"{reference['height']}"
+        )
 
+        print(
+            f"Target cell     : "
+            f"{reference['res']}"
+        )
 
-          git add \
-            data/raw/fwi
+        print(
+            f"Target bounds   : "
+            f"{reference['bounds']}"
+        )
 
+        print(
+            f"Resampling      : "
+            f"{resampling.name}"
+        )
 
-          if git diff --cached --quiet; then
+        reproject(
 
-            echo ""
-            echo "No FWI changes to commit."
+            source=source,
 
-            exit 0
+            destination=destination,
 
-          fi
+            src_transform=src.transform,
 
+            src_crs=src.crs,
 
-          git commit \
-            -m \
-            "chore(fwi): update forecast ${EXPECTED_DATE} [skip ci]"
+            src_nodata=np.nan,
 
+            dst_transform=reference[
+                "transform"
+            ],
 
-      # ========================================================
-      # PUSH
-      # ========================================================
+            dst_crs=reference[
+                "crs"
+            ],
 
-      - name: Push FWI
+            dst_nodata=np.nan,
 
-        shell: bash
+            resampling=resampling
+        )
 
-        run: |
+    destination[
+        ~np.isfinite(destination)
+    ] = np.nan
 
-          set -euo pipefail
+    print(
+        f"Aligned statistics: "
+        f"{stats(destination)}"
+    )
 
-          git fetch origin main
+    return destination
 
-          git merge origin/main \
-            -X ours \
-            --no-edit
 
-          git push origin HEAD:main
+# ============================================================
+# FUEL VALIDATION
+# ============================================================
 
+def validate_fuel_range(
+    fuel: np.ndarray
+):
 
-          echo ""
-          echo "=" * 70
-          echo "FIRIS FWI UPDATE COMPLETED"
-          echo "=" * 70
+    valid = np.isfinite(
+        fuel
+    )
 
-          echo ""
-          echo "Today in Iran:"
-          echo "${TODAY_IRAN}"
+    if not np.any(valid):
 
-          echo ""
-          echo "Forecast target:"
-          echo "${EXPECTED_DATE}"
+        raise ValueError(
+            "Fuel raster contains no valid pixels."
+        )
+
+    minimum = float(
+        np.nanmin(fuel)
+    )
+
+    maximum = float(
+        np.nanmax(fuel)
+    )
+
+    print()
+    print(
+        "FUEL VALUE VALIDATION"
+    )
+    print(
+        "---------------------"
+    )
+
+    print(
+        f"Minimum Fuel value : "
+        f"{minimum:.6f}"
+    )
+
+    print(
+        f"Maximum Fuel value : "
+        f"{maximum:.6f}"
+    )
+
+    if minimum < 0.0:
+
+        raise ValueError(
+            "Fuel raster contains values below 0."
+        )
+
+    if maximum > 1.0:
+
+        raise ValueError(
+            "Fuel raster contains values above 1."
+        )
+
+    print(
+        "✓ Fuel values are within the expected "
+        "0-1 range."
+    )
+
+
+# ============================================================
+# METRIC CELL SIZE
+# ============================================================
+
+def metric_cell_size(
+    src
+):
+
+    if src.crs is None:
+
+        raise ValueError(
+            "DEM CRS is missing."
+        )
+
+    xres = abs(
+        float(src.transform.a)
+    )
+
+    yres = abs(
+        float(src.transform.e)
+    )
+
+    if src.crs.is_projected:
+
+        return xres, yres
+
+    if src.crs.is_geographic:
+
+        center_row = (
+            src.height / 2.0
+        )
+
+        latitude = (
+            src.transform.f
+            +
+            center_row *
+            src.transform.e
+        )
+
+        lat = math.radians(
+            float(latitude)
+        )
+
+        meters_lat = (
+            111132.92
+            - 559.82 * math.cos(2 * lat)
+            + 1.175 * math.cos(4 * lat)
+            - 0.0023 * math.cos(6 * lat)
+        )
+
+        meters_lon = (
+            111412.84 * math.cos(lat)
+            - 93.5 * math.cos(3 * lat)
+            + 0.118 * math.cos(5 * lat)
+        )
+
+        return (
+            xres * meters_lon,
+            yres * meters_lat
+        )
+
+    raise ValueError(
+        "Unsupported DEM coordinate system."
+    )
+
+
+# ============================================================
+# NATIVE SLOPE
+# ============================================================
+
+def calculate_native_slope(
+    dem_path: Path
+):
+
+    """
+    Calculate slope on the native DEM.
+
+    Method:
+        Central finite differences.
+
+    NoData values are never filled.
+
+    A slope value is calculated only where:
+        - center DEM pixel is valid
+        - north pixel is valid
+        - south pixel is valid
+        - west pixel is valid
+        - east pixel is valid
+
+    Slope output unit:
+        degrees
+    """
+
+    print()
+    print(
+        "CALCULATING SLOPE ON NATIVE DEM"
+    )
+    print(
+        "--------------------------------"
+    )
+
+    with rasterio.open(
+        dem_path
+    ) as src:
+
+        if src.crs is None:
+
+            raise ValueError(
+                "DEM raster has no CRS."
+            )
+
+        dem = clean_array(
+            src.read(1),
+            src.nodata
+        )
+
+        valid = np.isfinite(
+            dem
+        )
+
+        if not np.any(valid):
+
+            raise ValueError(
+                "DEM contains no valid pixels."
+            )
+
+        dx, dy = metric_cell_size(
+            src
+        )
+
+        print(
+            f"DEM CRS       : {src.crs}"
+        )
+
+        print(
+            f"DEM size      : "
+            f"{src.width} x {src.height}"
+        )
+
+        print(
+            f"DEM cell      : "
+            f"{src.res}"
+        )
+
+        print(
+            f"DEM bounds    : "
+            f"{src.bounds}"
+        )
+
+        print(
+            f"Metric spacing: "
+            f"X={dx:.3f} m, "
+            f"Y={dy:.3f} m"
+        )
+
+        slope = np.full(
+            dem.shape,
+            np.nan,
+            dtype=np.float32
+        )
+
+        if (
+            dem.shape[0] >= 3
+            and
+            dem.shape[1] >= 3
+        ):
+
+            center = dem[
+                1:-1,
+                1:-1
+            ]
+
+            north = dem[
+                :-2,
+                1:-1
+            ]
+
+            south = dem[
+                2:,
+                1:-1
+            ]
+
+            west = dem[
+                1:-1,
+                :-2
+            ]
+
+            east = dem[
+                1:-1,
+                2:
+            ]
+
+            local_valid = (
+                np.isfinite(center)
+                &
+                np.isfinite(north)
+                &
+                np.isfinite(south)
+                &
+                np.isfinite(west)
+                &
+                np.isfinite(east)
+            )
+
+            dzdx = np.full(
+                center.shape,
+                np.nan,
+                dtype=np.float32
+            )
+
+            dzdy = np.full(
+                center.shape,
+                np.nan,
+                dtype=np.float32
+            )
+
+            dzdx[local_valid] = (
+
+                east[local_valid]
+                -
+                west[local_valid]
+
+            ) / (
+                2.0 * dx
+            )
+
+            dzdy[local_valid] = (
+
+                south[local_valid]
+                -
+                north[local_valid]
+
+            ) / (
+                2.0 * dy
+            )
+
+            gradient = np.sqrt(
+
+                dzdx ** 2
+                +
+                dzdy ** 2
+
+            )
+
+            local_slope = np.degrees(
+                np.arctan(
+                    gradient
+                )
+            )
+
+            inner = slope[
+                1:-1,
+                1:-1
+            ]
+
+            inner[local_valid] = (
+                local_slope[local_valid]
+            )
+
+        slope[
+            ~np.isfinite(slope)
+        ] = np.nan
+
+        print(
+            f"Native slope statistics: "
+            f"{stats(slope)}"
+        )
+
+        valid_slope_count = int(
+            np.sum(
+                np.isfinite(slope)
+            )
+        )
+
+        print(
+            f"Valid native slope pixels: "
+            f"{valid_slope_count:,}"
+        )
+
+        return (
+            slope,
+            src.transform,
+            src.crs
+        )
+
+
+# ============================================================
+# ALIGN SLOPE TO FWI
+# ============================================================
+
+def align_slope_to_fwi(
+    dem_path: Path,
+    reference: dict
+):
+
+    (
+        slope,
+        dem_transform,
+        dem_crs
+    ) = calculate_native_slope(
+        dem_path
+    )
+
+    destination = np.full(
+
+        (
+            reference["height"],
+            reference["width"]
+        ),
+
+        np.nan,
+
+        dtype=np.float32
+    )
+
+    print()
+    print(
+        "ALIGNING SLOPE TO FWI GRID"
+    )
+    print(
+        "--------------------------"
+    )
+
+    reproject(
+
+        source=slope,
+
+        destination=destination,
+
+        src_transform=dem_transform,
+
+        src_crs=dem_crs,
+
+        src_nodata=np.nan,
+
+        dst_transform=reference[
+            "transform"
+        ],
+
+        dst_crs=reference[
+            "crs"
+        ],
+
+        dst_nodata=np.nan,
+
+        resampling=Resampling.bilinear
+    )
+
+    destination[
+        ~np.isfinite(destination)
+    ] = np.nan
+
+    print(
+        f"FWI-grid slope statistics: "
+        f"{stats(destination)}"
+    )
+
+    return destination
+
+
+# ============================================================
+# WRITE RASTER
+# ============================================================
+
+def write_raster(
+    path: Path,
+    array: np.ndarray,
+    reference: dict
+):
+
+    profile = (
+        reference["profile"].copy()
+    )
+
+    profile.update(
+
+        driver="GTiff",
+
+        dtype="float32",
+
+        count=1,
+
+        width=
+            reference["width"],
+
+        height=
+            reference["height"],
+
+        crs=
+            reference["crs"],
+
+        transform=
+            reference["transform"],
+
+        nodata=
+            OUTPUT_NODATA,
+
+        compress="deflate",
+
+        predictor=3
+    )
+
+    output = np.where(
+
+        np.isfinite(array),
+
+        array,
+
+        OUTPUT_NODATA
+
+    ).astype(
+        np.float32
+    )
+
+    with rasterio.open(
+        path,
+        "w",
+        **profile
+    ) as dst:
+
+        dst.write(
+            output,
+            1
+        )
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+
+    args = parse_args()
+
+    require_file(
+        args.fwi_raster,
+        "FWI raster"
+    )
+
+    require_file(
+        args.fuel_raster,
+        "Fuel raster"
+    )
+
+    require_file(
+        args.dem_raster,
+        "DEM raster"
+    )
+
+    require_file(
+        args.boundary,
+        "Fars boundary"
+    )
+
+    args.output_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    print()
+    print("=" * 70)
+    print("FIRIS BUILD START")
+    print("=" * 70)
+
+    print()
+    print("NEW FUEL MODEL")
+    print("--------------")
+
+    print(
+        "Fuel source: Sentinel-2-derived continuous raster"
+    )
+
+    print(
+        "Fuel range : 0-1"
+    )
+
+    print(
+        "Excel      : NOT USED"
+    )
+
+    print(
+        "JOIN_VALUE : NOT USED"
+    )
+
+    if args.fuel_excel is not None:
+
+        print(
+            f"Legacy Excel argument received: "
+            f"{args.fuel_excel}"
+        )
+
+        print(
+            "It will NOT be used in the Fuel calculation."
+        )
+
+    # ========================================================
+    # FWI REFERENCE
+    # ========================================================
+
+    fwi, reference = read_fwi(
+        args.fwi_raster
+    )
+
+    # ========================================================
+    # FARS MASK
+    # ========================================================
+
+    fars_mask = load_boundary_mask(
+        args.boundary,
+        reference
+    )
+
+    # ========================================================
+    # FUEL ALIGNMENT
+    # ========================================================
+
+    f_fuel = align_to_fwi(
+
+        args.fuel_raster,
+
+        reference,
+
+        Resampling.nearest
+    )
+
+    # ========================================================
+    # FUEL VALIDATION
+    # ========================================================
+
+    validate_fuel_range(
+        f_fuel
+    )
+
+    # ========================================================
+    # DEM / SLOPE
+    # ========================================================
+
+    slope = align_slope_to_fwi(
+
+        args.dem_raster,
+
+        reference
+    )
+
+    # ========================================================
+    # FWI NORMALIZATION
+    # ========================================================
+
+    f_fwi = np.full(
+        fwi.shape,
+        np.nan,
+        dtype=np.float32
+    )
+
+    fwi_valid = np.isfinite(
+        fwi
+    )
+
+    f_fwi[fwi_valid] = np.clip(
+
+        fwi[fwi_valid]
+        /
+        FWI_MAX,
+
+        0.0,
+        1.0
+    )
+
+    # ========================================================
+    # TOPOGRAPHY NORMALIZATION
+    # ========================================================
+
+    f_topo = np.full(
+        slope.shape,
+        np.nan,
+        dtype=np.float32
+    )
+
+    slope_valid = np.isfinite(
+        slope
+    )
+
+    f_topo[slope_valid] = np.clip(
+
+        slope[slope_valid]
+        /
+        SLOPE_REFERENCE,
+
+        0.0,
+        1.0
+    )
+
+    # ========================================================
+    # COVERAGE INSIDE FARS
+    # ========================================================
+
+    province_pixels = int(
+        np.sum(fars_mask)
+    )
+
+    fwi_inside = (
+        fars_mask
+        &
+        np.isfinite(fwi)
+    )
+
+    fuel_inside = (
+        fars_mask
+        &
+        np.isfinite(f_fuel)
+    )
+
+    topo_inside = (
+        fars_mask
+        &
+        np.isfinite(f_topo)
+    )
+
+    common = (
+        fwi_inside
+        &
+        fuel_inside
+        &
+        topo_inside
+    )
+
+    fwi_count = int(
+        np.sum(fwi_inside)
+    )
+
+    fuel_count = int(
+        np.sum(fuel_inside)
+    )
+
+    topo_count = int(
+        np.sum(topo_inside)
+    )
+
+    common_count = int(
+        np.sum(common)
+    )
+
+    print()
+    print(
+        "FARS COVERAGE VALIDATION"
+    )
+    print(
+        "------------------------"
+    )
+
+    print(
+        f"Province pixels      : "
+        f"{province_pixels:,}"
+    )
+
+    print(
+        f"FWI valid in Fars    : "
+        f"{fwi_count:,} "
+        f"({100*fwi_count/province_pixels:.2f}%)"
+    )
+
+    print(
+        f"Fuel valid in Fars   : "
+        f"{fuel_count:,} "
+        f"({100*fuel_count/province_pixels:.2f}%)"
+    )
+
+    print(
+        f"Topo valid in Fars   : "
+        f"{topo_count:,} "
+        f"({100*topo_count/province_pixels:.2f}%)"
+    )
+
+    print(
+        f"Common valid in Fars : "
+        f"{common_count:,} "
+        f"({100*common_count/province_pixels:.2f}%)"
+    )
+
+    if fuel_count < province_pixels:
+
+        print()
+        print(
+            "WARNING: Fuel does not cover all "
+            "of Fars."
+        )
+
+        print(
+            f"Missing Fuel pixels: "
+            f"{province_pixels-fuel_count:,}"
+        )
+
+        print(
+            "NoData will remain NoData."
+        )
+
+    else:
+
+        print()
+        print(
+            "✓ Fuel coverage is complete inside Fars."
+        )
+
+    if common_count == 0:
+
+        raise RuntimeError(
+            "No common valid pixels exist "
+            "inside Fars."
+        )
+
+    # ========================================================
+    # FLI CALCULATION
+    # ========================================================
+
+    fli = np.full(
+        fwi.shape,
+        np.nan,
+        dtype=np.float32
+    )
+
+    fli[common] = (
+
+        100.0
+
+        *
+
+        (
+            FWI_WEIGHT * f_fwi[common]
+            +
+            FUEL_WEIGHT * f_fuel[common]
+            +
+            TOPO_WEIGHT * f_topo[common]
+        )
+    )
+
+    fli = np.clip(
+        fli,
+        0.0,
+        100.0
+    )
+
+    print()
+    print(
+        "FINAL FLI"
+    )
+
+    print(
+        "---------"
+    )
+
+    print(
+        f"Statistics: "
+        f"{stats(fli)}"
+    )
+
+    # ========================================================
+    # OUTPUT PATHS
+    # ========================================================
+
+    date = args.run_date
+
+    f_fwi_path = (
+        args.output_dir
+        /
+        f"f_fwi_fars_{date}.tif"
+    )
+
+    f_fuel_path = (
+        args.output_dir
+        /
+        f"f_fuel_fars_{date}.tif"
+    )
+
+    slope_path = (
+        args.output_dir
+        /
+        f"slope_fars_{date}.tif"
+    )
+
+    f_topo_path = (
+        args.output_dir
+        /
+        f"f_topo_fars_{date}.tif"
+    )
+
+    fli_path = (
+        args.output_dir
+        /
+        f"fli_fars_{date}.tif"
+    )
+
+    coverage_path = (
+        args.output_dir
+        /
+        f"fuel_coverage_fars_{date}.tif"
+    )
+
+    report_path = (
+        args.output_dir
+        /
+        f"firis_report_{date}.json"
+    )
+
+    # ========================================================
+    # MASK FINAL OUTPUTS TO FARS
+    # ========================================================
+
+    f_fwi_out = np.where(
+
+        fars_mask,
+
+        f_fwi,
+
+        np.nan
+    )
+
+    f_fuel_out = np.where(
+
+        fars_mask,
+
+        f_fuel,
+
+        np.nan
+    )
+
+    slope_out = np.where(
+
+        fars_mask,
+
+        slope,
+
+        np.nan
+    )
+
+    f_topo_out = np.where(
+
+        fars_mask,
+
+        f_topo,
+
+        np.nan
+    )
+
+    # ========================================================
+    # FUEL COVERAGE
+    # ========================================================
+
+    coverage = np.full(
+
+        fwi.shape,
+
+        np.nan,
+
+        dtype=np.float32
+    )
+
+    coverage[fars_mask] = np.where(
+
+        fuel_inside[fars_mask],
+
+        1.0,
+
+        0.0
+    )
+
+    # ========================================================
+    # WRITE OUTPUTS
+    # ========================================================
+
+    print()
+    print(
+        "WRITING OUTPUTS"
+    )
+
+    print(
+        "---------------"
+    )
+
+    write_raster(
+        f_fwi_path,
+        f_fwi_out,
+        reference
+    )
+
+    write_raster(
+        f_fuel_path,
+        f_fuel_out,
+        reference
+    )
+
+    write_raster(
+        slope_path,
+        slope_out,
+        reference
+    )
+
+    write_raster(
+        f_topo_path,
+        f_topo_out,
+        reference
+    )
+
+    write_raster(
+        fli_path,
+        fli,
+        reference
+    )
+
+    write_raster(
+        coverage_path,
+        coverage,
+        reference
+    )
+
+    # ========================================================
+    # FINAL GRID VALIDATION
+    # ========================================================
+
+    output_paths = {
+
+        "F_FWI":
+            f_fwi_path,
+
+        "F_Fuel":
+            f_fuel_path,
+
+        "Slope":
+            slope_path,
+
+        "F_Topo":
+            f_topo_path,
+
+        "FLI":
+            fli_path,
+
+        "FuelCoverage":
+            coverage_path
+    }
+
+    grid_validation = (
+        validate_output_grids(
+            output_paths,
+            reference
+        )
+    )
+
+    # ========================================================
+    # REPORT
+    # ========================================================
+
+    report = {
+
+        "project":
+            "FIRIS - Fars Integrated Fire Information System",
+
+        "generated_at_utc":
+            datetime.now(
+                timezone.utc
+            ).isoformat(),
+
+        "run_date":
+            date,
+
+        "boundary":
+            str(args.boundary),
+
+        "formula":
+            "FLI = 100 * "
+            "(0.45 * F_FWI + "
+            "0.35 * F_Fuel + "
+            "0.20 * F_Topo)",
+
+        "weights": {
+
+            "F_FWI":
+                FWI_WEIGHT,
+
+            "F_Fuel":
+                FUEL_WEIGHT,
+
+            "F_Topo":
+                TOPO_WEIGHT
+        },
+
+        "fuel_model": {
+
+            "source":
+                "Sentinel-2-derived continuous Fuel raster",
+
+            "input_path":
+                str(args.fuel_raster),
+
+            "input_range":
+                "0-1",
+
+            "fuel_definition":
+                "Vegetation Availability x Fuel Dryness",
+
+            "normalization":
+                "P5-P95 robust normalization performed upstream in GEE",
+
+            "excel_used":
+                False,
+
+            "JOIN_VALUE_used":
+                False,
+
+            "Fuelbeds_metric_used":
+                False,
+
+            "resampling_to_FWI":
+                "nearest neighbour"
+        },
+
+        "slope_method": {
+
+            "calculation":
+                "Native DEM central finite differences",
+
+            "nodata_filling":
+                False,
+
+            "nodata_policy":
+                "Slope is calculated only where "
+                "center, north, south, west and east "
+                "DEM cells are valid.",
+
+            "units":
+                "degrees",
+
+            "reference_degrees":
+                SLOPE_REFERENCE,
+
+            "normalization":
+                "clip(slope_degrees / 45, 0, 1)"
+        },
+
+        "target_grid": {
+
+            "reference":
+                "FWI",
+
+            "crs":
+                str(reference["crs"]),
+
+            "width":
+                int(reference["width"]),
+
+            "height":
+                int(reference["height"]),
+
+            "cell_size_x":
+                float(reference["res"][0]),
+
+            "cell_size_y":
+                float(reference["res"][1]),
+
+            "bounds":
+                bounds_dict(
+                    reference["bounds"]
+                ),
+
+            "transform": [
+
+                float(reference["transform"].a),
+
+                float(reference["transform"].b),
+
+                float(reference["transform"].c),
+
+                float(reference["transform"].d),
+
+                float(reference["transform"].e),
+
+                float(reference["transform"].f)
+            ]
+        },
+
+        "input_metadata": {
+
+            "FWI":
+                raster_metadata(
+                    args.fwi_raster
+                ),
+
+            "Fuel":
+                raster_metadata(
+                    args.fuel_raster
+                ),
+
+            "DEM":
+                raster_metadata(
+                    args.dem_raster
+                )
+        },
+
+        "alignment": {
+
+            "FWI":
+                "reference grid",
+
+            "Fuel":
+                "nearest-neighbour to FWI",
+
+            "DEM":
+                "native slope calculation "
+                "without artificial NoData filling, "
+                "then bilinear alignment to FWI"
+        },
+
+        "normalization": {
+
+            "F_FWI":
+                "clip(FWI / 100, 0, 1)",
+
+            "F_Fuel":
+                "direct continuous Fuel raster value "
+                "in the range 0-1",
+
+            "F_Topo":
+                "clip(slope_degrees / 45, 0, 1)"
+        },
+
+        "grid_validation":
+            grid_validation,
+
+        "coverage_inside_fars": {
+
+            "province_pixels":
+                province_pixels,
+
+            "FWI_valid_pixels":
+                fwi_count,
+
+            "FWI_valid_percent":
+                round(
+                    100 *
+                    fwi_count /
+                    province_pixels,
+                    4
+                ),
+
+            "Fuel_valid_pixels":
+                fuel_count,
+
+            "Fuel_valid_percent":
+                round(
+                    100 *
+                    fuel_count /
+                    province_pixels,
+                    4
+                ),
+
+            "Topo_valid_pixels":
+                topo_count,
+
+            "Topo_valid_percent":
+                round(
+                    100 *
+                    topo_count /
+                    province_pixels,
+                    4
+                ),
+
+            "common_valid_pixels":
+                common_count,
+
+            "common_valid_percent":
+                round(
+                    100 *
+                    common_count /
+                    province_pixels,
+                    4
+                ),
+
+            "common_valid_percent_of_FWI":
+                round(
+                    100 *
+                    common_count /
+                    max(
+                        fwi_count,
+                        1
+                    ),
+                    4
+                )
+        },
+
+        "statistics": {
+
+            "FWI":
+                stats(f_fwi_out),
+
+            "F_FWI":
+                stats(f_fwi_out),
+
+            "Fuel":
+                stats(f_fuel_out),
+
+            "F_Fuel":
+                stats(f_fuel_out),
+
+            "Slope_degrees":
+                stats(slope_out),
+
+            "F_Topo":
+                stats(f_topo_out),
+
+            "FLI":
+                stats(fli)
+        },
+
+        "inputs": {
+
+            "FWI":
+                str(args.fwi_raster),
+
+            "Fuel":
+                str(args.fuel_raster),
+
+            "DEM":
+                str(args.dem_raster),
+
+            "Boundary":
+                str(args.boundary)
+        },
+
+        "outputs": {
+
+            "F_FWI":
+                str(f_fwi_path),
+
+            "F_Fuel":
+                str(f_fuel_path),
+
+            "Slope":
+                str(slope_path),
+
+            "F_Topo":
+                str(f_topo_path),
+
+            "FLI":
+                str(fli_path),
+
+            "FuelCoverage":
+                str(coverage_path)
+        },
+
+        "interpretation": {
+
+            "NoData_policy":
+                "NoData is preserved; "
+                "missing source coverage "
+                "is never extrapolated.",
+
+            "coverage_warning":
+                bool(
+                    fuel_count <
+                    province_pixels
+                ),
+
+            "grid_policy":
+                "All final rasters use the "
+                "exact FWI reference profile.",
+
+            "fuel_policy":
+                "Fuel is a continuous Sentinel-2-derived "
+                "0-1 index and is used directly.",
+
+            "excel_policy":
+                "No Excel fuel table is used.",
+
+            "classification_policy":
+                "No external fuel classification lookup is used."
+        }
+    }
+
+    # ========================================================
+    # WRITE JSON REPORT
+    # ========================================================
+
+    with report_path.open(
+        "w",
+        encoding="utf-8"
+    ) as file:
+
+        json.dump(
+
+            report,
+
+            file,
+
+            ensure_ascii=False,
+
+            indent=2,
+
+            allow_nan=False
+        )
+
+        file.write(
+            "\n"
+        )
+
+    # ========================================================
+    # FINAL
+    # ========================================================
+
+    print()
+
+    print(
+        "=" * 70
+    )
+
+    print(
+        "FIRIS BUILD COMPLETED SUCCESSFULLY"
+    )
+
+    print(
+        "=" * 70
+    )
+
+    print(
+        f"FLI output    : "
+        f"{fli_path}"
+    )
+
+    print(
+        f"Fuel output   : "
+        f"{f_fuel_path}"
+    )
+
+    print(
+        f"Fuel coverage : "
+        f"{coverage_path}"
+    )
+
+    print(
+        f"Report        : "
+        f"{report_path}"
+    )
+
+
+if __name__ == "__main__":
+
+    main()
