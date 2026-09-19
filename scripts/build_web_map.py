@@ -70,10 +70,11 @@ from shapely.ops import unary_union
 # ============================================================
 
 RISK_CLASSES = (
-    ("متوسط", 0.0, 25.0, "#C7A900"),
-    ("زیاد", 25.0, 50.0, "#FB8C00"),
-    ("خیلی زیاد", 50.0, 75.0, "#E53935"),
-    ("بحرانی", 75.0, 100.000001, "#880E4F"),
+    ("کم", 0.0, 20.0, "#FFF59D"),
+    ("متوسط", 20.0, 40.0, "#FDD835"),
+    ("زیاد", 40.0, 60.0, "#FB8C00"),
+    ("خیلی زیاد", 60.0, 80.0, "#E53935"),
+    ("بحرانی", 80.0, 100.000001, "#880E4F"),
 )
 
 RISK_CODE_TO_INFO = {
@@ -86,20 +87,10 @@ RISK_CODE_TO_INFO = {
 # WEB GEOMETRY SETTINGS
 # ============================================================
 
-# حداقل مساحت قطعات کوچک در GeoJSON وب
 MIN_VECTOR_AREA = 0.000002
-
-# تعداد تکرار Chaikin
 CHAIKIN_ITERATIONS = 2
-
-# میزان نرم‌کنندگی Chaikin
 CHAIKIN_RATIO = 0.25
-
-# میزان ساده‌سازی نهایی
-# مقدار کم = حفظ جزئیات بیشتر
 SIMPLIFY_TOLERANCE = 0.00025
-
-# حداقل تعداد نقاط حلقه
 MIN_RING_POINTS = 4
 
 
@@ -236,11 +227,15 @@ def risk_info(
             "#777777",
         )
 
+    last_label, last_minimum, last_maximum, last_color = (
+        RISK_CLASSES[-1]
+    )
+
     return (
-        "بحرانی",
-        75.0,
-        100.0,
-        "#880E4F",
+        last_label,
+        last_minimum,
+        min(last_maximum, 100.0),
+        last_color,
     )
 
 
@@ -505,19 +500,12 @@ def build_grid_json(
 
     return {
         "forecast_date": forecast_date,
-
         "target_date": forecast_date,
-
         "crs": reference["crs"],
-
         "rows": reference["height"],
-
         "cols": reference["width"],
-
         "bounds": reference["bounds"],
-
         "resolution": reference["resolution"],
-
         "values": array_to_json_values(array),
     }
 
@@ -578,17 +566,13 @@ def build_metadata_json(
         "risk_classes": [
             {
                 "label": label,
-
                 "minimum": minimum,
-
                 "maximum": min(
                     maximum,
                     100.0,
                 ),
-
                 "color": color,
             }
-
             for (
                 label,
                 minimum,
@@ -698,6 +682,7 @@ def extract_polygon_parts(
         Polygon,
     ):
         return [geometry]
+
     if isinstance(
         geometry,
         MultiPolygon,
@@ -953,21 +938,11 @@ def professionalize_geometry(
     if geometry.is_empty:
         return geometry
 
-    # --------------------------------------------------------
-    # STEP 1
-    # Repair original geometry
-    # --------------------------------------------------------
-
     if not geometry.is_valid:
         geometry = geometry.buffer(0)
 
     if geometry.is_empty:
         return geometry
-
-    # --------------------------------------------------------
-    # STEP 2
-    # Remove very small fragments
-    # --------------------------------------------------------
 
     geometry = remove_small_fragments(
         geometry,
@@ -976,11 +951,6 @@ def professionalize_geometry(
 
     if geometry.is_empty:
         return geometry
-
-    # --------------------------------------------------------
-    # STEP 3
-    # Chaikin smoothing
-    # --------------------------------------------------------
 
     geometry = smooth_polygon(
         geometry,
@@ -991,11 +961,6 @@ def professionalize_geometry(
     if geometry.is_empty:
         return geometry
 
-    # --------------------------------------------------------
-    # STEP 4
-    # Controlled simplification
-    # --------------------------------------------------------
-
     geometry = geometry.simplify(
         SIMPLIFY_TOLERANCE,
         preserve_topology=True,
@@ -1003,11 +968,6 @@ def professionalize_geometry(
 
     if geometry.is_empty:
         return geometry
-
-    # --------------------------------------------------------
-    # STEP 5
-    # Final geometry repair
-    # --------------------------------------------------------
 
     if not geometry.is_valid:
 
@@ -1093,10 +1053,6 @@ def make_feature_collection(
         if not geometries:
             continue
 
-        # ----------------------------------------------------
-        # DISSOLVE
-        # ----------------------------------------------------
-
         dissolved = unary_union(
             geometries
         )
@@ -1113,10 +1069,6 @@ def make_feature_collection(
         original_area = float(
             dissolved.area
         )
-
-        # ----------------------------------------------------
-        # PROFESSIONAL GENERALIZATION
-        # ----------------------------------------------------
 
         smoothed = professionalize_geometry(
             dissolved
@@ -1396,6 +1348,7 @@ def validate_polygons(
     ) as handle:
 
         geojson = json.load(handle)
+
     if geojson.get("type") != "FeatureCollection":
 
         raise RuntimeError(
