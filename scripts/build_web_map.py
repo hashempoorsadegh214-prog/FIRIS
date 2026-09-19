@@ -698,7 +698,6 @@ def extract_polygon_parts(
         Polygon,
     ):
         return [geometry]
-
     if isinstance(
         geometry,
         MultiPolygon,
@@ -1397,7 +1396,6 @@ def validate_polygons(
     ) as handle:
 
         geojson = json.load(handle)
-
     if geojson.get("type") != "FeatureCollection":
 
         raise RuntimeError(
