@@ -3,15 +3,23 @@
 <html lang="fa" dir="rtl">
 
 <head>
+
 <meta charset="UTF-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>سامانه پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی</title>
+<title>
+سامانه پیش‌بینی و پهنه‌بندی خطر حریق در عرصه‌های طبیعی
+</title>
 
-<link rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+>
 
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
 <style>
 
@@ -79,21 +87,65 @@ a {
   justify-content: center;
   padding: 10px 20px;
   color: white;
+
   background: linear-gradient(
     135deg,
     #e52e2e 0%,
     #c31313 50%,
     #8c0505 100%
   );
+
   box-shadow: var(--shadow-lg);
   z-index: 3000;
 }
+
+/* ============================================================
+   LOGO
+   ============================================================ */
+
+.header-logo {
+  position: absolute;
+  left: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  width: 68px;
+  height: 68px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 20;
+}
+
+.header-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+
+  filter:
+    brightness(0)
+    invert(1);
+
+  opacity: .98;
+  transition: var(--transition);
+}
+
+.header-logo img:hover {
+  transform: scale(1.05);
+}
+
+/* ============================================================
+   HEADER CENTER
+   ============================================================ */
 
 .header-center {
   position: relative;
   z-index: 2;
   text-align: center;
-  padding: 0 170px;
+  padding: 0 190px;
 }
 
 .header-title {
@@ -110,60 +162,119 @@ a {
   font-weight: 600;
 }
 
+/* ============================================================
+   FORECAST BADGE
+   ============================================================ */
+
 .header-subtitle-badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+
   margin-top: 5px;
   padding: 3px 11px;
+
   background: rgba(0,0,0,.28);
   border: 1px solid rgba(255,255,255,.25);
   border-radius: 18px;
+
   font-size: 11px;
 }
 
 .header-subtitle-badge .bullet {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
+
   background: #4ade80;
+
   border-radius: 50%;
-  box-shadow: 0 0 6px #4ade80;
+
+  box-shadow:
+    0 0 5px #4ade80,
+    0 0 10px rgba(74,222,128,.85);
+
+  flex-shrink: 0;
+
+  animation:
+    forecastLedBlink
+    1.2s
+    ease-in-out
+    infinite;
+}
+
+@keyframes forecastLedBlink {
+
+  0%,
+  100% {
+    opacity: .30;
+    transform: scale(.78);
+
+    box-shadow:
+      0 0 3px #4ade80,
+      0 0 6px rgba(74,222,128,.35);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+
+    box-shadow:
+      0 0 7px #4ade80,
+      0 0 14px rgba(74,222,128,.95),
+      0 0 20px rgba(74,222,128,.55);
+  }
+
 }
 
 /* ============================================================
-   BUTTONS
+   HEADER BUTTONS
    ============================================================ */
 
 .header-buttons-group {
   position: absolute;
-  left: 20px;
+
+  right: 20px;
+  left: auto;
+
   top: 50%;
   transform: translateY(-50%);
+
   display: flex;
   align-items: center;
+
   gap: 7px;
+
   padding: 6px 9px;
+
   background: rgba(255,255,255,.08);
   border: 1px solid rgba(255,255,255,.15);
   border-radius: 10px;
+
   z-index: 10;
 }
 
 .header-btn {
   width: 38px;
   height: 38px;
+
   display: inline-flex;
   align-items: center;
   justify-content: center;
+
   border: 1px solid var(--border);
   border-radius: 8px;
+
   background: var(--panel);
   color: var(--text);
+
   cursor: pointer;
   text-decoration: none;
+
   font-size: 16px;
   line-height: 1;
+
   transition: var(--transition);
+
   flex-shrink: 0;
 }
 
@@ -188,7 +299,7 @@ a {
 }
 
 /* ============================================================
-   FILTER
+   DROPDOWN
    ============================================================ */
 
 .dropdown {
@@ -197,17 +308,30 @@ a {
 
 .dropdown-menu {
   position: absolute;
+
   top: calc(100% + 9px);
-  left: 0;
+  right: 0;
+  left: auto;
+
   width: 285px;
+
   margin: 0;
   padding: 12px;
+
   list-style: none;
+
   background: var(--panel);
-  border: 1px solid var(--border-light);
+
+  border:
+    1px solid
+    var(--border-light);
+
   border-radius: 12px;
+
   box-shadow: var(--shadow-lg);
+
   z-index: 6000;
+
   display: none;
 }
 
@@ -215,19 +339,34 @@ a {
   display: block;
 }
 
+.archive-menu {
+  width: 285px;
+}
+
+/* ============================================================
+   FILTER
+   ============================================================ */
+
 .location-filter-title {
   font-size: 15px;
   font-weight: 900;
   color: var(--text);
+
   margin-bottom: 10px;
   padding-bottom: 9px;
-  border-bottom: 1px solid var(--border-light);
+
+  border-bottom:
+    1px solid
+    var(--border-light);
 }
 
 .location-filter-label {
   display: block;
+
   margin-bottom: 6px;
+
   color: var(--text-light);
+
   font-size: 12px;
   font-weight: 700;
 }
@@ -235,29 +374,46 @@ a {
 .filter-select {
   width: 100%;
   height: 40px;
+
   padding: 5px 10px;
-  border: 1px solid var(--border);
+
+  border:
+    1px solid
+    var(--border);
+
   border-radius: 8px;
+
   background: white;
   color: var(--text);
+
   font-size: 13px;
   font-weight: 700;
+
   outline: none;
   cursor: pointer;
 }
 
 .filter-select:focus {
   border-color: var(--green);
-  box-shadow: 0 0 0 2px rgba(23,107,44,.10);
+
+  box-shadow:
+    0 0 0 2px
+    rgba(23,107,44,.10);
 }
 
 .filter-description {
   margin-top: 9px;
+
   padding: 8px;
+
   background: #f5f7f8;
+
   border-radius: 7px;
+
   color: var(--muted);
+
   font-size: 10px;
+
   line-height: 1.7;
 }
 
@@ -292,10 +448,14 @@ a {
 #nightOverlay {
   position: absolute;
   inset: 0;
+
   z-index: 1000;
   pointer-events: none;
+
   display: none;
-  background: rgba(20,25,35,.20);
+
+  background:
+    rgba(20,25,35,.20);
 }
 
 body.night #nightOverlay {
@@ -308,15 +468,26 @@ body.night #nightOverlay {
 
 .gauge-panel {
   position: absolute;
+
   top: 20px;
   right: 20px;
+
   width: 270px;
+
   background: var(--panel);
-  border: 1px solid var(--border-light);
+
+  border:
+    1px solid
+    var(--border-light);
+
   border-radius: 14px;
+
   box-shadow: var(--shadow-lg);
+
   padding: 17px;
+
   z-index: 1400;
+
   text-align: center;
 }
 
@@ -329,27 +500,37 @@ body.night #nightOverlay {
 .gauge {
   width: 145px;
   height: 145px;
+
   margin: 0 auto 12px;
+
   border-radius: 50%;
-  background: conic-gradient(
-    #2e7d32 0deg 72deg,
-    #fdd835 72deg 144deg,
-    #fb8c00 144deg 216deg,
-    #e53935 216deg 288deg,
-    #880e4f 288deg 360deg
-  );
+
+  background:
+    conic-gradient(
+      #2e7d32 0deg 72deg,
+      #fdd835 72deg 144deg,
+      #fb8c00 144deg 216deg,
+      #e53935 216deg 288deg,
+      #880e4f 288deg 360deg
+    );
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   position: relative;
 }
 
 .gauge::before {
   content: "";
+
   position: absolute;
+
   width: 110px;
   height: 110px;
+
   border-radius: 50%;
+
   background: var(--panel);
 }
 
@@ -366,23 +547,33 @@ body.night #nightOverlay {
 
 .gauge-label {
   margin-top: 5px;
+
   font-size: 12px;
   font-weight: 800;
 }
 
 .gauge-location {
   font-size: 11px;
+
   color: var(--muted);
+
   line-height: 1.6;
+
   margin-top: 8px;
   padding-top: 9px;
-  border-top: 1px solid var(--border-light);
+
+  border-top:
+    1px solid
+    var(--border-light);
 }
 
 .gauge-legend-bar {
   margin-top: 9px;
   padding-top: 8px;
-  border-top: 1px solid var(--border-light);
+
+  border-top:
+    1px solid
+    var(--border-light);
 }
 
 .gauge-legend-items {
@@ -392,10 +583,14 @@ body.night #nightOverlay {
 
 .gauge-legend-chip {
   flex: 1;
+
   font-size: 8px;
   font-weight: 700;
+
   padding: 4px 2px;
+
   border-radius: 4px;
+
   color: white;
 }
 
@@ -406,6 +601,7 @@ body.night #nightOverlay {
 .leaflet-popup-content {
   margin: 0 !important;
   padding: 0 !important;
+
   direction: rtl;
   text-align: center;
 }
@@ -413,7 +609,9 @@ body.night #nightOverlay {
 .fli-popup,
 .region-popup {
   min-width: 230px;
+
   padding: 12px;
+
   direction: rtl;
   text-align: center;
 }
@@ -421,29 +619,39 @@ body.night #nightOverlay {
 .popup-title {
   font-size: 14px;
   font-weight: 900;
+
   margin-bottom: 7px;
 }
 
 .popup-risk {
   display: inline-block;
+
   padding: 5px 11px;
+
   border-radius: 7px;
+
   color: white;
+
   font-size: 12px;
   font-weight: 800;
+
   margin: 3px 0 5px;
 }
 
 .popup-value {
   font-size: 12px;
   font-weight: 800;
+
   margin-top: 4px;
 }
 
 .popup-coord {
   color: var(--muted);
+
   font-size: 10px;
+
   margin-top: 7px;
+
   line-height: 1.5;
 }
 
@@ -453,13 +661,21 @@ body.night #nightOverlay {
 
 .about-overlay {
   position: fixed;
+
   inset: 0;
+
   display: none;
+
   align-items: center;
   justify-content: center;
+
   padding: 20px;
-  background: rgba(0,0,0,.5);
+
+  background:
+    rgba(0,0,0,.5);
+
   backdrop-filter: blur(4px);
+
   z-index: 7000;
 }
 
@@ -469,28 +685,42 @@ body.night #nightOverlay {
 
 .about-box {
   width: min(680px,96vw);
+
   max-height: 88vh;
+
   overflow-y: auto;
+
   background: var(--panel);
+
   border-radius: 15px;
+
   box-shadow: var(--shadow-lg);
+
   padding: 25px;
+
   direction: rtl;
   text-align: right;
 }
 
 .about-header {
   display: flex;
+
   align-items: center;
   justify-content: space-between;
+
   margin-bottom: 17px;
   padding-bottom: 13px;
-  border-bottom: 2px solid var(--border-light);
+
+  border-bottom:
+    2px solid
+    var(--border-light);
 }
 
 .about-title {
   margin: 0;
+
   color: var(--red-main);
+
   font-size: 22px;
   font-weight: 900;
 }
@@ -498,19 +728,30 @@ body.night #nightOverlay {
 .about-close {
   width: 38px;
   height: 38px;
-  border: 1px solid var(--border-light);
+
+  border:
+    1px solid
+    var(--border-light);
+
   border-radius: 9px;
+
   background: #f8f9fa;
+
   cursor: pointer;
+
   font-size: 20px;
+
   display: flex;
+
   align-items: center;
   justify-content: center;
 }
 
 .about-text {
   font-size: 13px;
+
   line-height: 1.8;
+
   color: var(--text-light);
 }
 
@@ -520,15 +761,22 @@ body.night #nightOverlay {
 
 .about-table {
   width: 100%;
+
   border-collapse: collapse;
+
   margin-top: 13px;
+
   font-size: 12px;
 }
 
 .about-table th,
 .about-table td {
-  border: 1px solid var(--border-light);
+  border:
+    1px solid
+    var(--border-light);
+
   padding: 9px;
+
   text-align: right;
 }
 
@@ -539,12 +787,21 @@ body.night #nightOverlay {
 
 .about-note {
   margin-top: 13px;
+
   padding: 11px;
+
   border-radius: 9px;
+
   background: #e8f5e9;
-  border: 1px solid #c8e6c9;
+
+  border:
+    1px solid
+    #c8e6c9;
+
   font-size: 12px;
+
   line-height: 1.8;
+
   color: #2e7d32;
 }
 
@@ -562,8 +819,19 @@ body.night #nightOverlay {
     padding: 6px 8px;
   }
 
+  .header-logo {
+    left: 8px;
+
+    width: 48px;
+    height: 48px;
+  }
+
   .header-center {
-    padding: 0 125px 0 10px;
+    padding:
+      0
+      115px
+      0
+      65px;
   }
 
   .header-title {
@@ -579,26 +847,36 @@ body.night #nightOverlay {
   }
 
   .header-buttons-group {
-    left: 8px;
+    right: 8px;
+    left: auto;
+
     gap: 4px;
+
     padding: 4px;
   }
 
   .header-btn {
     width: 34px;
     height: 34px;
+
     font-size: 13px;
   }
 
-  .dropdown-menu {
+  .dropdown-menu,
+  .archive-menu {
     width: 245px;
+
+    right: 0;
+    left: auto;
   }
 
   .gauge-panel {
     top: auto;
     right: 10px;
     bottom: 10px;
+
     width: 215px;
+
     padding: 10px;
   }
 
@@ -622,6 +900,51 @@ body.night #nightOverlay {
 
 }
 
+@media (max-width: 480px) {
+
+  .header-logo {
+    width: 42px;
+    height: 42px;
+
+    left: 5px;
+  }
+
+  .header-center {
+    padding:
+      0
+      110px
+      0
+      55px;
+  }
+
+  .header-title {
+    font-size: 13px;
+  }
+
+  .header-subtitle-badge {
+    font-size: 8px;
+
+    padding:
+      2px 7px;
+  }
+
+  .header-buttons-group {
+    right: 5px;
+
+    gap: 2px;
+
+    padding: 3px;
+  }
+
+  .header-btn {
+    width: 31px;
+    height: 31px;
+
+    font-size: 12px;
+  }
+
+}
+
 </style>
 
 </head>
@@ -632,43 +955,56 @@ body.night #nightOverlay {
 
 <header class="header">
 
+<div class="header-logo">
+
+<img
+  src="logo.webp"
+  alt="لوگوی سامانه"
+>
+
+</div>
+
 <div class="header-buttons-group">
 
 <div class="dropdown">
 
 <button
-id="layersBtn"
-class="header-btn"
-title="فیلتر مکانی"
-aria-label="فیلتر مکانی"
-type="button"
+  id="layersBtn"
+  class="header-btn"
+  title="فیلتر مکانی"
+  aria-label="فیلتر مکانی"
+  type="button"
+>
+🗺️
+</button>
 
-> 🗺️</button>
-
-<div id="layersMenu" class="dropdown-menu">
+<div
+  id="layersMenu"
+  class="dropdown-menu"
+>
 
 <div class="location-filter-title">
 فیلتر مکانی
 </div>
 
 <label
-class="location-filter-label"
-for="locationFilter"
-
+  class="location-filter-label"
+  for="locationFilter"
 >
+محدوده مورد نظر
+</label>
 
-محدوده مورد نظر </label>
-
-<select id="locationFilter" class="filter-select">
+<select
+  id="locationFilter"
+  class="filter-select"
+>
 
 <option value="all">
 کل استان فارس
 </option>
 
-<!-- اصلاح اصلی: value و عنوان با هم هماهنگ شده‌اند -->
-
 <option value="protected">
-مناطق شکارممنوع 
+مناطق شکارممنوع
 </option>
 
 <option value="hunting">
@@ -682,44 +1018,97 @@ for="locationFilter"
 </div>
 
 </div>
+
+</div>
+
+<div class="dropdown">
+
+<button
+  id="archiveBtn"
+  class="header-btn"
+  title="آرشیو پیش‌بینی"
+  aria-label="آرشیو پیش‌بینی"
+  type="button"
+>
+📅
+</button>
+
+<div
+  id="archiveMenu"
+  class="dropdown-menu archive-menu"
+>
+
+<div class="location-filter-title">
+آرشیو پیش‌بینی
+</div>
+
+<label
+  class="location-filter-label"
+  for="archiveFilter"
+>
+تاریخ پیش‌بینی
+</label>
+
+<select
+  id="archiveFilter"
+  class="filter-select"
+>
+
+<option value="latest">
+آخرین پیش‌بینی
+</option>
+
+</select>
+
+<div class="filter-description">
+با انتخاب تاریخ، نقشه و اطلاعات همان پیش‌بینی نمایش داده می‌شود.
+</div>
+
+</div>
+
 </div>
 
 <button
-id="fitButton"
-class="header-btn primary"
-title="نمایش کامل استان فارس"
-aria-label="نمایش کامل استان فارس"
-type="button"
-
-> 🌐</button>
-
-<button
-id="modeButton"
-class="header-btn"
-title="حالت شب"
-aria-label="تغییر حالت روز و شب"
-type="button"
-
-> ☀️</button>
+  id="fitButton"
+  class="header-btn primary"
+  title="نمایش کامل استان فارس"
+  aria-label="نمایش کامل استان فارس"
+  type="button"
+>
+🌐
+</button>
 
 <button
-id="aboutButton"
-class="header-btn"
-title="معرفی سامانه"
-aria-label="معرفی سامانه"
-type="button"
+  id="modeButton"
+  class="header-btn"
+  title="حالت شب"
+  aria-label="تغییر حالت روز و شب"
+  type="button"
+>
+☀️
+</button>
 
-> ℹ️</button>
+<button
+  id="aboutButton"
+  class="header-btn"
+  title="معرفی سامانه"
+  aria-label="معرفی سامانه"
+  type="button"
+>
+ℹ️
+</button>
 
 <a
-href="data/report/firis_report.xlsx"
-target="_blank"
-rel="noopener"
-class="header-btn primary"
-title="خروجی Excel"
-aria-label="خروجی Excel"
-
-> 📊</a>
+  id="excelButton"
+  href="data/report/firis_report.xlsx"
+  target="_blank"
+  rel="noopener"
+  class="header-btn primary"
+  title="خروجی Excel آخرین پیش‌بینی"
+  aria-label="خروجی Excel"
+>
+📊
+</a>
 
 </div>
 
@@ -734,10 +1123,13 @@ aria-label="خروجی Excel"
 </div>
 
 <div class="header-subtitle-badge">
+
 <span class="bullet"></span>
+
 <span id="forecastDateBadge">
 پیش‌بینی برای فردا
 </span>
+
 </div>
 
 </div>
@@ -760,18 +1152,28 @@ aria-label="خروجی Excel"
 
 <div class="gauge-content">
 
-<div id="gaugeValue" class="gauge-value">
+<div
+  id="gaugeValue"
+  class="gauge-value"
+>
 —
 </div>
 
-<div id="gaugeLabel" class="gauge-label">
+<div
+  id="gaugeLabel"
+  class="gauge-label"
+>
 انتخاب کنید
 </div>
 
 </div>
+
 </div>
 
-<div id="gaugeLocation" class="gauge-location">
+<div
+  id="gaugeLocation"
+  class="gauge-location"
+>
 —
 </div>
 
@@ -780,53 +1182,52 @@ aria-label="خروجی Excel"
 <div class="gauge-legend-items">
 
 <span
-class="gauge-legend-chip"
-style="background:#2e7d32"
-
+  class="gauge-legend-chip"
+  style="background:#2e7d32"
 >
-
-کم </span>
+کم
+</span>
 
 <span
-class="gauge-legend-chip"
-style="background:#fdd835;color:#222"
-
+  class="gauge-legend-chip"
+  style="background:#fdd835;color:#222"
 >
-
-متوسط </span>
+متوسط
+</span>
 
 <span
-class="gauge-legend-chip"
-style="background:#fb8c00"
-
+  class="gauge-legend-chip"
+  style="background:#fb8c00"
 >
-
-زیاد </span>
+زیاد
+</span>
 
 <span
-class="gauge-legend-chip"
-style="background:#e53935"
-
+  class="gauge-legend-chip"
+  style="background:#e53935"
 >
-
-خیلی زیاد </span>
+خیلی زیاد
+</span>
 
 <span
-class="gauge-legend-chip"
-style="background:#880e4f"
-
+  class="gauge-legend-chip"
+  style="background:#880e4f"
 >
+بحرانی
+</span>
 
-بحرانی </span>
-
-</div>
 </div>
 
 </div>
 
 </div>
 
-<div id="aboutOverlay" class="about-overlay">
+</div>
+
+<div
+  id="aboutOverlay"
+  class="about-overlay"
+>
 
 <div
   class="about-box"
@@ -837,18 +1238,22 @@ style="background:#880e4f"
 
 <div class="about-header">
 
-<h2 id="aboutTitle" class="about-title">
+<h2
+  id="aboutTitle"
+  class="about-title"
+>
 معرفی سامانه
 </h2>
 
 <button
-id="aboutClose"
-class="about-close"
-title="بستن"
-aria-label="بستن"
-type="button"
-
-> ×</button>
+  id="aboutClose"
+  class="about-close"
+  title="بستن"
+  aria-label="بستن"
+  type="button"
+>
+×
+</button>
 
 </div>
 
@@ -865,11 +1270,13 @@ type="button"
 <table class="about-table">
 
 <thead>
+
 <tr>
 <th>مؤلفه</th>
 <th>نقش</th>
 <th>منطق</th>
 </tr>
+
 </thead>
 
 <tbody>
@@ -899,6 +1306,7 @@ type="button"
 </tr>
 
 </tbody>
+
 </table>
 
 <div class="about-note">
@@ -906,14 +1314,19 @@ type="button"
 </div>
 
 </div>
+
 </div>
+
 </div>
 
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
 
 <script>
+
 "use strict";
 
 /* ============================================================
@@ -933,32 +1346,40 @@ const APP_STATE = {
 
   data: {
     fliGrid: null,
-    fliMetadata: null
+    fliMetadata: null,
+    archiveDates: [],
+    currentArchiveDate: "latest"
   },
 
   ui: {
     nightMode: false,
     currentPopup: null,
-
-    /*
-     * all       = کل استان
-     * protected = مناطق چهارگانه
-     * hunting   = مناطق شکار ممنوع
-     */
-    locationFilter: "all"
+    locationFilter: "all",
+    excelObjectUrl: null
   }
 
 };
 
-
 /* ============================================================
-   DATE
+   DATE - IRAN TIME
    ============================================================ */
 
+/*
+ * این تابع تاریخ فردا را فقط بر اساس تاریخ ایران
+ * (Asia/Tehran) محاسبه می‌کند.
+ *
+ * تاریخ میلادی ابتدا از ساعت ایران استخراج می‌شود،
+ * سپس یک روز به آن اضافه می‌شود و در نهایت با تقویم
+ * فارسی نمایش داده می‌شود.
+ *
+ * بنابراین timezone سیستم کاربر هیچ تأثیری ندارد.
+ */
 function setupTomorrowDate() {
 
   const badge =
-    document.getElementById("forecastDateBadge");
+    document.getElementById(
+      "forecastDateBadge"
+    );
 
   if (!badge) {
     return;
@@ -966,41 +1387,123 @@ function setupTomorrowDate() {
 
   try {
 
-    const tomorrow =
-      new Date();
-
-    tomorrow.setDate(
-      tomorrow.getDate() + 1
-    );
-
-    const dateStr =
-      tomorrow.toLocaleDateString(
-        "fa-IR",
+    /*
+     * دریافت تاریخ فعلی ایران
+     */
+    const iranParts =
+      new Intl.DateTimeFormat(
+        "en-US",
         {
-          weekday: "long",
+          timeZone: "Asia/Tehran",
           year: "numeric",
-          month: "long",
+          month: "numeric",
           day: "numeric"
         }
+      ).formatToParts(
+        new Date()
       );
 
+    const year =
+      Number(
+        iranParts.find(
+          part =>
+            part.type === "year"
+        ).value
+      );
+
+    const month =
+      Number(
+        iranParts.find(
+          part =>
+            part.type === "month"
+        ).value
+      );
+
+    const day =
+      Number(
+        iranParts.find(
+          part =>
+            part.type === "day"
+        ).value
+      );
+
+    /*
+     * ساخت فردا به‌صورت مستقل از timezone مرورگر
+     */
+    const tomorrow =
+      new Date(
+        Date.UTC(
+          year,
+          month - 1,
+          day + 1,
+          12,
+          0,
+          0
+        )
+      );
+
+    /*
+     * دریافت اجزای تاریخ شمسی فردا
+     */
+    const persianParts =
+      new Intl.DateTimeFormat(
+        "fa-IR-u-ca-persian",
+        {
+          timeZone: "Asia/Tehran",
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric"
+        }
+      ).formatToParts(
+        tomorrow
+      );
+
+    const weekday =
+      persianParts.find(
+        part =>
+          part.type === "weekday"
+      )?.value || "";
+
+    const persianDay =
+      persianParts.find(
+        part =>
+          part.type === "day"
+      )?.value || "";
+
+    const persianMonth =
+      persianParts.find(
+        part =>
+          part.type === "month"
+      )?.value || "";
+
+    const persianYear =
+      persianParts.find(
+        part =>
+          part.type === "year"
+      )?.value || "";
+
+    /*
+     * ترتیب نمایش کاملاً دستی:
+     *
+     * پیش‌بینی برای یکشنبه ۱۵ شهریور ۱۴۰۵
+     */
     badge.textContent =
-      `پیش‌بینی برای ${dateStr}`;
+      `پیش‌بینی برای ${weekday} ${persianDay} ${persianMonth} ${persianYear}`;
 
   } catch (error) {
 
     console.warn(
-      "Date error:",
+      "Iran forecast date error:",
       error
     );
 
     badge.textContent =
       "پیش‌بینی برای فردا";
+
   }
 
 }
-
-
 /* ============================================================
    FETCH
    ============================================================ */
@@ -1030,31 +1533,41 @@ async function fetchWithTimeout(
         }
       );
 
-    clearTimeout(timer);
+    clearTimeout(
+      timer
+    );
 
     if (!response.ok) {
+
       throw new Error(
         `HTTP ${response.status}`
       );
+
     }
 
     return response;
 
   } catch (error) {
 
-    clearTimeout(timer);
+    clearTimeout(
+      timer
+    );
 
     if (
       error.name === "AbortError"
     ) {
-      throw new Error("Timeout");
+
+      throw new Error(
+        "Timeout"
+      );
+
     }
 
     throw error;
+
   }
 
 }
-
 
 /* ============================================================
    NUMBER
@@ -1068,7 +1581,9 @@ function formatNumber(value) {
   if (
     !Number.isFinite(number)
   ) {
+
     return "—";
+
   }
 
   return number.toLocaleString(
@@ -1079,7 +1594,6 @@ function formatNumber(value) {
   );
 
 }
-
 
 /* ============================================================
    RISK
@@ -1144,7 +1658,6 @@ function getRisk(value) {
 
 }
 
-
 /* ============================================================
    GAUGE
    ============================================================ */
@@ -1175,7 +1688,9 @@ function updateGauge(
     !labelElement ||
     !locationElement
   ) {
+
     return;
+
   }
 
   if (
@@ -1197,6 +1712,7 @@ function updateGauge(
       subtitle || "—";
 
     return;
+
   }
 
   const risk =
@@ -1215,7 +1731,6 @@ function updateGauge(
     `${title || ""}${subtitle ? " | " + subtitle : ""}`;
 
 }
-
 
 /* ============================================================
    MAP
@@ -1238,14 +1753,13 @@ function initMap() {
     {
       maxZoom: 18,
       attribution:
-        "&copy; OpenStreetMap contributors"
+        "© OpenStreetMap contributors"
     }
   ).addTo(
     APP_STATE.map
   );
 
 }
-
 
 /* ============================================================
    FARS
@@ -1281,7 +1795,6 @@ async function loadFars() {
 
 }
 
-
 /* ============================================================
    FLI
    ============================================================ */
@@ -1308,11 +1821,17 @@ async function loadFLI() {
             "#777";
 
           return {
+
             color: color,
+
             weight: .15,
+
             opacity: .85,
+
             fillColor: color,
+
             fillOpacity: .72
+
           };
 
         },
@@ -1327,7 +1846,6 @@ async function loadFLI() {
   return APP_STATE.layers.fli;
 
 }
-
 
 /* ============================================================
    FLI METADATA
@@ -1355,7 +1873,6 @@ async function loadFLIData() {
   }
 
 }
-
 
 /* ============================================================
    GRID
@@ -1401,10 +1918,1332 @@ async function loadGrid() {
 
 }
 
+/* ============================================================
+   ARCHIVE DATE FORMAT
+   ============================================================ */
+
+function formatArchiveDate(
+  isoDate
+) {
+
+  const parts =
+    String(isoDate).split("-");
+
+  if (
+    parts.length !== 3
+  ) {
+
+    return String(isoDate);
+
+  }
+
+  const date =
+    new Date(
+      Number(parts[0]),
+      Number(parts[1]) - 1,
+      Number(parts[2]),
+      12,
+      0,
+      0
+    );
+
+  try {
+
+    return date.toLocaleDateString(
+      "fa-IR-u-ca-persian",
+      {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      }
+    );
+
+  } catch (error) {
+
+    return String(isoDate);
+
+  }
+
+}
+
+/* ============================================================
+   FORECAST BADGE
+   ============================================================ */
+
+/*
+ * اصلاح مهم:
+ *
+ * اگر currentArchiveDate = latest باشد،
+ * تاریخ تابلو فقط از setupTomorrowDate()
+ * گرفته می‌شود.
+ *
+ * بنابراین metadata قدیمی دیگر نمی‌تواند
+ * تاریخ تابلو را از فردا به امروز برگرداند.
+ *
+ * اگر یک تاریخ آرشیوی انتخاب شده باشد،
+ * همان تاریخ آرشیو نمایش داده می‌شود.
+ */
+
+function updateForecastBadgeFromMetadata() {
+
+  const badge =
+    document.getElementById(
+      "forecastDateBadge"
+    );
+
+  if (!badge) {
+    return;
+  }
+
+  /*
+   * حالت آخرین پیش‌بینی
+   */
+  if (
+    APP_STATE.data.currentArchiveDate ===
+    "latest"
+  ) {
+
+    setupTomorrowDate();
+
+    return;
+
+  }
+
+  /*
+   * حالت آرشیو
+   */
+  const archiveDate =
+    APP_STATE.data.currentArchiveDate;
+
+  if (
+    archiveDate &&
+    archiveDate !== "latest"
+  ) {
+
+    badge.textContent =
+      `پیش‌بینی برای ${formatArchiveDate(archiveDate)}`;
+
+    return;
+
+  }
+
+  /*
+   * fallback
+   */
+  setupTomorrowDate();
+
+}
+
+/* ============================================================
+   ARCHIVE EXCEL
+   ============================================================ */
+
+function releaseArchiveExcelObjectUrl() {
+
+  if (
+    APP_STATE.ui.excelObjectUrl
+  ) {
+
+    try {
+
+      URL.revokeObjectURL(
+        APP_STATE.ui.excelObjectUrl
+      );
+
+    } catch (error) {
+
+      console.warn(
+        "Excel object URL cleanup:",
+        error
+      );
+
+    }
+
+    APP_STATE.ui.excelObjectUrl =
+      null;
+
+  }
+
+}
+
+/* ============================================================
+   RESET EXCEL
+   ============================================================ */
+
+function resetExcelButtonToLatest() {
+
+  const button =
+    document.getElementById(
+      "excelButton"
+    );
+
+  if (!button) {
+    return;
+  }
+
+  releaseArchiveExcelObjectUrl();
+
+  button.href =
+    "data/report/firis_report.xlsx";
+
+  button.target =
+    "_blank";
+
+  button.removeAttribute(
+    "download"
+  );
+
+  button.title =
+    "خروجی Excel آخرین پیش‌بینی";
+
+}
+
+/* ============================================================
+   BUILD ARCHIVE EXCEL
+   ============================================================ */
+
+function buildArchiveExcelWorkbook() {
+
+  if (
+    typeof XLSX === "undefined"
+  ) {
+
+    throw new Error(
+      "کتابخانه Excel بارگذاری نشده است."
+    );
+
+  }
+
+  const metadata =
+    APP_STATE.data.fliMetadata || {};
+
+  const grid =
+    APP_STATE.data.fliGrid;
+
+  const archiveDate =
+    APP_STATE.data.currentArchiveDate;
+
+  if (
+    !archiveDate ||
+    archiveDate === "latest"
+  ) {
+
+    throw new Error(
+      "تاریخ آرشیو انتخاب نشده است."
+    );
+
+  }
+
+  if (
+    !grid ||
+    !Array.isArray(
+      grid.values
+    )
+  ) {
+
+    throw new Error(
+      "داده Grid آرشیو وجود ندارد."
+    );
+
+  }
+
+  const forecastDate =
+    metadata.forecast_date ||
+    metadata.target_date ||
+    archiveDate;
+
+  if (
+    String(forecastDate) !==
+    String(archiveDate)
+  ) {
+
+    throw new Error(
+      `تاریخ Metadata آرشیو (${forecastDate}) ` +
+      `با تاریخ انتخاب‌شده (${archiveDate}) یکسان نیست.`
+    );
+
+  }
+
+  const values = [];
+
+  for (
+    const row of grid.values
+  ) {
+
+    if (
+      !Array.isArray(row)
+    ) {
+
+      continue;
+
+    }
+
+    for (
+      const item of row
+    ) {
+
+      const number =
+        Number(item);
+
+      if (
+        Number.isFinite(number) &&
+        number >= 0 &&
+        number <= 100
+      ) {
+
+        values.push(
+          number
+        );
+
+      }
+
+    }
+
+  }
+
+  if (
+    values.length === 0
+  ) {
+
+    throw new Error(
+      "هیچ مقدار معتبر FLI در آرشیو پیدا نشد."
+    );
+
+  }
+
+  const sum =
+    values.reduce(
+      (
+        total,
+        value
+      ) => total + value,
+      0
+    );
+
+  const min =
+    Math.min(
+      ...values
+    );
+
+  const max =
+    Math.max(
+      ...values
+    );
+
+  const mean =
+    sum /
+    values.length;
+
+  const bounds =
+    parseBounds(
+      grid.bounds
+    );
+
+  const rows =
+    Number(grid.rows);
+
+  const cols =
+    Number(grid.cols);
+
+  const resolutionX =
+    bounds &&
+    cols > 0
+      ?
+        (
+          bounds.east -
+          bounds.west
+        ) /
+        cols
+      :
+        null;
+
+  const resolutionY =
+    bounds &&
+    rows > 0
+      ?
+        (
+          bounds.north -
+          bounds.south
+        ) /
+        rows
+      :
+        null;
+
+  const summaryRows = [
+
+    [
+      "گزارش خطر حریق استان فارس"
+    ],
+
+    [],
+
+    [
+      "تاریخ پیش‌بینی",
+      forecastDate
+    ],
+
+    [
+      "فایل FLI",
+      `fli_fars_${forecastDate}.tif`
+    ],
+
+    [
+      "سیستم مختصات",
+      metadata.crs ||
+      "EPSG:4326"
+    ],
+
+    [
+      "تعداد سلول معتبر",
+      values.length
+    ],
+
+    [
+      "حداقل FLI",
+      Number(
+        min.toFixed(2)
+      )
+    ],
+
+    [
+      "حداکثر FLI",
+      Number(
+        max.toFixed(2)
+      )
+    ],
+
+    [
+      "میانگین FLI",
+      Number(
+        mean.toFixed(2)
+      )
+    ],
+
+    [
+      "طبقه خطر استان",
+      getRisk(mean).label
+    ],
+
+    [
+      "رزولوشن X",
+      resolutionX !== null
+        ?
+          Number(
+            resolutionX.toFixed(9)
+          )
+        :
+          null
+    ],
+
+    [
+      "رزولوشن Y",
+      resolutionY !== null
+        ?
+          Number(
+            resolutionY.toFixed(9)
+          )
+        :
+          null
+    ]
+
+  ];
+
+  const classDefinitions = [
+
+    ["کم", 0, 20],
+
+    ["متوسط", 20, 40],
+
+    ["زیاد", 40, 60],
+
+    ["خیلی زیاد", 60, 80],
+
+    ["بحرانی", 80, 100.000001]
+
+  ];
+
+  const classRows = [
+
+    [
+      "طبقه خطر",
+      "حداقل FLI",
+      "حداکثر FLI",
+      "تعداد سلول",
+      "درصد از کل"
+    ]
+
+  ];
+
+  for (
+    const item of
+    classDefinitions
+  ) {
+
+    const label =
+      item[0];
+
+    const minimum =
+      item[1];
+
+    const maximum =
+      item[2];
+
+    const count =
+      values.filter(
+        value =>
+          value >= minimum &&
+          value < maximum
+      ).length;
+
+    const percent =
+      values.length > 0
+        ?
+          (
+            100 *
+            count /
+            values.length
+          )
+        :
+          0;
+
+    classRows.push(
+      [
+        label,
+        minimum,
+        Math.min(
+          maximum,
+          100
+        ),
+        count,
+        Number(
+          percent.toFixed(2)
+        )
+      ]
+    );
+
+  }
+
+  function collectRegionRows(
+    layer,
+    regionTitle
+  ) {
+
+    const rows = [
+
+      [
+        "ردیف",
+        "نام منطقه",
+        "نوع منطقه",
+        "میانگین FLI",
+        "حداقل FLI",
+        "حداکثر FLI",
+        "تعداد سلول معتبر",
+        "طبقه خطر"
+      ]
+
+    ];
+
+    if (!layer) {
+      return rows;
+    }
+
+    const features =
+      layer
+        .getLayers()
+        .map(
+          item =>
+            item.toGeoJSON()
+        );
+
+    features.forEach(
+      (
+        feature,
+        index
+      ) => {
+
+        const name =
+          getRegionName(
+            feature,
+            `${regionTitle} ${index + 1}`
+          );
+
+        const statistics =
+          regionStatistics(
+            feature
+          );
+
+        rows.push(
+          [
+
+            index + 1,
+
+            name,
+
+            regionTitle,
+
+            statistics
+              ?
+                Number(
+                  statistics.mean.toFixed(2)
+                )
+              :
+                null,
+
+            statistics
+              ?
+                Number(
+                  statistics.min.toFixed(2)
+                )
+              :
+                null,
+
+            statistics
+              ?
+                Number(
+                  statistics.max.toFixed(2)
+                )
+              :
+                null,
+
+            statistics
+              ?
+                statistics.count
+              :
+                0,
+
+            statistics
+              ?
+                getRisk(
+                  statistics.mean
+                ).label
+              :
+                "بدون داده"
+
+          ]
+        );
+
+      }
+    );
+
+    return rows;
+
+  }
+
+  const workbook =
+    XLSX.utils.book_new();
+
+  const summarySheet =
+    XLSX.utils.aoa_to_sheet(
+      summaryRows
+    );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    summarySheet,
+    "خلاصه"
+  );
+
+  const protectedRows =
+    collectRegionRows(
+      APP_STATE.layers.protected,
+      "مناطق چهارگانه"
+    );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(
+      protectedRows
+    ),
+    "مناطق_چهارگانه"
+  );
+
+  const huntingRows =
+    collectRegionRows(
+      APP_STATE.layers.hunting,
+      "مناطق شکار ممنوع"
+    );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(
+      huntingRows
+    ),
+    "مناطق_شکار_ممنوع"
+  );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(
+      classRows
+    ),
+    "طبقات_خطر"
+  );
+
+  const technicalRows = [
+
+    [
+      "CRS",
+      metadata.crs ||
+      "EPSG:4326"
+    ],
+
+    [
+      "Width",
+      cols
+    ],
+
+    [
+      "Height",
+      rows
+    ],
+
+    [
+      "Resolution X",
+      resolutionX !== null
+        ?
+          Number(
+            resolutionX.toFixed(9)
+          )
+        :
+          null
+    ],
+
+    [
+      "Resolution Y",
+      resolutionY !== null
+        ?
+          Number(
+            resolutionY.toFixed(9)
+          )
+        :
+          null
+    ],
+
+    [
+      "Left",
+      bounds?.west ?? null
+    ],
+
+    [
+      "Bottom",
+      bounds?.south ?? null
+    ],
+
+    [
+      "Right",
+      bounds?.east ?? null
+    ],
+
+    [
+      "Top",
+      bounds?.north ?? null
+    ],
+
+    [
+      "Forecast date",
+      forecastDate
+    ]
+
+  ];
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet(
+      technicalRows
+    ),
+    "اطلاعات_فنی"
+  );
+
+  return workbook;
+
+}
+
+/* ============================================================
+   PREPARE ARCHIVE EXCEL
+   ============================================================ */
+
+function prepareArchiveExcelButton() {
+
+  const button =
+    document.getElementById(
+      "excelButton"
+    );
+
+  if (!button) {
+    return;
+  }
+
+  const date =
+    APP_STATE.data.currentArchiveDate;
+
+  if (
+    !date ||
+    date === "latest"
+  ) {
+
+    resetExcelButtonToLatest();
+
+    return;
+
+  }
+
+  try {
+
+    const workbook =
+      buildArchiveExcelWorkbook();
+
+    const binary =
+      XLSX.write(
+        workbook,
+        {
+          bookType: "xlsx",
+          type: "array"
+        }
+      );
+
+    const blob =
+      new Blob(
+        [
+          binary
+        ],
+        {
+          type:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        }
+      );
+
+    releaseArchiveExcelObjectUrl();
+
+    const objectUrl =
+      URL.createObjectURL(
+        blob
+      );
+
+    APP_STATE.ui.excelObjectUrl =
+      objectUrl;
+
+    button.href =
+      objectUrl;
+
+    button.target =
+      "_blank";
+
+    button.download =
+      `firis_report_${date}.xlsx`;
+
+    button.title =
+      `گزارش Excel آرشیو ${formatArchiveDate(date)}`;
+
+  } catch (error) {
+
+    console.error(
+      "Archive Excel preparation error:",
+      error
+    );
+
+    releaseArchiveExcelObjectUrl();
+
+    button.href =
+      "#";
+
+    button.removeAttribute(
+      "download"
+    );
+
+    button.removeAttribute(
+      "target"
+    );
+
+    button.title =
+      "گزارش Excel آرشیو آماده نشد.";
+
+  }
+
+}
+
+/* ============================================================
+   LOAD ARCHIVE DATES
+   ============================================================ */
+
+async function loadArchiveDates() {
+
+  const select =
+    document.getElementById(
+      "archiveFilter"
+    );
+
+  if (!select) {
+    return;
+  }
+
+  try {
+
+    const response =
+      await fetchWithTimeout(
+        "data/web/archive/index.json"
+      );
+
+    const data =
+      await response.json();
+
+    const dates =
+      Array.isArray(data)
+        ?
+          data
+        :
+          Array.isArray(
+            data?.dates
+          )
+            ?
+              data.dates
+            :
+              [];
+
+    APP_STATE.data.archiveDates =
+      dates
+        .map(
+          item =>
+            typeof item === "string"
+              ?
+                item
+              :
+                item?.date
+        )
+        .filter(Boolean)
+        .sort();
+
+    select.innerHTML =
+      "";
+
+    const latestOption =
+      document.createElement(
+        "option"
+      );
+
+    latestOption.value =
+      "latest";
+
+    latestOption.textContent =
+      "آخرین پیش‌بینی";
+
+    select.appendChild(
+      latestOption
+    );
+
+    APP_STATE.data.archiveDates
+      .slice()
+      .reverse()
+      .forEach(
+        date => {
+
+          const option =
+            document.createElement(
+              "option"
+            );
+
+          option.value =
+            date;
+
+          option.textContent =
+            formatArchiveDate(
+              date
+            );
+
+          select.appendChild(
+            option
+          );
+
+        }
+      );
+
+  } catch (error) {
+
+    console.warn(
+      "FIRIS archive index unavailable:",
+      error
+    );
+
+  }
+
+}
+
+/* ============================================================
+   LOAD ARCHIVE FORECAST
+   ============================================================ */
+
+async function loadArchiveForecast(
+  date
+) {
+
+  /*
+   * ==========================================================
+   * LATEST
+   * ==========================================================
+   */
+
+  if (
+    !date ||
+    date === "latest"
+  ) {
+
+    await loadFLIData();
+
+    await loadGrid();
+
+    if (
+      APP_STATE.layers.fli &&
+      APP_STATE.map.hasLayer(
+        APP_STATE.layers.fli
+      )
+    ) {
+
+      APP_STATE.map.removeLayer(
+        APP_STATE.layers.fli
+      );
+
+    }
+
+    await loadFLI();
+
+    /*
+     * بسیار مهم:
+     * ابتدا currentArchiveDate روی latest قرار می‌گیرد،
+     * سپس badge فقط بر اساس تاریخ فردا تنظیم می‌شود.
+     */
+
+    APP_STATE.data.currentArchiveDate =
+      "latest";
+
+    updateForecastBadgeFromMetadata();
+
+    resetExcelButtonToLatest();
+
+    return;
+
+  }
+
+  /*
+   * ==========================================================
+   * ARCHIVE
+   * ==========================================================
+   */
+
+  const base =
+    `data/web/archive/${date}/`;
+
+  const responses =
+    await Promise.all([
+
+      fetchWithTimeout(
+        `${base}fli.json`
+      ),
+
+      fetchWithTimeout(
+        `${base}fli_grid.json`
+      ),
+
+      fetchWithTimeout(
+        `${base}fli_polygons.geojson`
+      )
+
+    ]);
+
+  const metadata =
+    await responses[0].json();
+
+  const grid =
+    await responses[1].json();
+
+  const polygons =
+    await responses[2].json();
+
+  const metadataDate =
+    metadata?.forecast_date ||
+    metadata?.target_date;
+
+  if (
+    String(metadataDate) !==
+    String(date)
+  ) {
+
+    throw new Error(
+      `تاریخ آرشیو اشتباه است: ` +
+      `انتخاب=${date}، داده=${metadataDate}`
+    );
+
+  }
+
+  if (
+    !grid ||
+    !Array.isArray(
+      grid.values
+    )
+  ) {
+
+    throw new Error(
+      "آرشیو Grid معتبر نیست."
+    );
+
+  }
+
+  if (
+    !polygons ||
+    polygons.type !==
+      "FeatureCollection"
+  ) {
+
+    throw new Error(
+      "آرشیو FLI معتبر نیست."
+    );
+
+  }
+
+  APP_STATE.data.fliMetadata =
+    metadata;
+
+  APP_STATE.data.fliGrid =
+    grid;
+
+  APP_STATE.data.currentArchiveDate =
+    date;
+
+  if (
+    APP_STATE.layers.fli &&
+    APP_STATE.map.hasLayer(
+      APP_STATE.layers.fli
+    )
+  ) {
+
+    APP_STATE.map.removeLayer(
+      APP_STATE.layers.fli
+    );
+
+  }
+
+  APP_STATE.layers.fli =
+    L.geoJSON(
+      polygons,
+      {
+
+        style: feature => {
+
+          const color =
+            feature.properties?.color ||
+            "#777";
+
+          return {
+
+            color: color,
+
+            weight: .15,
+
+            opacity: .85,
+
+            fillColor: color,
+
+            fillOpacity: .72
+
+          };
+
+        },
+
+        interactive: false
+
+      }
+    );
+
+  APP_STATE.layers.fli.addTo(
+    APP_STATE.map
+  );
+
+  /*
+   * در آرشیو، تاریخ انتخاب‌شده نمایش داده می‌شود.
+   */
+
+  updateForecastBadgeFromMetadata();
+
+  prepareArchiveExcelButton();
+
+}
+
+/* ============================================================
+   ARCHIVE FILTER
+   ============================================================ */
+
+function setupArchiveFilter() {
+
+  const select =
+    document.getElementById(
+      "archiveFilter"
+    );
+
+  const button =
+    document.getElementById(
+      "archiveBtn"
+    );
+
+  const menu =
+    document.getElementById(
+      "archiveMenu"
+    );
+
+  if (
+    !select ||
+    !button ||
+    !menu
+  ) {
+
+    return;
+
+  }
+
+  button.addEventListener(
+    "click",
+    event => {
+
+      event.stopPropagation();
+
+      const locationMenu =
+        document.getElementById(
+          "layersMenu"
+        );
+
+      if (locationMenu) {
+
+        locationMenu.classList.remove(
+          "show"
+        );
+
+      }
+
+      menu.classList.toggle(
+        "show"
+      );
+
+    }
+  );
+
+  menu.addEventListener(
+    "click",
+    event => {
+
+      event.stopPropagation();
+
+    }
+  );
+
+  select.addEventListener(
+    "change",
+    async event => {
+
+      const date =
+        event.target.value;
+
+      try {
+
+        await loadArchiveForecast(
+          date
+        );
+
+      } catch (error) {
+
+        console.error(
+          "FIRIS archive error:",
+          error
+        );
+
+        select.value =
+          APP_STATE.data.currentArchiveDate ||
+          "latest";
+
+        if (
+          APP_STATE.data.currentArchiveDate ===
+          "latest"
+        ) {
+
+          resetExcelButtonToLatest();
+
+          setupTomorrowDate();
+
+        }
+
+      }
+
+    }
+  );
+
+  document.addEventListener(
+    "click",
+    event => {
+
+      if (
+        !menu.contains(
+          event.target
+        ) &&
+        !button.contains(
+          event.target
+        )
+      ) {
+
+        menu.classList.remove(
+          "show"
+        );
+
+      }
+
+    }
+  );
+
+}
+
+/* ============================================================
+   EXCEL BUTTON
+   ============================================================ */
+
+function setupExcelButton() {
+
+  const button =
+    document.getElementById(
+      "excelButton"
+    );
+
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener(
+    "click",
+    event => {
+
+      const currentDate =
+        APP_STATE.data.currentArchiveDate;
+
+      if (
+        currentDate &&
+        currentDate !== "latest"
+      ) {
+
+        if (
+          !button.href ||
+          button.href === "#" ||
+          !APP_STATE.ui.excelObjectUrl
+        ) {
+
+          event.preventDefault();
+
+          prepareArchiveExcelButton();
+
+        }
+
+      }
+
+    }
+  );
+
+}
 
 /* ============================================================
    PROTECTED
-   مناطق چهارگانه
    ============================================================ */
 
 async function loadProtected() {
@@ -1423,15 +3262,24 @@ async function loadProtected() {
       {
 
         style: {
+
           color: "#1565c0",
+
           weight: 1.7,
+
           opacity: .95,
+
           fillColor: "#42a5f5",
+
           fillOpacity: .10
+
         },
 
         onEachFeature:
-          (feature, layer) => {
+          (
+            feature,
+            layer
+          ) => {
 
             bindRegion(
               feature,
@@ -1448,10 +3296,8 @@ async function loadProtected() {
 
 }
 
-
 /* ============================================================
    HUNTING
-   مناطق شکار ممنوع
    ============================================================ */
 
 async function loadHunting() {
@@ -1470,15 +3316,24 @@ async function loadHunting() {
       {
 
         style: {
+
           color: "#7b1fa2",
+
           weight: 1.7,
+
           opacity: .95,
+
           fillColor: "#ab47bc",
+
           fillOpacity: .10
+
         },
 
         onEachFeature:
-          (feature, layer) => {
+          (
+            feature,
+            layer
+          ) => {
 
             bindRegion(
               feature,
@@ -1495,18 +3350,21 @@ async function loadHunting() {
 
 }
 
-
 /* ============================================================
    BOUNDS
    ============================================================ */
 
-function parseBounds(bounds) {
+function parseBounds(
+  bounds
+) {
 
   if (
     !Array.isArray(bounds) ||
     bounds.length < 2
   ) {
+
     return null;
+
   }
 
   const a =
@@ -1521,7 +3379,9 @@ function parseBounds(bounds) {
     a.length < 2 ||
     b.length < 2
   ) {
+
     return null;
+
   }
 
   const y1 =
@@ -1542,27 +3402,40 @@ function parseBounds(bounds) {
     !Number.isFinite(y2) ||
     !Number.isFinite(x2)
   ) {
+
     return null;
+
   }
 
   return {
 
     south:
-      Math.min(y1, y2),
+      Math.min(
+        y1,
+        y2
+      ),
 
     north:
-      Math.max(y1, y2),
+      Math.max(
+        y1,
+        y2
+      ),
 
     west:
-      Math.min(x1, x2),
+      Math.min(
+        x1,
+        x2
+      ),
 
     east:
-      Math.max(x1, x2)
+      Math.max(
+        x1,
+        x2
+      )
 
   };
 
 }
-
 
 /* ============================================================
    COORDINATES
@@ -1574,19 +3447,25 @@ function validateCoords(
 ) {
 
   return (
+
     Number.isFinite(lat) &&
+
     Number.isFinite(lon) &&
+
     lat >= -90 &&
+
     lat <= 90 &&
+
     lon >= -180 &&
+
     lon <= 180
+
   );
 
 }
 
-
 /* ============================================================
-   GRID CELL VALUE
+   GRID CELL
    ============================================================ */
 
 function getPointValue(
@@ -1600,14 +3479,18 @@ function getPointValue(
       lon
     )
   ) {
+
     return null;
+
   }
 
   const grid =
     APP_STATE.data.fliGrid;
 
   if (!grid) {
+
     return null;
+
   }
 
   const bounds =
@@ -1616,7 +3499,9 @@ function getPointValue(
     );
 
   if (!bounds) {
+
     return null;
+
   }
 
   const rows =
@@ -1630,9 +3515,13 @@ function getPointValue(
     !Number.isInteger(cols) ||
     rows <= 0 ||
     cols <= 0 ||
-    !Array.isArray(grid.values)
+    !Array.isArray(
+      grid.values
+    )
   ) {
+
     return null;
+
   }
 
   const {
@@ -1643,16 +3532,20 @@ function getPointValue(
   } = bounds;
 
   const latRange =
-    north - south;
+    north -
+    south;
 
   const lonRange =
-    east - west;
+    east -
+    west;
 
   if (
     latRange <= 0 ||
     lonRange <= 0
   ) {
+
     return null;
+
   }
 
   if (
@@ -1661,7 +3554,9 @@ function getPointValue(
     lon < west ||
     lon > east
   ) {
+
     return null;
+
   }
 
   let row =
@@ -1669,7 +3564,8 @@ function getPointValue(
       (
         (north - lat) /
         latRange
-      ) * rows
+      ) *
+      rows
     );
 
   let col =
@@ -1677,7 +3573,8 @@ function getPointValue(
       (
         (lon - west) /
         lonRange
-      ) * cols
+      ) *
+      cols
     );
 
   row =
@@ -1708,13 +3605,14 @@ function getPointValue(
     value >= 0 &&
     value <= 100
   ) {
+
     return value;
+
   }
 
   return null;
 
 }
-
 
 /* ============================================================
    POINT INSIDE FARS
@@ -1727,9 +3625,14 @@ function pointInsideFars(
 
   if (
     !APP_STATE.layers.fars ||
-    !validateCoords(lat, lon)
+    !validateCoords(
+      lat,
+      lon
+    )
   ) {
+
     return false;
+
   }
 
   const point =
@@ -1770,7 +3673,6 @@ function pointInsideFars(
 
 }
 
-
 /* ============================================================
    REGION STATISTICS
    ============================================================ */
@@ -1783,7 +3685,9 @@ function regionStatistics(
     APP_STATE.data.fliGrid;
 
   if (!grid) {
+
     return null;
+
   }
 
   const bounds =
@@ -1792,7 +3696,9 @@ function regionStatistics(
     );
 
   if (!bounds) {
+
     return null;
+
   }
 
   const rows =
@@ -1806,9 +3712,13 @@ function regionStatistics(
     !Number.isInteger(cols) ||
     rows <= 0 ||
     cols <= 0 ||
-    !Array.isArray(grid.values)
+    !Array.isArray(
+      grid.values
+    )
   ) {
+
     return null;
+
   }
 
   let bbox;
@@ -1828,13 +3738,16 @@ function regionStatistics(
     );
 
     return null;
+
   }
 
   if (
     !Array.isArray(bbox) ||
     bbox.length !== 4
   ) {
+
     return null;
+
   }
 
   const minLon =
@@ -1857,28 +3770,29 @@ function regionStatistics(
   } = bounds;
 
   const latRange =
-    north - south;
+    north -
+    south;
 
   const lonRange =
-    east - west;
+    east -
+    west;
 
   if (
     latRange <= 0 ||
     lonRange <= 0
   ) {
-    return null;
-  }
 
-  /*
-   * تبدیل Bounding Box به محدوده Grid
-   */
+    return null;
+
+  }
 
   let startRow =
     Math.floor(
       (
         (north - maxLat) /
         latRange
-      ) * rows
+      ) *
+      rows
     );
 
   let endRow =
@@ -1886,7 +3800,8 @@ function regionStatistics(
       (
         (north - minLat) /
         latRange
-      ) * rows
+      ) *
+      rows
     ) - 1;
 
   let startCol =
@@ -1894,7 +3809,8 @@ function regionStatistics(
       (
         (minLon - west) /
         lonRange
-      ) * cols
+      ) *
+      cols
     );
 
   let endCol =
@@ -1902,12 +3818,9 @@ function regionStatistics(
       (
         (maxLon - west) /
         lonRange
-      ) * cols
+      ) *
+      cols
     ) - 1;
-
-  /*
-   * محدود کردن به Grid
-   */
 
   startRow =
     Math.max(
@@ -1949,17 +3862,18 @@ function regionStatistics(
     startRow > endRow ||
     startCol > endCol
   ) {
+
     return null;
+
   }
 
   let sum = 0;
-  let count = 0;
-  let min = Infinity;
-  let max = -Infinity;
 
-  /*
-   * بررسی مرکز سلول‌ها
-   */
+  let count = 0;
+
+  let min = Infinity;
+
+  let max = -Infinity;
 
   for (
     let row = startRow;
@@ -1991,7 +3905,9 @@ function regionStatistics(
         value < 0 ||
         value > 100
       ) {
+
         continue;
+
       }
 
       const lon =
@@ -2017,18 +3933,23 @@ function regionStatistics(
         ) {
 
           sum += value;
+
           count++;
 
           if (
             value < min
           ) {
+
             min = value;
+
           }
 
           if (
             value > max
           ) {
+
             max = value;
+
           }
 
         }
@@ -2049,7 +3970,9 @@ function regionStatistics(
   if (
     count === 0
   ) {
+
     return null;
+
   }
 
   return {
@@ -2069,7 +3992,6 @@ function regionStatistics(
   };
 
 }
-
 
 /* ============================================================
    REGION NAME
@@ -2113,14 +4035,15 @@ function getRegionName(
       );
 
   return found
-    ? String(found)
-    : fallback;
+    ?
+      String(found)
+    :
+      fallback;
 
 }
 
-
 /* ============================================================
-   REGION TYPE TITLE
+   REGION TYPE
    ============================================================ */
 
 function getRegionTypeTitle(
@@ -2147,7 +4070,6 @@ function getRegionTypeTitle(
 
 }
 
-
 /* ============================================================
    REGION POPUP
    ============================================================ */
@@ -2163,18 +4085,11 @@ function bindRegion(
       regionType
     );
 
-  const fallback =
-    regionTypeTitle;
-
   const name =
     getRegionName(
       feature,
-      fallback
+      regionTypeTitle
     );
-
-  /*
-   * محاسبه واقعی FLI
-   */
 
   const statistics =
     regionStatistics(
@@ -2183,8 +4098,10 @@ function bindRegion(
 
   const mean =
     statistics
-      ? statistics.mean
-      : null;
+      ?
+        statistics.mean
+      :
+        null;
 
   const risk =
     getRisk(
@@ -2214,6 +4131,7 @@ function bindRegion(
         Number.isFinite(mean)
         ?
         `
+
         <div class="popup-value">
           میانگین شاخص خطر:
           ${formatNumber(mean)}
@@ -2231,12 +4149,15 @@ function bindRegion(
           حداکثر:
           ${formatNumber(statistics.max)}
         </div>
+
         `
         :
         `
+
         <div class="popup-value">
           برای این محدوده داده خطر موجود نیست.
         </div>
+
         `
       }
 
@@ -2255,11 +4176,6 @@ function bindRegion(
     "click",
     () => {
 
-      /*
-       * Gauge دقیقاً همان Polygon
-       * و همان نوع منطقه را نشان می‌دهد.
-       */
-
       updateGauge(
         mean,
         name,
@@ -2270,7 +4186,6 @@ function bindRegion(
   );
 
 }
-
 
 /* ============================================================
    MAP CLICK
@@ -2288,19 +4203,18 @@ function setupMapClick() {
       const lon =
         event.latlng.lng;
 
-      /*
-       * اگر فیلتر فعال است:
-       * فقط داخل همان نوع محدوده اجازه کلیک داریم.
-       */
-
       if (
-        APP_STATE.ui.locationFilter !== "all"
+        APP_STATE.ui.locationFilter !==
+        "all"
       ) {
 
         const activeLayer =
-          APP_STATE.ui.locationFilter === "protected"
-            ? APP_STATE.layers.protected
-            : APP_STATE.layers.hunting;
+          APP_STATE.ui.locationFilter ===
+          "protected"
+            ?
+              APP_STATE.layers.protected
+            :
+              APP_STATE.layers.hunting;
 
         if (!activeLayer) {
           return;
@@ -2311,7 +4225,8 @@ function setupMapClick() {
             [lon, lat]
           );
 
-        let inside = false;
+        let inside =
+          false;
 
         for (
           const layer of
@@ -2328,6 +4243,7 @@ function setupMapClick() {
             ) {
 
               inside = true;
+
               break;
 
             }
@@ -2347,9 +4263,7 @@ function setupMapClick() {
           return;
         }
 
-      }
-
-      else {
+      } else {
 
         if (
           !pointInsideFars(
@@ -2357,7 +4271,9 @@ function setupMapClick() {
             lon
           )
         ) {
+
           return;
+
         }
 
       }
@@ -2368,18 +4284,21 @@ function setupMapClick() {
           lon
         );
 
-      /*
-       * عنوان Gauge در حالت کل استان
-       */
-
       updateGauge(
+
         value,
-        APP_STATE.ui.locationFilter === "all"
-          ? "استان فارس"
-          : getRegionTypeTitle(
+
+        APP_STATE.ui.locationFilter ===
+          "all"
+          ?
+            "استان فارس"
+          :
+            getRegionTypeTitle(
               APP_STATE.ui.locationFilter
             ),
+
         `${lat.toFixed(4)}° ، ${lon.toFixed(4)}°`
+
       );
 
       if (
@@ -2387,7 +4306,9 @@ function setupMapClick() {
           Number(value)
         )
       ) {
+
         return;
+
       }
 
       const risk =
@@ -2440,7 +4361,6 @@ function setupMapClick() {
 
 }
 
-
 /* ============================================================
    LAYER VISIBILITY
    ============================================================ */
@@ -2486,7 +4406,6 @@ function setLayerVisible(
 
 }
 
-
 /* ============================================================
    FIT FARS
    ============================================================ */
@@ -2497,7 +4416,9 @@ function fitFars() {
     !APP_STATE.layers.fars ||
     !APP_STATE.map
   ) {
+
     return;
+
   }
 
   const bounds =
@@ -2506,7 +4427,9 @@ function fitFars() {
   if (
     !bounds.isValid()
   ) {
+
     return;
+
   }
 
   APP_STATE.map.fitBounds(
@@ -2529,7 +4452,6 @@ function fitFars() {
 
 }
 
-
 /* ============================================================
    FIT LAYER
    ============================================================ */
@@ -2539,8 +4461,11 @@ function fitLayer(
 ) {
 
   if (!layer) {
+
     fitFars();
+
     return;
+
   }
 
   const bounds =
@@ -2551,6 +4476,7 @@ function fitLayer(
   ) {
 
     fitFars();
+
     return;
 
   }
@@ -2565,7 +4491,6 @@ function fitLayer(
   );
 
 }
-
 
 /* ============================================================
    UPDATE FILTER GAUGE
@@ -2593,9 +4518,14 @@ function updateFilterGauge(
 
   }
 
-  let totalWeighted = 0;
-  let totalCells = 0;
-  let regionCount = 0;
+  let totalWeighted =
+    0;
+
+  let totalCells =
+    0;
+
+  let regionCount =
+    0;
 
   for (
     const regionLayer of
@@ -2605,31 +4535,29 @@ function updateFilterGauge(
     const feature =
       regionLayer.toGeoJSON();
 
-    const stats =
+    const statistics =
       regionStatistics(
         feature
       );
 
     if (
-      !stats ||
+      !statistics ||
       !Number.isFinite(
-        stats.mean
+        statistics.mean
       ) ||
-      stats.count <= 0
+      statistics.count <= 0
     ) {
+
       continue;
+
     }
 
-    /*
-     * میانگین وزنی بر اساس تعداد سلول‌ها
-     */
-
     totalWeighted +=
-      stats.mean *
-      stats.count;
+      statistics.mean *
+      statistics.count;
 
     totalCells +=
-      stats.count;
+      statistics.count;
 
     regionCount++;
 
@@ -2661,7 +4589,6 @@ function updateFilterGauge(
 
 }
 
-
 /* ============================================================
    LOCATION FILTER
    ============================================================ */
@@ -2670,40 +4597,34 @@ function applyLocationFilter(
   value
 ) {
 
-  /*
-   * فقط مقادیر معتبر پذیرفته می‌شوند.
-   */
-
   const validValues = [
+
     "all",
+
     "protected",
+
     "hunting"
+
   ];
 
   if (
-    !validValues.includes(value)
+    !validValues.includes(
+      value
+    )
   ) {
 
-    value = "all";
+    value =
+      "all";
 
   }
 
   APP_STATE.ui.locationFilter =
     value;
 
-  /*
-   * FLI همیشه نمایش داده می‌شود.
-   */
-
   setLayerVisible(
     APP_STATE.layers.fli,
     true
   );
-
-  /*
-   * ابتدا هر دو لایه منطقه‌ای
-   * خاموش می‌شوند.
-   */
 
   setLayerVisible(
     APP_STATE.layers.protected,
@@ -2714,10 +4635,6 @@ function applyLocationFilter(
     APP_STATE.layers.hunting,
     false
   );
-
-  /*
-   * کل استان
-   */
 
   if (
     value === "all"
@@ -2734,10 +4651,6 @@ function applyLocationFilter(
     return;
 
   }
-
-  /*
-   * مناطق شکارممنوع
-   */
 
   if (
     value === "protected"
@@ -2760,10 +4673,6 @@ function applyLocationFilter(
     return;
 
   }
-
-  /*
-   * مناطق چهارگانه
-   */
 
   if (
     value === "hunting"
@@ -2789,9 +4698,8 @@ function applyLocationFilter(
 
 }
 
-
 /* ============================================================
-   FILTER UI
+   LOCATION FILTER UI
    ============================================================ */
 
 function setupLocationFilter() {
@@ -2816,7 +4724,9 @@ function setupLocationFilter() {
     !menu ||
     !select
   ) {
+
     return;
+
   }
 
   button.addEventListener(
@@ -2824,6 +4734,19 @@ function setupLocationFilter() {
     event => {
 
       event.stopPropagation();
+
+      const archiveMenu =
+        document.getElementById(
+          "archiveMenu"
+        );
+
+      if (archiveMenu) {
+
+        archiveMenu.classList.remove(
+          "show"
+        );
+
+      }
 
       menu.classList.toggle(
         "show"
@@ -2880,7 +4803,6 @@ function setupLocationFilter() {
 
 }
 
-
 /* ============================================================
    FIT BUTTON
    ============================================================ */
@@ -2906,7 +4828,10 @@ function setupFitButton() {
         );
 
       if (select) {
-        select.value = "all";
+
+        select.value =
+          "all";
+
       }
 
       applyLocationFilter(
@@ -2918,9 +4843,8 @@ function setupFitButton() {
 
 }
 
-
 /* ============================================================
-   NIGHT
+   NIGHT MODE
    ============================================================ */
 
 function setupNightMode() {
@@ -2948,19 +4872,22 @@ function setupNightMode() {
 
       button.textContent =
         APP_STATE.ui.nightMode
-          ? "🌙"
-          : "☀️";
+          ?
+            "🌙"
+          :
+            "☀️";
 
       button.title =
         APP_STATE.ui.nightMode
-          ? "حالت روز"
-          : "حالت شب";
+          ?
+            "حالت روز"
+          :
+            "حالت شب";
 
     }
   );
 
 }
-
 
 /* ============================================================
    ABOUT
@@ -2988,7 +4915,9 @@ function setupAbout() {
     !openButton ||
     !closeButton
   ) {
+
     return;
+
   }
 
   openButton.addEventListener(
@@ -3049,7 +4978,6 @@ function setupAbout() {
 
 }
 
-
 /* ============================================================
    START
    ============================================================ */
@@ -3058,43 +4986,32 @@ async function startApp() {
 
   try {
 
+    /*
+     * ابتدا تاریخ فردا را نمایش بده
+     */
     setupTomorrowDate();
 
     initMap();
 
-    /*
-     * Grid و Metadata اختیاری هستند.
-     */
-
     await Promise.all([
-      loadFLIData(),
-      loadGrid()
-    ]);
 
-    /*
-     * مرز استان
-     */
+      loadFLIData(),
+
+      loadGrid()
+
+    ]);
 
     await loadFars();
 
-    /*
-     * لایه FLI
-     */
-
     await loadFLI();
 
-    /*
-     * لایه‌های مناطق
-     */
-
     await Promise.all([
-      loadProtected(),
-      loadHunting()
-    ]);
 
-    /*
-     * وضعیت اولیه
-     */
+      loadProtected(),
+
+      loadHunting()
+
+    ]);
 
     setLayerVisible(
       APP_STATE.layers.fli,
@@ -3111,13 +5028,11 @@ async function startApp() {
       false
     );
 
-    /*
-     * رویدادها
-     */
-
     setupMapClick();
 
     setupLocationFilter();
+
+    setupArchiveFilter();
 
     setupFitButton();
 
@@ -3125,9 +5040,26 @@ async function startApp() {
 
     setupAbout();
 
+    setupExcelButton();
+
+    await loadArchiveDates();
+
     /*
-     * نمایش کل استان
+     * مهم:
+     *
+     * اینجا دیگر metadata اجازه ندارد
+     * تاریخ latest را overwrite کند.
+     *
+     * چون حالت اولیه latest است،
+     * تاریخ تابلو = فردای ایران.
      */
+
+    APP_STATE.data.currentArchiveDate =
+      "latest";
+
+    updateForecastBadgeFromMetadata();
+
+    resetExcelButtonToLatest();
 
     fitFars();
 
@@ -3159,19 +5091,35 @@ async function startApp() {
       );
 
     message.style.cssText = `
+
       position:fixed;
+
       top:110px;
+
       left:50%;
+
       transform:translateX(-50%);
+
       z-index:9999;
+
       background:#b40000;
+
       color:white;
+
       padding:12px 20px;
+
       border-radius:8px;
+
       font-family:Tahoma;
+
       font-size:13px;
-      box-shadow:0 4px 15px rgba(0,0,0,.25);
+
+      box-shadow:
+        0 4px 15px
+        rgba(0,0,0,.25);
+
       direction:rtl;
+
     `;
 
     message.textContent =
@@ -3185,7 +5133,6 @@ async function startApp() {
 
 }
 
-
 /* ============================================================
    DOM READY
    ============================================================ */
@@ -3198,4 +5145,5 @@ document.addEventListener(
 </script>
 
 </body>
+
 </html>
